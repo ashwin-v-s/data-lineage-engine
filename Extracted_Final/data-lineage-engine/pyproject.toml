@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "data-lineage-engine"
+version = "0.0.1"
+description = "Kairos: bitemporal lineage engine with coverage-aware execution-conditioned reasoning (research prototype)"
+requires-python = ">=3.11"
+dependencies = [
+    "sqlglot>=30.18.0",    # M1: Static lineage extraction
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+# Exact versions are NOT YET FROZEN: freeze at the first working build (Pack Section 42).
+
+[tool.setuptools.packages.find]
+include = ["contracts*", "research*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

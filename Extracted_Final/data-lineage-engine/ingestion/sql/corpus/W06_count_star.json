@@ -1,0 +1,19 @@
+{
+  "case_id": "W06_count_star",
+  "description": "COUNT(*) must emit dataset-level evidence only, never column edges",
+  "sql": "SELECT COUNT(*) AS row_count FROM orders",
+  "dialect": "postgres",
+  "schema": {
+    "orders": {
+      "id": "int",
+      "amount": "numeric"
+    }
+  },
+  "target_dataset": "orders",
+  "expected": {
+    "row_count": []
+  },
+  "expected_granularity": "DATASET",
+  "notes": "Hand-derived by M1. COUNT(*) depends on the dataset as a whole, not any specific column. Evidence should be granularity=DATASET, source_column_id=null, target_column_id=null.",
+  "is_mock": false
+}
