@@ -1,0 +1,23 @@
+{
+  "case_id": "W05_join_alias",
+  "description": "INNER JOIN with table aliases - must resolve aliases to real table names",
+  "sql": "SELECT o.order_id, c.name FROM orders o INNER JOIN customers c ON o.customer_id = c.id",
+  "dialect": "postgres",
+  "schema": {
+    "orders": {
+      "order_id": "int",
+      "customer_id": "int"
+    },
+    "customers": {
+      "id": "int",
+      "name": "text"
+    }
+  },
+  "target_dataset": "orders",
+  "expected": {
+    "order_id": ["orders.order_id"],
+    "name": ["customers.name"]
+  },
+  "notes": "Hand-derived by M1. Aliases 'o' and 'c' must resolve to 'orders' and 'customers'. Output columns depend on their respective source tables.",
+  "is_mock": false
+}

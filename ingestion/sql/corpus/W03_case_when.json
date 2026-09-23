@@ -1,0 +1,20 @@
+{
+  "case_id": "W03_case_when",
+  "description": "CASE WHEN with condition and branch columns",
+  "sql": "SELECT CASE WHEN country = 'US' THEN salary ELSE 0 END AS adjusted_salary FROM employees",
+  "dialect": "postgres",
+  "schema": {
+    "employees": {
+      "id": "int",
+      "name": "text",
+      "country": "text",
+      "salary": "int"
+    }
+  },
+  "target_dataset": "employees",
+  "expected": {
+    "adjusted_salary": ["employees.country", "employees.salary"]
+  },
+  "notes": "Hand-derived by M1. CASE condition (country='US') and branch (salary) both feed output. Both columns required for complete understanding.",
+  "is_mock": false
+}
