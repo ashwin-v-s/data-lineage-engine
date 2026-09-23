@@ -1,0 +1,100 @@
+# Kairos Research Protocol v1
+# Pack Section 42.  MUST be committed before the full experiment run.
+# Status: SKELETON — many values are TBD pending team decisions.
+#
+# Frozen values are marked LOCKED.
+# Values awaiting team decision are marked TBD + decision reference.
+# Plumbing-only defaults are marked PLUMBING.
+#
+# Rules:
+#   - Do not invent a TBD value to make this file look complete.
+#   - A real (non-plumbing) experiment run must fail if any required field is TBD.
+#   - Changing a LOCKED value requires a decision record in docs/DECISION_LOG.md.
+
+protocol_version: "1.0-skeleton"          # bump when any field changes
+
+# ---------------------------------------------------------------------------
+# Benchmark
+# ---------------------------------------------------------------------------
+benchmark_version: TBD                    # frozen when case files are committed (M4+M1+M2)
+benchmark_path: "research/benchmarks/"    # PLUMBING: points to fixture for now
+sql_subset: TBD                           # list of supported SQL constructs (M1 confirms)
+splits:
+  development: TBD                        # D-07: case IDs assigned to dev split
+  validation: TBD                         # D-07
+  held_out: TBD                           # D-07 — do NOT tune on these
+
+# ---------------------------------------------------------------------------
+# Semantics and prediction unit
+# ---------------------------------------------------------------------------
+contribution_semantics: TBD              # D-11: where-provenance or why-provenance
+prediction_unit_universe: TBD           # D-12: static-candidates + positive-evidence pairs
+
+# ---------------------------------------------------------------------------
+# Loss model
+# ---------------------------------------------------------------------------
+loss:
+  mechanisms: [mcar, operator, dataset, branch, complete_run, correlated]
+  levels: [0, 10, 30, 50, 70, 90]
+  master_seed: TBD
+  replicates: TBD
+  rounding_rule: TBD
+  zero_arrival_semantics: TBD
+
+# ---------------------------------------------------------------------------
+# Methods
+# ---------------------------------------------------------------------------
+baselines: [B1, B2, B3, B4, B5]         # LOCKED names (Pack Section 23)
+proposed: proposed                        # the FourStateEngine
+
+# ---------------------------------------------------------------------------
+# Metrics
+# ---------------------------------------------------------------------------
+metrics:
+  primary: TBD                           # D-05 / D-08: team confirms primary metric
+  secondary:
+    - false_refutation                   # key research metric
+    - false_observation
+    - correct_refutation
+    - precision_strict
+    - precision_lenient
+    - recall_strict
+    - recall_lenient
+    - unknown_rate
+    - possible_rate
+    - committed_accuracy
+    - query_exact_strict
+    - query_jaccard_strict
+  confidence_interval: TBD              # D-08: bootstrap / Wilson / etc.
+  na_rule: "zero_denominator_is_NA"     # LOCKED (implemented in metrics.py)
+  granularity_separation: true          # LOCKED: DATASET and COLUMN scored separately (AQ-4)
+
+# ---------------------------------------------------------------------------
+# Evaluation rules
+# ---------------------------------------------------------------------------
+aggregation: TBD                         # across cases / loss levels (D-05)
+stopping_rule: TBD                       # result classification: Supported/Inconclusive/Rejected (D-05)
+exclusion_rules: TBD                     # how unsupported cases are handled
+
+# ---------------------------------------------------------------------------
+# Output
+# ---------------------------------------------------------------------------
+output_format: "json"                    # PLUMBING default; full format TBD
+output_path: "research/results/"
+
+# ---------------------------------------------------------------------------
+# Research integrity
+# ---------------------------------------------------------------------------
+ground_truth_isolation: true             # LOCKED: GT loaded only after predictions exist
+no_held_out_tuning: true                # LOCKED: do not tune on held-out cases
+no_gt_in_predictor: true                # LOCKED: engine/baselines never receive GT objects
+
+# ---------------------------------------------------------------------------
+# Environment (filled at run time by the runner)
+# ---------------------------------------------------------------------------
+environment:
+  python_version: TBD                   # recorded at run time
+  platform: TBD                         # recorded at run time
+  git_sha: TBD                          # recorded at run time
+  db_version: TBD                       # N/A for plumbing; filled when PostgreSQL is wired
+  provider_version: TBD                 # ground-truth provider version (M2)
