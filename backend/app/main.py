@@ -1,54 +1,56 @@
+from fastapi import FastAPI, Request
 import uuid
 
-from fastapi import FastAPI, Request
-from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
-from pydantic import BaseModel
-
-from contracts.evidence import PredictorInput
-from contracts.mocks.loaders import load_case
-from research.reasoning.engine import FourStateEngine
-
-app = FastAPI(title="Kairos API", version="0.0.1")
+from backend.app.api.errors import api_error
+from backend.app.api.routes.health import router as health_router
+from backend.app.api.routes.search import router as search_router
+from backend.app.api.routes.assets import router as assets_router
+from backend.app.api.routes.lineage import router as lineage_router
 
 
-class ApiError(Exception):
-    def __init__(self, status: int, code: str, message: str, details: dict | None = None):
-        self.status, self.code, self.message, self.details = status, code, message, details or {}
+app = FastAPI(
+    title="KAIROS API",
+    version="1.0.0",
+)
 
 
-def error_body(code: str, message: str, details: dict | None = None) -> dict:
-    return {"error": {"code": code, "message": message, "details": details or {}, "request_id": str(uuid.uuid4())}}
+@app.middleware("http")
+async def add_request_id(request: Request, call_next):
+    request_id = request.headers.get("X-Request-ID") or str(uuid.uuid4())
+
+    response = await call_next(request)
+
+    response.headers["X-Request-ID"] = request_id
+
+    return response
 
 
-@app.exception_handler(ApiError)
-async def api_error_handler(request: Request, exc: ApiError):
-    return JSONResponse(status_code=exc.status, content=error_body(exc.code, exc.message, exc.details))
+@app.exception_handler(404)
+async def not_found_handler(request: Request, exc):
+    return api_error(
+        request=request,
+        message="The requested resource was not found",
+        status_code=404,
+        code="NOT_FOUND",
+    )
 
 
-@app.exception_handler(RequestValidationError)
-async def validation_handler(request: Request, exc: RequestValidationError):
-    return JSONResponse(status_code=422, content=error_body("VALIDATION_ERROR", "Invalid request", {"errors": exc.errors()}))
+app.include_router(
+    health_router,
+    prefix="/api/v1",
+)
 
+app.include_router(
+    search_router,
+    prefix="/api/v1",
+)
 
-class HealthResponse(BaseModel):
-    status: str
+app.include_router(
+    assets_router,
+    prefix="/api/v1",
+)
 
-
-@app.get("/api/v1/health", response_model=HealthResponse)
-def health():
-    return HealthResponse(status="ok")
-
-
-@app.get("/api/v1/runs/{run_id}/dependency/{source}/{target}")
-def dependency(run_id: str, source: str, target: str):
-    """Vertical slice on the MOCK fixture (PLUMBING): real engine, canned evidence."""
-    keys, static, runtime = load_case("w03_case_when")
-    wanted = [k for k in keys if (k.run_id, k.source_column_id, k.target_column_id) == (run_id, source, target)]
-    if not wanted:
-        raise ApiError(404, "ENTITY_NOT_FOUND", "Dependency not found in the mock fixture")
-    (pred,) = FourStateEngine().infer(PredictorInput(tuple(wanted), tuple(static), tuple(runtime)))
-    warnings = ["NO_RUNTIME_EVENT_IS_NOT_NEGATIVE_EVIDENCE"] if pred.state.value == "POSSIBLE" else []
-    return {"state": pred.state.value, "rule_id": pred.rule_id, "explanation": pred.explanation,
-            "evidence_ids": list(pred.evidence_ids), "reasoning_version": pred.reasoning_version,
-            "is_mock": True, "warnings": warnings}
+app.include_router(
+    lineage_router,
+    prefix="/api/v1",
+)
