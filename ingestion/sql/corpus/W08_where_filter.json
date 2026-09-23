@@ -1,0 +1,20 @@
+{
+  "case_id": "W08_where_filter",
+  "description": "WHERE clause - filter columns are included in dependencies",
+  "sql": "SELECT salary FROM employees WHERE country = 'US'",
+  "dialect": "postgres",
+  "schema": {
+    "employees": {
+      "id": "int",
+      "name": "text",
+      "country": "text",
+      "salary": "int"
+    }
+  },
+  "target_dataset": "employees",
+  "expected": {
+    "salary": ["employees.country", "employees.salary"]
+  },
+  "notes": "Hand-derived by M1. Both the selected column (salary) and filter column (country) feed the output, as both determine which rows appear.",
+  "is_mock": false
+}

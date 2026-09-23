@@ -1,0 +1,16 @@
+{
+  "case_id": "UNSUPPORTED_parse_error",
+  "description": "SQL syntax error - parser fails",
+  "sql": "SELECT FROM WHERE",
+  "dialect": "postgres",
+  "schema": {
+    "employees": {
+      "id": "int"
+    }
+  },
+  "target_dataset": "employees",
+  "expected_status": "UNSUPPORTED",
+  "expected_diagnostic_contains": "SQL parse error",
+  "notes": "Hand-derived by M1. Malformed SQL that SQLGlot cannot parse. Should be marked UNSUPPORTED with a parse error diagnostic.",
+  "is_mock": false
+}

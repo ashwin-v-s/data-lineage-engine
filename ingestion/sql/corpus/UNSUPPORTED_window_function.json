@@ -1,0 +1,18 @@
+{
+  "case_id": "UNSUPPORTED_window_function",
+  "description": "Window function - should be marked UNSUPPORTED",
+  "sql": "SELECT row_number() OVER (PARTITION BY department ORDER BY salary DESC) AS rank FROM employees",
+  "dialect": "postgres",
+  "schema": {
+    "employees": {
+      "id": "int",
+      "department": "text",
+      "salary": "int"
+    }
+  },
+  "target_dataset": "employees",
+  "expected_status": "UNSUPPORTED",
+  "expected_diagnostic": "Window function not supported",
+  "notes": "Hand-derived by M1. Window functions have unclear semantics for column contribution in the MVP scope. Should be detected and marked UNSUPPORTED.",
+  "is_mock": false
+}
