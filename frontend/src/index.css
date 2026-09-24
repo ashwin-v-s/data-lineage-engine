@@ -1,0 +1,47 @@
+@import "tailwindcss/base";
+@import "tailwindcss/components";
+@import "tailwindcss/utilities";
+
+@layer base {
+  html, body {
+    margin: 0;
+    padding: 0;
+    background-color: #051424;
+    color: #d4e4fa;
+    font-family: 'Inter', sans-serif;
+    overscroll-behavior: none;
+  }
+}
+
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+
+::-webkit-scrollbar-track {
+  background: #051424;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #273647;
+  border-radius: 2px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #3e484f;
+}
+
+details > summary::-webkit-details-marker {
+  display: none;
+}
+
+/* React Flow Canvas Custom Overrides */
+.react-flow__pane {
+  cursor: grab;
+}
+.react-flow__pane:active {
+  cursor: grabbing;
+}
+.react-flow__attribution {
+  display: none !important;
+}
