@@ -1,7 +1,9 @@
 import uuid
+from typing import List, Optional
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Query, Request
 from fastapi.exceptions import RequestValidationError
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
@@ -10,6 +12,15 @@ from contracts.mocks.loaders import load_case
 from research.reasoning.engine import FourStateEngine
 
 app = FastAPI(title="Kairos API", version="0.0.1")
+
+# Allow frontend on localhost:3000 to call the backend
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 class ApiError(Exception):
@@ -41,7 +52,9 @@ def health():
 
 
 @app.get("/api/v1/runs/{run_id}/dependency/{source}/{target}")
-def dependency(run_id: str, source: str, target: str):
+def dependency(run_id: str, source: str, target: str,
+               as_of: Optional[str] = Query(None),
+               recorded_as_of: Optional[str] = Query(None)):
     """Vertical slice on the MOCK fixture (PLUMBING): real engine, canned evidence."""
     keys, static, runtime = load_case("w03_case_when")
     wanted = [k for k in keys if (k.run_id, k.source_column_id, k.target_column_id) == (run_id, source, target)]
@@ -52,3 +65,110 @@ def dependency(run_id: str, source: str, target: str):
     return {"state": pred.state.value, "rule_id": pred.rule_id, "explanation": pred.explanation,
             "evidence_ids": list(pred.evidence_ids), "reasoning_version": pred.reasoning_version,
             "is_mock": True, "warnings": warnings}
+
+
+# ---------------------------------------------------------------------------
+# MOCK LINEAGE GRAPH ENDPOINT — PLUMBING, returns synthetic graph data
+# ---------------------------------------------------------------------------
+MOCK_NODES = [
+    {"id": "raw_orders", "label": "raw_orders", "type": "TABLE", "system": "postgres",
+     "schema": "raw", "description": "Raw ingest from OMS", "is_mock": True},
+    {"id": "stg_customer_orders", "label": "stg_customer_orders", "type": "TABLE",
+     "system": "postgres", "schema": "staging", "description": "Staged customer orders", "is_mock": True},
+    {"id": "orders_fact", "label": "orders_fact", "type": "TABLE", "system": "postgres",
+     "schema": "warehouse", "description": "Fact table for orders", "is_mock": True},
+    {"id": "revenue_summary", "label": "revenue_summary", "type": "TABLE", "system": "postgres",
+     "schema": "mart", "description": "Revenue aggregation", "is_mock": True},
+    {"id": "customers_dim", "label": "customers_dim", "type": "TABLE", "system": "postgres",
+     "schema": "warehouse", "description": "Customer dimension", "is_mock": True},
+]
+
+MOCK_EDGES = [
+    {"id": "edge_raw_to_stg", "source": "raw_orders", "target": "stg_customer_orders",
+     "reasoning_state": "OBSERVED", "relationship_type": "DERIVED_FROM",
+     "d14_warning": False, "evidence_ids": ["ev_001", "ev_002"], "is_mock": True},
+    {"id": "edge_stg_to_fact", "source": "stg_customer_orders", "target": "orders_fact",
+     "reasoning_state": "OBSERVED", "relationship_type": "DERIVED_FROM",
+     "d14_warning": True, "evidence_ids": ["ev_stg_orders_01", "ev_stg_orders_02"], "is_mock": True},
+    {"id": "edge_fact_to_rev", "source": "orders_fact", "target": "revenue_summary",
+     "reasoning_state": "POSSIBLE", "relationship_type": "AGGREGATED_INTO",
+     "d14_warning": False, "evidence_ids": ["ev_003"], "is_mock": True},
+    {"id": "edge_cust_to_fact", "source": "customers_dim", "target": "orders_fact",
+     "reasoning_state": "OBSERVED", "relationship_type": "JOINED_WITH",
+     "d14_warning": False, "evidence_ids": ["ev_004"], "is_mock": True},
+]
+
+
+@app.get("/api/v1/lineage/{entity}")
+def get_lineage(entity: str,
+                as_of: Optional[str] = Query(None),
+                recorded_as_of: Optional[str] = Query(None),
+                granularity: str = Query("COLUMN"),
+                depth: int = Query(3)):
+    """Mock lineage graph endpoint (PLUMBING). Returns synthetic nodes/edges."""
+    return {
+        "anchor": entity,
+        "nodes": MOCK_NODES,
+        "edges": MOCK_EDGES,
+        "as_of": as_of,
+        "recorded_as_of": recorded_as_of,
+        "granularity": granularity,
+        "depth": depth,
+        "is_mock": True,
+        "warnings": ["MOCK_DATA_NOT_FROM_DATABASE"],
+    }
+
+
+@app.get("/api/v1/lineage/{entity}/upstream")
+def get_lineage_upstream(entity: str, depth: int = Query(1)):
+    upstream_edges = [e for e in MOCK_EDGES if e["target"] == entity]
+    upstream_ids = {e["source"] for e in upstream_edges}
+    upstream_nodes = [n for n in MOCK_NODES if n["id"] in upstream_ids or n["id"] == entity]
+    return {"anchor": entity, "nodes": upstream_nodes, "edges": upstream_edges,
+            "direction": "upstream", "is_mock": True}
+
+
+@app.get("/api/v1/lineage/{entity}/downstream")
+def get_lineage_downstream(entity: str, depth: int = Query(1)):
+    downstream_edges = [e for e in MOCK_EDGES if e["source"] == entity]
+    downstream_ids = {e["target"] for e in downstream_edges}
+    downstream_nodes = [n for n in MOCK_NODES if n["id"] in downstream_ids or n["id"] == entity]
+    return {"anchor": entity, "nodes": downstream_nodes, "edges": downstream_edges,
+            "direction": "downstream", "is_mock": True}
+
+
+@app.get("/api/v1/search")
+def search(q: str = Query(""), type: Optional[str] = Query(None), limit: int = Query(20)):
+    """Mock search endpoint (PLUMBING)."""
+    results = [
+        {"id": n["id"], "label": n["label"], "type": n["type"],
+         "schema": n["schema"], "description": n["description"]}
+        for n in MOCK_NODES
+        if q.lower() in n["label"].lower() or q == ""
+    ]
+    return {"query": q, "results": results[:limit], "total": len(results), "is_mock": True}
+
+
+@app.get("/api/v1/runs/{run_id}")
+def get_run(run_id: str):
+    """Mock run endpoint (PLUMBING)."""
+    return {"run_id": run_id, "job_id": "kairos_demo_job", "status": "COMPLETE",
+            "started_at": "2026-09-23T09:32:14Z", "is_mock": True}
+
+
+@app.get("/api/v1/evidence/{dependency}")
+def get_evidence(dependency: str):
+    """Mock evidence endpoint (PLUMBING)."""
+    return {"dependency": dependency, "evidence": [
+        {"evidence_id": "ev_static_001", "type": "STATIC", "source": "SQLGlot",
+         "parser_status": "SUPPORTED", "is_mock": True},
+        {"evidence_id": "ev_runtime_001", "type": "RUNTIME", "source": "OpenLineage",
+         "observed": True, "is_mock": True},
+    ], "is_mock": True}
+
+
+@app.get("/api/v1/evaluation/oracle/{run_id}")
+def get_oracle(run_id: str):
+    """Mock benchmark oracle endpoint (PLUMBING)."""
+    return {"run_id": run_id, "oracle_available": False,
+            "message": "ProvSQL ground truth not yet configured", "is_mock": True}
