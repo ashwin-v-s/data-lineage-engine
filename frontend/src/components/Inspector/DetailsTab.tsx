@@ -136,7 +136,7 @@ export const DetailsTab: React.FC<DetailsTabProps> = ({
             </span>
           </div>
           <span className="px-2 py-0.5 rounded-xl bg-surface-container-highest text-outline font-mono-sm text-[10px] font-bold">
-            {dependencyData?.reasoning?.rule_id || (state === 'OBSERVED' ? 'Rule R2' : 'Rule R5')}
+            {dependencyData?.rule_id || (state === 'OBSERVED' ? 'Rule R2' : 'Rule R5')}
           </span>
         </div>
         <p className="font-body-sm text-xs text-on-surface leading-relaxed">{interp}</p>

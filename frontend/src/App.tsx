@@ -74,8 +74,13 @@ const InvestigatorCockpit: React.FC = () => {
   const { data: dependencyData } = useDependencyQuery(runId, depSource, depTarget, validAt, knownAsOf);
 
   // Filter edges based on reasoning state selection
+  // Edges from the real DB have {source, target, granularity} — no reasoning_state yet.
+  // Keep the filter ready for when M4 reasoning is wired; default to showing all edges.
   const rawEdges = lineageData?.edges || [];
-  const filteredEdges = rawEdges.filter((e) => selectedStates[e.reasoning_state] ?? true);
+  const filteredEdges = rawEdges.filter((e) => {
+    const state = (e as any).reasoning_state;
+    return state ? (selectedStates[state] ?? true) : true;
+  });
   const rawNodes = lineageData?.nodes || [];
 
   return (

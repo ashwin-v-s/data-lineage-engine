@@ -84,13 +84,15 @@ export const LineageCanvas: React.FC<LineageCanvasProps> = ({
   // Convert API nodes to React Flow format
   const initialNodes: Node[] = useMemo(() => {
     return rawNodes.map((n) => {
-      const isAnchor = n.id === anchorId || n.name === 'orders_fact';
+      const isAnchor = n.id === anchorId || n.name === anchorId;
       return {
-        id: n.name || n.id,
+        id: n.id,           // use UUID so edges (source/target UUIDs) connect correctly
         type: 'lineageNode',
         position: { x: 0, y: 0 },
         data: {
           ...n,
+          display_name: n.display_name || n.name,
+          namespace: n.namespace || '',
           isAnchor,
           onExpandDirection,
           onOpenPopover,
@@ -102,14 +104,14 @@ export const LineageCanvas: React.FC<LineageCanvasProps> = ({
   // Convert API edges to React Flow format
   const initialEdges: Edge[] = useMemo(() => {
     return rawEdges.map((e) => ({
-      id: e.edge_id,
+      id: e.edge_id || `${e.source}->${e.target}`,
       source: e.source,
       target: e.target,
       type: 'lineageEdge',
       data: {
         ...e,
-        reasoning_state: e.reasoning_state,
-        d14_warning: e.d14_warning,
+        reasoning_state: (e as any).reasoning_state,
+        d14_warning: (e as any).d14_warning ?? false,
       },
     }));
   }, [rawEdges]);
