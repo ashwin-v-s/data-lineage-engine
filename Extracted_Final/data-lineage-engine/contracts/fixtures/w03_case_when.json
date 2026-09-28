@@ -1,0 +1,255 @@
+{
+  "is_mock": true,
+  "case_id": "W03_case_when",
+  "description": "PLUMBING fixture: CASE WHEN country='US' THEN salary ELSE 0 END. Not project data.",
+  "keys": [
+    {
+      "run_id": "run_A",
+      "source_column_id": "employees.country",
+      "target_column_id": "out.adjusted_salary",
+      "granularity": "COLUMN",
+      "temporal_context": {
+        "valid_at": null,
+        "known_as_of": null
+      }
+    },
+    {
+      "run_id": "run_A",
+      "source_column_id": "employees.salary",
+      "target_column_id": "out.adjusted_salary",
+      "granularity": "COLUMN",
+      "temporal_context": {
+        "valid_at": null,
+        "known_as_of": null
+      }
+    },
+    {
+      "run_id": "run_B",
+      "source_column_id": "employees.country",
+      "target_column_id": "out.adjusted_salary",
+      "granularity": "COLUMN",
+      "temporal_context": {
+        "valid_at": null,
+        "known_as_of": null
+      }
+    },
+    {
+      "run_id": "run_B",
+      "source_column_id": "employees.salary",
+      "target_column_id": "out.adjusted_salary",
+      "granularity": "COLUMN",
+      "temporal_context": {
+        "valid_at": null,
+        "known_as_of": null
+      }
+    },
+    {
+      "run_id": "run_C",
+      "source_column_id": "employees.country",
+      "target_column_id": "out.adjusted_salary",
+      "granularity": "COLUMN",
+      "temporal_context": {
+        "valid_at": null,
+        "known_as_of": null
+      }
+    },
+    {
+      "run_id": "run_C",
+      "source_column_id": "employees.salary",
+      "target_column_id": "out.adjusted_salary",
+      "granularity": "COLUMN",
+      "temporal_context": {
+        "valid_at": null,
+        "known_as_of": null
+      }
+    },
+    {
+      "run_id": "run_D",
+      "source_column_id": "employees.country",
+      "target_column_id": "out.adjusted_salary",
+      "granularity": "COLUMN",
+      "temporal_context": {
+        "valid_at": null,
+        "known_as_of": null
+      }
+    },
+    {
+      "run_id": "run_D",
+      "source_column_id": "employees.salary",
+      "target_column_id": "out.adjusted_salary",
+      "granularity": "COLUMN",
+      "temporal_context": {
+        "valid_at": null,
+        "known_as_of": null
+      }
+    }
+  ],
+  "static_evidence": [
+    {
+      "evidence_id": "static_0",
+      "source_dataset_id": "employees",
+      "target_dataset_id": "out",
+      "source_column_id": "employees.country",
+      "target_column_id": "out.adjusted_salary",
+      "granularity": "COLUMN",
+      "operator": "CASE",
+      "expression_fingerprint": "expr-0",
+      "query_fingerprint": "q-w03",
+      "schema_fingerprint": "schema-w03",
+      "parser_status": "SUPPORTED",
+      "unsupported_constructs": [],
+      "diagnostics": [],
+      "is_mock": true
+    },
+    {
+      "evidence_id": "static_1",
+      "source_dataset_id": "employees",
+      "target_dataset_id": "out",
+      "source_column_id": "employees.salary",
+      "target_column_id": "out.adjusted_salary",
+      "granularity": "COLUMN",
+      "operator": "CASE",
+      "expression_fingerprint": "expr-1",
+      "query_fingerprint": "q-w03",
+      "schema_fingerprint": "schema-w03",
+      "parser_status": "SUPPORTED",
+      "unsupported_constructs": [],
+      "diagnostics": [],
+      "is_mock": true
+    }
+  ],
+  "runtime_evidence": [
+    {
+      "evidence_id": "rt_A_country",
+      "evidence_type": "RUNTIME_POSITIVE",
+      "key": {
+        "run_id": "run_A",
+        "source_column_id": "employees.country",
+        "target_column_id": "out.adjusted_salary",
+        "granularity": "COLUMN",
+        "temporal_context": {
+          "valid_at": null,
+          "known_as_of": null
+        }
+      },
+      "source_system": "mock",
+      "event_time": "2026-01-01T00:00:00Z",
+      "coverage": {
+        "run_covered": true,
+        "operator_covered": true,
+        "source_dataset_covered": true,
+        "target_dataset_covered": true,
+        "source_columns_covered": [
+          "employees.country"
+        ],
+        "target_columns_covered": [
+          "out.adjusted_salary"
+        ],
+        "branches_covered": true,
+        "coverage_mode": "runtime",
+        "parser_status": "SUPPORTED"
+      },
+      "raw_payload_hash": "hash-A-c",
+      "is_mock": true
+    },
+    {
+      "evidence_id": "rt_B_country",
+      "evidence_type": "RUNTIME_POSITIVE",
+      "key": {
+        "run_id": "run_B",
+        "source_column_id": "employees.country",
+        "target_column_id": "out.adjusted_salary",
+        "granularity": "COLUMN",
+        "temporal_context": {
+          "valid_at": null,
+          "known_as_of": null
+        }
+      },
+      "source_system": "mock",
+      "event_time": "2026-01-01T00:00:00Z",
+      "coverage": {
+        "run_covered": true,
+        "operator_covered": true,
+        "source_dataset_covered": true,
+        "target_dataset_covered": true,
+        "source_columns_covered": [
+          "employees.country"
+        ],
+        "target_columns_covered": [
+          "out.adjusted_salary"
+        ],
+        "branches_covered": true,
+        "coverage_mode": "runtime",
+        "parser_status": "SUPPORTED"
+      },
+      "raw_payload_hash": "hash-B-c",
+      "is_mock": true
+    },
+    {
+      "evidence_id": "rt_A_salary",
+      "evidence_type": "RUNTIME_POSITIVE",
+      "key": {
+        "run_id": "run_A",
+        "source_column_id": "employees.salary",
+        "target_column_id": "out.adjusted_salary",
+        "granularity": "COLUMN",
+        "temporal_context": {
+          "valid_at": null,
+          "known_as_of": null
+        }
+      },
+      "source_system": "mock",
+      "event_time": "2026-01-01T00:00:00Z",
+      "coverage": {
+        "run_covered": true,
+        "operator_covered": true,
+        "source_dataset_covered": true,
+        "target_dataset_covered": true,
+        "source_columns_covered": [
+          "employees.salary"
+        ],
+        "target_columns_covered": [
+          "out.adjusted_salary"
+        ],
+        "branches_covered": true,
+        "coverage_mode": "runtime",
+        "parser_status": "SUPPORTED"
+      },
+      "raw_payload_hash": "hash-A-s",
+      "is_mock": true
+    },
+    {
+      "evidence_id": "rt_B_salary_neg",
+      "evidence_type": "RUNTIME_NEGATIVE_EVALUATION",
+      "key": {
+        "run_id": "run_B",
+        "source_column_id": "employees.salary",
+        "target_column_id": "out.adjusted_salary",
+        "granularity": "COLUMN",
+        "temporal_context": {
+          "valid_at": null,
+          "known_as_of": null
+        }
+      },
+      "source_system": "mock",
+      "event_time": "2026-01-01T00:00:00Z",
+      "coverage": {
+        "run_covered": true,
+        "operator_covered": true,
+        "source_dataset_covered": true,
+        "target_dataset_covered": true,
+        "source_columns_covered": [
+          "employees.salary"
+        ],
+        "target_columns_covered": [
+          "out.adjusted_salary"
+        ],
+        "branches_covered": true,
+        "coverage_mode": "runtime",
+        "parser_status": "SUPPORTED"
+      },
+      "raw_payload_hash": "hash-B-s",
+      "is_mock": true
+    }
+  ]
+}

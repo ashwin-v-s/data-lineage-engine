@@ -1,0 +1,19 @@
+{
+  "is_mock": true,
+  "provider": "reference_interpreter",
+  "version": "reference-1.0",
+  "results": [
+    {
+      "source_column": "employees_a.salary",
+      "target_column": "out_adjusted.adjusted_salary",
+      "label": "PROPAGATED",
+      "artifact_hash": "mock-hash-propagated"
+    },
+    {
+      "source_column": "employees_a.country",
+      "target_column": "out_adjusted.adjusted_salary",
+      "label": "NOT_PROPAGATED",
+      "artifact_hash": "mock-hash-not-propagated"
+    }
+  ]
+}

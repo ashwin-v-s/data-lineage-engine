@@ -1,0 +1,12 @@
+{
+  "case_id": "UNSUPPORTED_missing_schema",
+  "description": "SELECT * without schema - cannot expand columns",
+  "sql": "SELECT * FROM unknown_table",
+  "dialect": "postgres",
+  "schema": {},
+  "target_dataset": "unknown_table",
+  "expected_status": "UNSUPPORTED",
+  "expected_diagnostic": "Empty or missing schema",
+  "notes": "Hand-derived by M1. Without a schema providing column information, SELECT * cannot be expanded. Should be marked UNSUPPORTED.",
+  "is_mock": false
+}

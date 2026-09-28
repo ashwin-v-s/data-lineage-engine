@@ -1,0 +1,21 @@
+{
+  "case_id": "UNSUPPORTED_outer_join",
+  "description": "LEFT OUTER JOIN - not supported in MVP scope",
+  "sql": "SELECT o.id, c.name FROM orders o LEFT JOIN customers c ON o.customer_id = c.id",
+  "dialect": "postgres",
+  "schema": {
+    "orders": {
+      "id": "int",
+      "customer_id": "int"
+    },
+    "customers": {
+      "id": "int",
+      "name": "text"
+    }
+  },
+  "target_dataset": "orders",
+  "expected_status": "UNSUPPORTED",
+  "expected_diagnostic": "Outer join (LEFT) not supported in MVP",
+  "notes": "Hand-derived by M1. LEFT/RIGHT/FULL OUTER JOINs are not supported because ground truth via ProvSQL cannot handle them. INNER JOIN is supported.",
+  "is_mock": false
+}

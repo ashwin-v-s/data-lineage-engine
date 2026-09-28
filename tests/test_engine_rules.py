@@ -85,3 +85,30 @@ def test_ground_truth_coverage_mode_on_positive_evidence_is_rejected_by_engine()
 def test_every_prediction_records_version_and_evidence():
     p = one(inp([static()], [positive()]))
     assert p.reasoning_version and p.evidence_ids == ("p1",)
+
+
+# --- Day 2A gap tests ---
+
+def test_r1_unresolved_identity_empty_target_gives_unknown():
+    # Gap: Day 1 only tested empty source_column_id. Verify empty target_column_id alone also fires R1.
+    k = key(tgt="")
+    (p,) = ENGINE.infer(inp([static()], [], keys=[k]))
+    assert (p.state, p.rule_id) == (S.UNKNOWN, "R1")
+
+
+def test_r2_partial_static_with_positive_evidence_gives_observed():
+    # Gap: confirm R2 fires before the fully_supported check in R3.
+    # PARTIAL static must not block OBSERVED when positive runtime evidence exists.
+    p = one(inp([static(ParserStatus.PARTIAL)], [positive()]))
+    assert (p.state, p.rule_id) == (S.OBSERVED, "R2")
+
+
+def test_r3_supported_plus_partial_mix_with_complete_negative_never_refutes():
+    # Gap: one SUPPORTED + one PARTIAL static candidate + complete negative evaluation.
+    # fully_supported requires ALL candidates to be SUPPORTED; PARTIAL candidate must
+    # block R3 and fall through to R4 (POSSIBLE), not produce REFUTED_FOR_RUN.
+    supported = static(ParserStatus.SUPPORTED, eid="s_sup")
+    partial = static(ParserStatus.PARTIAL, eid="s_par")
+    p = one(inp([supported, partial], [negative()]))
+    assert p.state == S.POSSIBLE
+    assert p.rule_id == "R4"

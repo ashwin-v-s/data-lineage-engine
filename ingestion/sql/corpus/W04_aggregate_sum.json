@@ -1,0 +1,20 @@
+{
+  "case_id": "W04_aggregate_sum",
+  "description": "SUM aggregate with implicit source column dependency",
+  "sql": "SELECT SUM(amount) AS total_amount FROM orders",
+  "dialect": "postgres",
+  "schema": {
+    "orders": {
+      "id": "int",
+      "customer_id": "int",
+      "amount": "numeric",
+      "order_date": "date"
+    }
+  },
+  "target_dataset": "orders",
+  "expected": {
+    "total_amount": ["orders.amount"]
+  },
+  "notes": "Hand-derived by M1. SUM(amount) depends on the amount column only. Group column (if any) is handled separately per M4 guidance.",
+  "is_mock": false
+}

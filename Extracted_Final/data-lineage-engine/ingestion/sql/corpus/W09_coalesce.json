@@ -1,0 +1,19 @@
+{
+  "case_id": "W09_coalesce",
+  "description": "COALESCE - all arguments feed output",
+  "sql": "SELECT COALESCE(email, phone, 'unknown') AS contact FROM users",
+  "dialect": "postgres",
+  "schema": {
+    "users": {
+      "id": "int",
+      "email": "text",
+      "phone": "text"
+    }
+  },
+  "target_dataset": "users",
+  "expected": {
+    "contact": ["users.email", "users.phone"]
+  },
+  "notes": "Hand-derived by M1. COALESCE depends on all its column arguments (email, phone). The literal 'unknown' is not a column dependency.",
+  "is_mock": false
+}

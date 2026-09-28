@@ -1,0 +1,117 @@
+{
+  "_comment": "Sample lineage records for M3, M4, M5 integration (MOCK DATA)",
+  "is_mock": true,
+  "datasets": [
+    {
+      "id": "a1b2c3d4-1111-1111-1111-000000000001",
+      "source_system": "dbt",
+      "namespace": "prod",
+      "database_name": "analytics",
+      "schema_name": "public",
+      "name": "employees",
+      "asset_type": "table"
+    },
+    {
+      "id": "a1b2c3d4-2222-2222-2222-000000000002",
+      "source_system": "dbt",
+      "namespace": "prod",
+      "database_name": "analytics",
+      "schema_name": "public",
+      "name": "adjusted_salaries",
+      "asset_type": "table"
+    }
+  ],
+  "columns": [
+    {
+      "id": "c1c1c1c1-1111-1111-1111-000000000001",
+      "dataset_id": "a1b2c3d4-1111-1111-1111-000000000001",
+      "column_name": "employee_id",
+      "data_type": "int",
+      "schema_version": "v1"
+    },
+    {
+      "id": "c1c1c1c1-1111-1111-1111-000000000002",
+      "dataset_id": "a1b2c3d4-1111-1111-1111-000000000001",
+      "column_name": "country",
+      "data_type": "text",
+      "schema_version": "v1"
+    },
+    {
+      "id": "c1c1c1c1-1111-1111-1111-000000000003",
+      "dataset_id": "a1b2c3d4-1111-1111-1111-000000000001",
+      "column_name": "salary",
+      "data_type": "int",
+      "schema_version": "v1"
+    },
+    {
+      "id": "c2c2c2c2-2222-2222-2222-000000000001",
+      "dataset_id": "a1b2c3d4-2222-2222-2222-000000000002",
+      "column_name": "employee_id",
+      "data_type": "int",
+      "schema_version": "v1"
+    },
+    {
+      "id": "c2c2c2c2-2222-2222-2222-000000000002",
+      "dataset_id": "a1b2c3d4-2222-2222-2222-000000000002",
+      "column_name": "adjusted_salary",
+      "data_type": "int",
+      "schema_version": "v1"
+    }
+  ],
+  "edges": [
+    {
+      "edge_id": "e1e1e1e1-1111-1111-1111-000000000001",
+      "source_column_id": "c1c1c1c1-1111-1111-1111-000000000002",
+      "target_column_id": "c2c2c2c2-2222-2222-2222-000000000002",
+      "granularity": "COLUMN"
+    },
+    {
+      "edge_id": "e1e1e1e1-1111-1111-1111-000000000002",
+      "source_column_id": "c1c1c1c1-1111-1111-1111-000000000003",
+      "target_column_id": "c2c2c2c2-2222-2222-2222-000000000002",
+      "granularity": "COLUMN"
+    }
+  ],
+  "temporal_versions": [
+    {
+      "version_id": "v1v1v1v1-1111-1111-1111-000000000001",
+      "edge_id": "e1e1e1e1-1111-1111-1111-000000000001",
+      "valid_from": "2026-01-01T00:00:00Z",
+      "valid_to": null,
+      "transaction_from": "2026-01-02T00:00:00Z",
+      "transaction_to": null,
+      "effective_time_status": "KNOWN",
+      "source_system": "dbt"
+    },
+    {
+      "version_id": "v1v1v1v1-1111-1111-1111-000000000002",
+      "edge_id": "e1e1e1e1-1111-1111-1111-000000000002",
+      "valid_from": "2026-01-01T00:00:00Z",
+      "valid_to": null,
+      "transaction_from": "2026-01-02T00:00:00Z",
+      "transaction_to": null,
+      "effective_time_status": "KNOWN",
+      "source_system": "dbt"
+    }
+  ],
+  "execution_states": [
+    {
+      "run_id": "run-001",
+      "source_column_id": "c1c1c1c1-1111-1111-1111-000000000002",
+      "target_column_id": "c2c2c2c2-2222-2222-2222-000000000002",
+      "granularity": "COLUMN",
+      "state": "OBSERVED",
+      "reasoning_engine_version": "v1.0",
+      "explanation": "Positive runtime evidence seen"
+    },
+    {
+      "run_id": "run-001",
+      "source_column_id": "c1c1c1c1-1111-1111-1111-000000000003",
+      "target_column_id": "c2c2c2c2-2222-2222-2222-000000000002",
+      "granularity": "COLUMN",
+      "state": "OBSERVED",
+      "reasoning_engine_version": "v1.0",
+      "explanation": "Positive runtime evidence seen"
+    }
+  ]
+}

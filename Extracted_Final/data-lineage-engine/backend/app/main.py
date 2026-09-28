@@ -1,0 +1,346 @@
+import uuid
+from typing import List, Optional
+
+from fastapi import FastAPI, Query, Request
+from fastapi.exceptions import RequestValidationError
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from pydantic import BaseModel
+
+from contracts.evidence import PredictorInput
+from contracts.mocks.loaders import load_case
+from research.reasoning.engine import FourStateEngine
+
+app = FastAPI(title="Kairos API", version="0.0.1")
+
+# Allow frontend on localhost:3000 to call the backend
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+class ApiError(Exception):
+    def __init__(self, status: int, code: str, message: str, details: dict | None = None):
+        self.status, self.code, self.message, self.details = status, code, message, details or {}
+
+
+def error_body(code: str, message: str, details: dict | None = None) -> dict:
+    return {"error": {"code": code, "message": message, "details": details or {}, "request_id": str(uuid.uuid4())}}
+
+
+@app.exception_handler(ApiError)
+async def api_error_handler(request: Request, exc: ApiError):
+    return JSONResponse(status_code=exc.status, content=error_body(exc.code, exc.message, exc.details))
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_handler(request: Request, exc: RequestValidationError):
+    return JSONResponse(status_code=422, content=error_body("VALIDATION_ERROR", "Invalid request", {"errors": exc.errors()}))
+
+
+class HealthResponse(BaseModel):
+    status: str
+    db: str = "unknown"
+
+
+@app.get("/api/v1/health", response_model=HealthResponse)
+def health():
+    try:
+        from backend.app.db import health_check
+        db_ok = health_check()
+        return HealthResponse(status="ok", db="connected" if db_ok else "unreachable")
+    except Exception:
+        return HealthResponse(status="ok", db="unreachable")
+
+
+@app.get("/api/v1/runs/{run_id}/dependency/{source}/{target}")
+def dependency(run_id: str, source: str, target: str,
+               as_of: Optional[str] = Query(None),
+               recorded_as_of: Optional[str] = Query(None)):
+    """Vertical slice on the MOCK fixture (PLUMBING): real engine, canned evidence."""
+    keys, static, runtime = load_case("w03_case_when")
+    wanted = [k for k in keys if (k.run_id, k.source_column_id, k.target_column_id) == (run_id, source, target)]
+    if not wanted:
+        raise ApiError(404, "ENTITY_NOT_FOUND", "Dependency not found in the mock fixture")
+    (pred,) = FourStateEngine().infer(PredictorInput(tuple(wanted), tuple(static), tuple(runtime)))
+    warnings = ["NO_RUNTIME_EVENT_IS_NOT_NEGATIVE_EVIDENCE"] if pred.state.value == "POSSIBLE" else []
+    return {"state": pred.state.value, "rule_id": pred.rule_id, "explanation": pred.explanation,
+            "evidence_ids": list(pred.evidence_ids), "reasoning_version": pred.reasoning_version,
+            "is_mock": True, "warnings": warnings}
+
+
+# ---------------------------------------------------------------------------
+# MOCK LINEAGE GRAPH ENDPOINT — PLUMBING, returns synthetic graph data
+# ---------------------------------------------------------------------------
+MOCK_NODES = [
+    {"id": "raw_orders", "label": "raw_orders", "type": "TABLE", "system": "postgres",
+     "schema": "raw", "description": "Raw ingest from OMS", "is_mock": True},
+    {"id": "stg_customer_orders", "label": "stg_customer_orders", "type": "TABLE",
+     "system": "postgres", "schema": "staging", "description": "Staged customer orders", "is_mock": True},
+    {"id": "orders_fact", "label": "orders_fact", "type": "TABLE", "system": "postgres",
+     "schema": "warehouse", "description": "Fact table for orders", "is_mock": True},
+    {"id": "revenue_summary", "label": "revenue_summary", "type": "TABLE", "system": "postgres",
+     "schema": "mart", "description": "Revenue aggregation", "is_mock": True},
+    {"id": "customers_dim", "label": "customers_dim", "type": "TABLE", "system": "postgres",
+     "schema": "warehouse", "description": "Customer dimension", "is_mock": True},
+]
+
+MOCK_EDGES = [
+    {"id": "edge_raw_to_stg", "source": "raw_orders", "target": "stg_customer_orders",
+     "reasoning_state": "OBSERVED", "relationship_type": "DERIVED_FROM",
+     "d14_warning": False, "evidence_ids": ["ev_001", "ev_002"], "is_mock": True},
+    {"id": "edge_stg_to_fact", "source": "stg_customer_orders", "target": "orders_fact",
+     "reasoning_state": "OBSERVED", "relationship_type": "DERIVED_FROM",
+     "d14_warning": True, "evidence_ids": ["ev_stg_orders_01", "ev_stg_orders_02"], "is_mock": True},
+    {"id": "edge_fact_to_rev", "source": "orders_fact", "target": "revenue_summary",
+     "reasoning_state": "POSSIBLE", "relationship_type": "AGGREGATED_INTO",
+     "d14_warning": False, "evidence_ids": ["ev_003"], "is_mock": True},
+    {"id": "edge_cust_to_fact", "source": "customers_dim", "target": "orders_fact",
+     "reasoning_state": "OBSERVED", "relationship_type": "JOINED_WITH",
+     "d14_warning": False, "evidence_ids": ["ev_004"], "is_mock": True},
+]
+
+
+@app.get("/api/v1/lineage/{entity}")
+def get_lineage(entity: str,
+                as_of: Optional[str] = Query(None),
+                recorded_as_of: Optional[str] = Query(None),
+                granularity: str = Query("COLUMN"),
+                depth: int = Query(3)):
+    """Real lineage graph from Supabase."""
+    try:
+        from backend.app.db import get_cursor
+        with get_cursor() as cur:
+            # Get all datasets as nodes
+            cur.execute("""
+                SELECT id, name, schema_name, source_system, asset_type
+                FROM dataset
+                ORDER BY schema_name, name
+            """)
+            datasets = cur.fetchall()
+            nodes = [
+                {
+                    "id": str(row["id"]),
+                    "label": row["name"],
+                    "type": row["asset_type"],
+                    "system": row["source_system"],
+                    "schema": row["schema_name"],
+                    "description": f"{row['schema_name']}.{row['name']}",
+                    "is_mock": False,
+                }
+                for row in datasets
+            ]
+
+            # Get lineage edges with temporal filter
+            time_filter = ""
+            params = []
+            if as_of:
+                time_filter += " AND etv.valid_from <= %s AND (etv.valid_to IS NULL OR %s < etv.valid_to)"
+                params += [as_of, as_of]
+            if recorded_as_of:
+                time_filter += " AND etv.transaction_from <= %s AND (etv.transaction_to IS NULL OR %s < etv.transaction_to)"
+                params += [recorded_as_of, recorded_as_of]
+
+            cur.execute(f"""
+                SELECT
+                    le.id,
+                    le.source_id,
+                    le.target_id,
+                    le.granularity,
+                    src.name AS source_name,
+                    tgt.name AS target_name
+                FROM lineage_edge le
+                JOIN edge_temporal_version etv ON etv.edge_id = le.id
+                LEFT JOIN dataset src ON src.id = le.source_id
+                LEFT JOIN dataset tgt ON tgt.id = le.target_id
+                WHERE 1=1 {time_filter}
+                ORDER BY src.name, tgt.name
+            """, params)
+            edge_rows = cur.fetchall()
+            edges = [
+                {
+                    "id": str(row["id"]),
+                    "source": str(row["source_id"]),
+                    "source_label": row["source_name"] or str(row["source_id"]),
+                    "target": str(row["target_id"]),
+                    "target_label": row["target_name"] or str(row["target_id"]),
+                    "reasoning_state": "OBSERVED",
+                    "relationship_type": "DERIVED_FROM",
+                    "d14_warning": False,
+                    "evidence_ids": [],
+                    "is_mock": False,
+                }
+                for row in edge_rows
+            ]
+
+        return {
+            "anchor": entity,
+            "nodes": nodes,
+            "edges": edges,
+            "as_of": as_of,
+            "recorded_as_of": recorded_as_of,
+            "granularity": granularity,
+            "depth": depth,
+            "is_mock": False,
+            "warnings": [],
+        }
+    except Exception as e:
+        # Fallback to mock if DB unavailable
+        return {
+            "anchor": entity,
+            "nodes": MOCK_NODES,
+            "edges": MOCK_EDGES,
+            "as_of": as_of,
+            "recorded_as_of": recorded_as_of,
+            "granularity": granularity,
+            "depth": depth,
+            "is_mock": True,
+            "warnings": [f"DB_UNAVAILABLE: {str(e)} — showing mock data"],
+        }
+
+
+@app.get("/api/v1/lineage/{entity}/upstream")
+def get_lineage_upstream(entity: str, depth: int = Query(1)):
+    try:
+        from backend.app.db import get_cursor
+        with get_cursor() as cur:
+            cur.execute("""
+                SELECT le.id, le.source_id, le.target_id,
+                       src.name AS source_name, tgt.name AS target_name,
+                       src.schema_name AS src_schema, tgt.schema_name AS tgt_schema,
+                       src.asset_type AS src_type, tgt.asset_type AS tgt_type,
+                       src.source_system AS src_system
+                FROM lineage_edge le
+                JOIN edge_temporal_version etv ON etv.edge_id = le.id
+                LEFT JOIN dataset src ON src.id = le.source_id
+                LEFT JOIN dataset tgt ON tgt.id = le.target_id
+                WHERE tgt.name = %s
+                   OR tgt.id::text = %s
+            """, [entity, entity])
+            rows = cur.fetchall()
+            edges = [{"id": str(r["id"]), "source": str(r["source_id"]),
+                      "target": str(r["target_id"]), "reasoning_state": "OBSERVED",
+                      "relationship_type": "DERIVED_FROM", "is_mock": False} for r in rows]
+            node_ids = {str(r["source_id"]) for r in rows} | {str(r["target_id"]) for r in rows}
+            cur.execute("SELECT id, name, schema_name, asset_type, source_system FROM dataset WHERE id::text = ANY(%s)",
+                        [list(node_ids)])
+            node_rows = cur.fetchall()
+            nodes = [{"id": str(r["id"]), "label": r["name"], "type": r["asset_type"],
+                      "system": r["source_system"], "schema": r["schema_name"], "is_mock": False}
+                     for r in node_rows]
+        return {"anchor": entity, "nodes": nodes, "edges": edges, "direction": "upstream", "is_mock": False}
+    except Exception as e:
+        upstream_edges = [e for e in MOCK_EDGES if e["target"] == entity]
+        upstream_ids = {e["source"] for e in upstream_edges}
+        upstream_nodes = [n for n in MOCK_NODES if n["id"] in upstream_ids or n["id"] == entity]
+        return {"anchor": entity, "nodes": upstream_nodes, "edges": upstream_edges,
+                "direction": "upstream", "is_mock": True, "warnings": [str(e)]}
+
+
+@app.get("/api/v1/lineage/{entity}/downstream")
+def get_lineage_downstream(entity: str, depth: int = Query(1)):
+    try:
+        from backend.app.db import get_cursor
+        with get_cursor() as cur:
+            cur.execute("""
+                SELECT le.id, le.source_id, le.target_id,
+                       src.name AS source_name, tgt.name AS target_name
+                FROM lineage_edge le
+                JOIN edge_temporal_version etv ON etv.edge_id = le.id
+                LEFT JOIN dataset src ON src.id = le.source_id
+                LEFT JOIN dataset tgt ON tgt.id = le.target_id
+                WHERE src.name = %s OR src.id::text = %s
+            """, [entity, entity])
+            rows = cur.fetchall()
+            edges = [{"id": str(r["id"]), "source": str(r["source_id"]),
+                      "target": str(r["target_id"]), "reasoning_state": "OBSERVED",
+                      "relationship_type": "DERIVED_FROM", "is_mock": False} for r in rows]
+            node_ids = {str(r["source_id"]) for r in rows} | {str(r["target_id"]) for r in rows}
+            cur.execute("SELECT id, name, schema_name, asset_type, source_system FROM dataset WHERE id::text = ANY(%s)",
+                        [list(node_ids)])
+            node_rows = cur.fetchall()
+            nodes = [{"id": str(r["id"]), "label": r["name"], "type": r["asset_type"],
+                      "system": r["source_system"], "schema": r["schema_name"], "is_mock": False}
+                     for r in node_rows]
+        return {"anchor": entity, "nodes": nodes, "edges": edges, "direction": "downstream", "is_mock": False}
+    except Exception as e:
+        downstream_edges = [e for e in MOCK_EDGES if e["source"] == entity]
+        downstream_ids = {e["target"] for e in downstream_edges}
+        downstream_nodes = [n for n in MOCK_NODES if n["id"] in downstream_ids or n["id"] == entity]
+        return {"anchor": entity, "nodes": downstream_nodes, "edges": downstream_edges,
+                "direction": "downstream", "is_mock": True, "warnings": [str(e)]}
+
+
+@app.get("/api/v1/search")
+def search(q: str = Query(""), type: Optional[str] = Query(None), limit: int = Query(20)):
+    """Real search from Supabase dataset table."""
+    try:
+        from backend.app.db import get_cursor
+        with get_cursor() as cur:
+            if q:
+                cur.execute("""
+                    SELECT id, name, schema_name, asset_type, source_system
+                    FROM dataset
+                    WHERE name ILIKE %s
+                       OR schema_name ILIKE %s
+                    ORDER BY schema_name, name
+                    LIMIT %s
+                """, [f"%{q}%", f"%{q}%", limit])
+            else:
+                cur.execute("""
+                    SELECT id, name, schema_name, asset_type, source_system
+                    FROM dataset
+                    ORDER BY schema_name, name
+                    LIMIT %s
+                """, [limit])
+            rows = cur.fetchall()
+            results = [
+                {
+                    "id": str(row["id"]),
+                    "label": row["name"],
+                    "type": row["asset_type"],
+                    "schema": row["schema_name"],
+                    "description": f"{row['schema_name']}.{row['name']} ({row['source_system']})",
+                    "is_mock": False,
+                }
+                for row in rows
+            ]
+        return {"query": q, "results": results, "total": len(results), "is_mock": False}
+    except Exception as e:
+        results = [
+            {"id": n["id"], "label": n["label"], "type": n["type"],
+             "schema": n["schema"], "description": n["description"]}
+            for n in MOCK_NODES
+            if q.lower() in n["label"].lower() or q == ""
+        ]
+        return {"query": q, "results": results[:limit], "total": len(results),
+                "is_mock": True, "warnings": [str(e)]}
+
+
+@app.get("/api/v1/runs/{run_id}")
+def get_run(run_id: str):
+    """Mock run endpoint (PLUMBING)."""
+    return {"run_id": run_id, "job_id": "kairos_demo_job", "status": "COMPLETE",
+            "started_at": "2026-09-23T09:32:14Z", "is_mock": True}
+
+
+@app.get("/api/v1/evidence/{dependency}")
+def get_evidence(dependency: str):
+    """Mock evidence endpoint (PLUMBING)."""
+    return {"dependency": dependency, "evidence": [
+        {"evidence_id": "ev_static_001", "type": "STATIC", "source": "SQLGlot",
+         "parser_status": "SUPPORTED", "is_mock": True},
+        {"evidence_id": "ev_runtime_001", "type": "RUNTIME", "source": "OpenLineage",
+         "observed": True, "is_mock": True},
+    ], "is_mock": True}
+
+
+@app.get("/api/v1/evaluation/oracle/{run_id}")
+def get_oracle(run_id: str):
+    """Mock benchmark oracle endpoint (PLUMBING)."""
+    return {"run_id": run_id, "oracle_available": False,
+            "message": "ProvSQL ground truth not yet configured", "is_mock": True}

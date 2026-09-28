@@ -1,0 +1,23 @@
+{
+  "case_id": "W07_select_star",
+  "description": "SELECT * with schema - must expand to all columns",
+  "sql": "SELECT * FROM employees",
+  "dialect": "postgres",
+  "schema": {
+    "employees": {
+      "id": "int",
+      "name": "text",
+      "salary": "int",
+      "country": "text"
+    }
+  },
+  "target_dataset": "employees",
+  "expected": {
+    "id": ["employees.id"],
+    "name": ["employees.name"],
+    "salary": ["employees.salary"],
+    "country": ["employees.country"]
+  },
+  "notes": "Hand-derived by M1. SELECT * with schema expands to all available columns. Each output column depends on its corresponding input.",
+  "is_mock": false
+}

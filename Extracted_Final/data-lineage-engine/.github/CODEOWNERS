@@ -1,0 +1,21 @@
+# Replace the placeholder handles with real GitHub usernames (Pack Section 18).
+/ingestion/sql/ @M1-handle
+/ingestion/dbt/ @M1-handle
+/ingestion/openlineage/ @M2-handle
+/research/ground_truth/ @M2-handle
+/backend/migrations/ @M3-handle
+/backend/app/temporal/ @M3-handle
+/backend/app/identity/ @M3-handle
+/backend/app/repositories/ @M3-handle
+/research/protocol/ @M4-handle
+/research/baselines/ @M4-handle
+/research/reasoning/ @M4-handle
+/research/missingness/ @M4-handle
+/research/metrics/ @M4-handle
+/research/experiments/ @M4-handle
+/contracts/ @M4-handle @M1-handle @M2-handle @M3-handle @M5-handle
+/backend/app/api/ @M5-handle
+/backend/app/schemas/ @M5-handle
+/backend/app/services/ @M5-handle
+/frontend/ @M5-handle
+/docs/ @M4-handle @M1-handle @M2-handle @M3-handle @M5-handle
