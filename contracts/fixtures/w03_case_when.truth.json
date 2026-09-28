@@ -1,0 +1,141 @@
+{
+  "is_mock": true,
+  "records": [
+    {
+      "key": {
+        "run_id": "run_A",
+        "source_column_id": "employees.country",
+        "target_column_id": "out.adjusted_salary",
+        "granularity": "COLUMN",
+        "temporal_context": {
+          "valid_at": null,
+          "known_as_of": null
+        }
+      },
+      "label": "PROPAGATED",
+      "mechanism": "hand_derived",
+      "provider_version": "0",
+      "provenance_ref": "fixture",
+      "is_mock": true
+    },
+    {
+      "key": {
+        "run_id": "run_B",
+        "source_column_id": "employees.country",
+        "target_column_id": "out.adjusted_salary",
+        "granularity": "COLUMN",
+        "temporal_context": {
+          "valid_at": null,
+          "known_as_of": null
+        }
+      },
+      "label": "PROPAGATED",
+      "mechanism": "hand_derived",
+      "provider_version": "0",
+      "provenance_ref": "fixture",
+      "is_mock": true
+    },
+    {
+      "key": {
+        "run_id": "run_C",
+        "source_column_id": "employees.country",
+        "target_column_id": "out.adjusted_salary",
+        "granularity": "COLUMN",
+        "temporal_context": {
+          "valid_at": null,
+          "known_as_of": null
+        }
+      },
+      "label": "PROPAGATED",
+      "mechanism": "hand_derived",
+      "provider_version": "0",
+      "provenance_ref": "fixture",
+      "is_mock": true
+    },
+    {
+      "key": {
+        "run_id": "run_D",
+        "source_column_id": "employees.country",
+        "target_column_id": "out.adjusted_salary",
+        "granularity": "COLUMN",
+        "temporal_context": {
+          "valid_at": null,
+          "known_as_of": null
+        }
+      },
+      "label": "PROPAGATED",
+      "mechanism": "hand_derived",
+      "provider_version": "0",
+      "provenance_ref": "fixture",
+      "is_mock": true
+    },
+    {
+      "key": {
+        "run_id": "run_A",
+        "source_column_id": "employees.salary",
+        "target_column_id": "out.adjusted_salary",
+        "granularity": "COLUMN",
+        "temporal_context": {
+          "valid_at": null,
+          "known_as_of": null
+        }
+      },
+      "label": "PROPAGATED",
+      "mechanism": "hand_derived",
+      "provider_version": "0",
+      "provenance_ref": "fixture",
+      "is_mock": true
+    },
+    {
+      "key": {
+        "run_id": "run_B",
+        "source_column_id": "employees.salary",
+        "target_column_id": "out.adjusted_salary",
+        "granularity": "COLUMN",
+        "temporal_context": {
+          "valid_at": null,
+          "known_as_of": null
+        }
+      },
+      "label": "NOT_PROPAGATED",
+      "mechanism": "hand_derived",
+      "provider_version": "0",
+      "provenance_ref": "fixture",
+      "is_mock": true
+    },
+    {
+      "key": {
+        "run_id": "run_C",
+        "source_column_id": "employees.salary",
+        "target_column_id": "out.adjusted_salary",
+        "granularity": "COLUMN",
+        "temporal_context": {
+          "valid_at": null,
+          "known_as_of": null
+        }
+      },
+      "label": "NOT_PROPAGATED",
+      "mechanism": "hand_derived",
+      "provider_version": "0",
+      "provenance_ref": "fixture",
+      "is_mock": true
+    },
+    {
+      "key": {
+        "run_id": "run_D",
+        "source_column_id": "employees.salary",
+        "target_column_id": "out.adjusted_salary",
+        "granularity": "COLUMN",
+        "temporal_context": {
+          "valid_at": null,
+          "known_as_of": null
+        }
+      },
+      "label": "PROPAGATED",
+      "mechanism": "hand_derived",
+      "provider_version": "0",
+      "provenance_ref": "fixture",
+      "is_mock": true
+    }
+  ]
+}

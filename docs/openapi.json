@@ -1,0 +1,2094 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Kairos Data Lineage & Metadata Engine",
+    "description": "Historical lineage infrastructure & execution-conditioned reasoning API",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/api/v1/health": {
+      "get": {
+        "tags": [
+          "System"
+        ],
+        "summary": "Health",
+        "operationId": "health_api_v1_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/entities/by-name": {
+      "get": {
+        "tags": [
+          "Entities"
+        ],
+        "summary": "Get Entity By Name",
+        "operationId": "get_entity_by_name_api_v1_entities_by_name_get",
+        "parameters": [
+          {
+            "name": "fqn",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Fully qualified entity name",
+              "title": "Fqn"
+            },
+            "description": "Fully qualified entity name"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/entities/{entity_id}": {
+      "get": {
+        "tags": [
+          "Entities"
+        ],
+        "summary": "Get Entity By Id",
+        "operationId": "get_entity_by_id_api_v1_entities__entity_id__get",
+        "parameters": [
+          {
+            "name": "entity_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Entity Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/search": {
+      "get": {
+        "tags": [
+          "Discovery"
+        ],
+        "summary": "Search Entities",
+        "operationId": "search_entities_api_v1_search_get",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "Search term for datasets, columns, or views",
+              "default": "",
+              "title": "Q"
+            },
+            "description": "Search term for datasets, columns, or views"
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "dataset | column | view | job | stream",
+              "title": "Type"
+            },
+            "description": "dataset | column | view | job | stream"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 20,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/lineage/{entity_id}": {
+      "get": {
+        "tags": [
+          "Lineage"
+        ],
+        "summary": "Get Lineage Graph",
+        "operationId": "get_lineage_graph_api_v1_lineage__entity_id__get",
+        "parameters": [
+          {
+            "name": "entity_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Entity Id"
+            }
+          },
+          {
+            "name": "granularity",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^(DATASET|COLUMN)$",
+              "default": "COLUMN",
+              "title": "Granularity"
+            }
+          },
+          {
+            "name": "depth",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 10,
+              "minimum": 1,
+              "default": 3,
+              "title": "Depth"
+            }
+          },
+          {
+            "name": "valid_at",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "T_v: Validity time [valid_from, valid_to)",
+              "title": "Valid At"
+            },
+            "description": "T_v: Validity time [valid_from, valid_to)"
+          },
+          {
+            "name": "known_as_of",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "T_k: Knowledge transaction time [tx_from, tx_to)",
+              "title": "Known As Of"
+            },
+            "description": "T_k: Knowledge transaction time [tx_from, tx_to)"
+          },
+          {
+            "name": "as_of",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Alias for valid_at",
+              "title": "As Of"
+            },
+            "description": "Alias for valid_at"
+          },
+          {
+            "name": "recorded_as_of",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Alias for known_as_of",
+              "title": "Recorded As Of"
+            },
+            "description": "Alias for known_as_of"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LineageGraphResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/lineage/{entity_id}/graph": {
+      "get": {
+        "tags": [
+          "Lineage"
+        ],
+        "summary": "Get Lineage Graph",
+        "operationId": "get_lineage_graph_api_v1_lineage__entity_id__graph_get",
+        "parameters": [
+          {
+            "name": "entity_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Entity Id"
+            }
+          },
+          {
+            "name": "granularity",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^(DATASET|COLUMN)$",
+              "default": "COLUMN",
+              "title": "Granularity"
+            }
+          },
+          {
+            "name": "depth",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 10,
+              "minimum": 1,
+              "default": 3,
+              "title": "Depth"
+            }
+          },
+          {
+            "name": "valid_at",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "T_v: Validity time [valid_from, valid_to)",
+              "title": "Valid At"
+            },
+            "description": "T_v: Validity time [valid_from, valid_to)"
+          },
+          {
+            "name": "known_as_of",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "T_k: Knowledge transaction time [tx_from, tx_to)",
+              "title": "Known As Of"
+            },
+            "description": "T_k: Knowledge transaction time [tx_from, tx_to)"
+          },
+          {
+            "name": "as_of",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Alias for valid_at",
+              "title": "As Of"
+            },
+            "description": "Alias for valid_at"
+          },
+          {
+            "name": "recorded_as_of",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Alias for known_as_of",
+              "title": "Recorded As Of"
+            },
+            "description": "Alias for known_as_of"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LineageGraphResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/lineage/{entity_id}/upstream": {
+      "get": {
+        "tags": [
+          "Lineage"
+        ],
+        "summary": "Get Lineage Upstream",
+        "operationId": "get_lineage_upstream_api_v1_lineage__entity_id__upstream_get",
+        "parameters": [
+          {
+            "name": "entity_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Entity Id"
+            }
+          },
+          {
+            "name": "depth",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 10,
+              "minimum": 1,
+              "default": 1,
+              "title": "Depth"
+            }
+          },
+          {
+            "name": "valid_at",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Valid At"
+            }
+          },
+          {
+            "name": "known_as_of",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Known As Of"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LineageGraphResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/lineage/{entity_id}/downstream": {
+      "get": {
+        "tags": [
+          "Lineage"
+        ],
+        "summary": "Get Lineage Downstream",
+        "operationId": "get_lineage_downstream_api_v1_lineage__entity_id__downstream_get",
+        "parameters": [
+          {
+            "name": "entity_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Entity Id"
+            }
+          },
+          {
+            "name": "depth",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 10,
+              "minimum": 1,
+              "default": 1,
+              "title": "Depth"
+            }
+          },
+          {
+            "name": "valid_at",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Valid At"
+            }
+          },
+          {
+            "name": "known_as_of",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Known As Of"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LineageGraphResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/evidence/search": {
+      "get": {
+        "tags": [
+          "Evidence"
+        ],
+        "summary": "Search Evidence",
+        "operationId": "search_evidence_api_v1_evidence_search_get",
+        "parameters": [
+          {
+            "name": "evidence_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Evidence Type"
+            }
+          },
+          {
+            "name": "source_system",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Source System"
+            }
+          },
+          {
+            "name": "granularity",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Granularity"
+            }
+          },
+          {
+            "name": "operator",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Operator"
+            }
+          },
+          {
+            "name": "from_date",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "From Date"
+            }
+          },
+          {
+            "name": "to_date",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "To Date"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EvidenceListResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/evidence/entity/{entity_id}": {
+      "get": {
+        "tags": [
+          "Evidence"
+        ],
+        "summary": "Get Evidence By Entity",
+        "operationId": "get_evidence_by_entity_api_v1_evidence_entity__entity_id__get",
+        "parameters": [
+          {
+            "name": "entity_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Entity Id"
+            }
+          },
+          {
+            "name": "evidence_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Evidence Type"
+            }
+          },
+          {
+            "name": "source_system",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Source System"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EvidenceListResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/evidence/{evidence_id}": {
+      "get": {
+        "tags": [
+          "Evidence"
+        ],
+        "summary": "Get Evidence Dossier",
+        "operationId": "get_evidence_dossier_api_v1_evidence__evidence_id__get",
+        "parameters": [
+          {
+            "name": "evidence_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Evidence Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EvidenceDetailResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/runs/{run_id}/dependency/{source}/{target}": {
+      "get": {
+        "tags": [
+          "Reasoning"
+        ],
+        "summary": "Get Dependency Reasoning",
+        "operationId": "get_dependency_reasoning_api_v1_runs__run_id__dependency__source___target__get",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Run Id"
+            }
+          },
+          {
+            "name": "source",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Source"
+            }
+          },
+          {
+            "name": "target",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Target"
+            }
+          },
+          {
+            "name": "valid_at",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Valid At"
+            }
+          },
+          {
+            "name": "known_as_of",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Known As Of"
+            }
+          },
+          {
+            "name": "as_of",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "As Of"
+            }
+          },
+          {
+            "name": "recorded_as_of",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Recorded As Of"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DependencyReasoningResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/evaluation/oracle/{run_id}": {
+      "get": {
+        "tags": [
+          "Evaluation Mode"
+        ],
+        "summary": "Get Evaluation Oracle",
+        "operationId": "get_evaluation_oracle_api_v1_evaluation_oracle__run_id__get",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Run Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BenchmarkOracleResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "BenchmarkOracleRecord": {
+        "properties": {
+          "run_id": {
+            "type": "string",
+            "title": "Run Id"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source"
+          },
+          "target": {
+            "type": "string",
+            "title": "Target"
+          },
+          "expected_truth_label": {
+            "type": "string",
+            "title": "Expected Truth Label"
+          },
+          "inferred_state": {
+            "type": "string",
+            "title": "Inferred State"
+          },
+          "matches": {
+            "type": "boolean",
+            "title": "Matches"
+          },
+          "oracle_hash": {
+            "type": "string",
+            "title": "Oracle Hash"
+          }
+        },
+        "type": "object",
+        "required": [
+          "run_id",
+          "source",
+          "target",
+          "expected_truth_label",
+          "inferred_state",
+          "matches",
+          "oracle_hash"
+        ],
+        "title": "BenchmarkOracleRecord"
+      },
+      "BenchmarkOracleResponse": {
+        "properties": {
+          "warning": {
+            "type": "string",
+            "title": "Warning",
+            "default": "BENCHMARK EVALUATION ONLY: Leakage boundary enforced. Never exposed in normal investigator mode."
+          },
+          "run_id": {
+            "type": "string",
+            "title": "Run Id"
+          },
+          "records": {
+            "items": {
+              "$ref": "#/components/schemas/BenchmarkOracleRecord"
+            },
+            "type": "array",
+            "title": "Records"
+          },
+          "is_evaluation_mode": {
+            "type": "boolean",
+            "title": "Is Evaluation Mode",
+            "default": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "run_id",
+          "records"
+        ],
+        "title": "BenchmarkOracleResponse"
+      },
+      "CoverageVectorModel": {
+        "properties": {
+          "run_covered": {
+            "type": "boolean",
+            "title": "Run Covered"
+          },
+          "operator_covered": {
+            "type": "boolean",
+            "title": "Operator Covered"
+          },
+          "source_dataset_covered": {
+            "type": "boolean",
+            "title": "Source Dataset Covered"
+          },
+          "target_dataset_covered": {
+            "type": "boolean",
+            "title": "Target Dataset Covered"
+          },
+          "source_columns_covered": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Source Columns Covered"
+          },
+          "target_columns_covered": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Target Columns Covered"
+          },
+          "branches_covered": {
+            "type": "boolean",
+            "title": "Branches Covered"
+          },
+          "coverage_mode": {
+            "type": "string",
+            "title": "Coverage Mode"
+          },
+          "parser_status": {
+            "type": "string",
+            "title": "Parser Status"
+          }
+        },
+        "type": "object",
+        "required": [
+          "run_covered",
+          "operator_covered",
+          "source_dataset_covered",
+          "target_dataset_covered",
+          "source_columns_covered",
+          "target_columns_covered",
+          "branches_covered",
+          "coverage_mode",
+          "parser_status"
+        ],
+        "title": "CoverageVectorModel"
+      },
+      "DependencyReasoningResponse": {
+        "properties": {
+          "run_id": {
+            "type": "string",
+            "title": "Run Id"
+          },
+          "source": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Source"
+          },
+          "target": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Target"
+          },
+          "granularity": {
+            "type": "string",
+            "title": "Granularity"
+          },
+          "state": {
+            "type": "string",
+            "title": "State"
+          },
+          "interpretation": {
+            "type": "string",
+            "title": "Interpretation"
+          },
+          "explanation": {
+            "type": "string",
+            "title": "Explanation"
+          },
+          "rule_id": {
+            "type": "string",
+            "title": "Rule Id"
+          },
+          "reasoning_version": {
+            "type": "string",
+            "title": "Reasoning Version"
+          },
+          "evidence_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Evidence Ids"
+          },
+          "coverage": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CoverageVectorModel"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "flags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Flags"
+          },
+          "temporal_context": {
+            "$ref": "#/components/schemas/TemporalContextModel"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Warnings"
+          },
+          "is_mock": {
+            "type": "boolean",
+            "title": "Is Mock",
+            "default": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "run_id",
+          "source",
+          "target",
+          "granularity",
+          "state",
+          "interpretation",
+          "explanation",
+          "rule_id",
+          "reasoning_version",
+          "evidence_ids",
+          "temporal_context"
+        ],
+        "title": "DependencyReasoningResponse"
+      },
+      "EntitySearchItem": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "type": {
+            "type": "string",
+            "title": "Type"
+          },
+          "namespace": {
+            "type": "string",
+            "title": "Namespace"
+          },
+          "display_name": {
+            "type": "string",
+            "title": "Display Name"
+          },
+          "fully_qualified_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fully Qualified Name"
+          },
+          "column_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Column Count"
+          },
+          "row_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Row Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "type",
+          "namespace",
+          "display_name"
+        ],
+        "title": "EntitySearchItem"
+      },
+      "EvidenceDetailResponse": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success",
+            "default": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/EvidenceDossierData"
+          }
+        },
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "title": "EvidenceDetailResponse"
+      },
+      "EvidenceDossierData": {
+        "properties": {
+          "evidence_id": {
+            "type": "string",
+            "title": "Evidence Id"
+          },
+          "evidence_type": {
+            "type": "string",
+            "title": "Evidence Type"
+          },
+          "source_system": {
+            "type": "string",
+            "title": "Source System"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "granularity": {
+            "type": "string",
+            "title": "Granularity"
+          },
+          "operator": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Operator"
+          },
+          "query_fingerprint": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Query Fingerprint"
+          },
+          "schema_fingerprint": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Schema Fingerprint"
+          },
+          "expression_fingerprint": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expression Fingerprint"
+          },
+          "parser_status": {
+            "type": "string",
+            "title": "Parser Status"
+          },
+          "coverage": {
+            "type": "object",
+            "title": "Coverage"
+          },
+          "temporal": {
+            "type": "object",
+            "title": "Temporal"
+          },
+          "source": {
+            "type": "object",
+            "title": "Source"
+          },
+          "target": {
+            "type": "object",
+            "title": "Target"
+          },
+          "diagnostics": {
+            "type": "object",
+            "title": "Diagnostics"
+          },
+          "raw_event": {
+            "$ref": "#/components/schemas/RawEventInfo"
+          },
+          "lineage_versions": {
+            "items": {
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Lineage Versions"
+          }
+        },
+        "type": "object",
+        "required": [
+          "evidence_id",
+          "evidence_type",
+          "source_system",
+          "granularity",
+          "parser_status",
+          "raw_event"
+        ],
+        "title": "EvidenceDossierData"
+      },
+      "EvidenceListResponse": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success",
+            "default": true
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit"
+          },
+          "offset": {
+            "type": "integer",
+            "title": "Offset"
+          },
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/EvidenceSummaryItem"
+            },
+            "type": "array",
+            "title": "Data"
+          }
+        },
+        "type": "object",
+        "required": [
+          "total",
+          "limit",
+          "offset",
+          "data"
+        ],
+        "title": "EvidenceListResponse"
+      },
+      "EvidenceSummaryItem": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "evidence_id": {
+            "type": "string",
+            "title": "Evidence Id"
+          },
+          "evidence_type": {
+            "type": "string",
+            "title": "Evidence Type"
+          },
+          "source_system": {
+            "type": "string",
+            "title": "Source System"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "granularity": {
+            "type": "string",
+            "title": "Granularity"
+          },
+          "operator": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Operator"
+          },
+          "event_time": {
+            "type": "string",
+            "title": "Event Time"
+          },
+          "payload_hash": {
+            "type": "string",
+            "title": "Payload Hash"
+          },
+          "source_column_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Column Id"
+          },
+          "target_column_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Column Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "evidence_id",
+          "evidence_type",
+          "source_system",
+          "granularity",
+          "event_time",
+          "payload_hash"
+        ],
+        "title": "EvidenceSummaryItem"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "HealthResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "title": "Status",
+            "description": "ok | degraded | down",
+            "default": "ok"
+          },
+          "db": {
+            "type": "string",
+            "title": "Db",
+            "description": "Storage authority connection status",
+            "default": "connected"
+          },
+          "projection": {
+            "type": "string",
+            "title": "Projection",
+            "description": "Graph projection status",
+            "default": "not_configured"
+          },
+          "version": {
+            "type": "string",
+            "title": "Version",
+            "description": "Kairos engine version",
+            "default": "1.0.0-m5"
+          }
+        },
+        "type": "object",
+        "title": "HealthResponse"
+      },
+      "LineageEdge": {
+        "properties": {
+          "edge_id": {
+            "type": "string",
+            "title": "Edge Id"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source"
+          },
+          "target": {
+            "type": "string",
+            "title": "Target"
+          },
+          "granularity": {
+            "type": "string",
+            "title": "Granularity",
+            "default": "COLUMN"
+          },
+          "operator_fingerprint": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Operator Fingerprint"
+          },
+          "query_fingerprint": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Query Fingerprint"
+          },
+          "relationship_type": {
+            "type": "string",
+            "title": "Relationship Type",
+            "default": "DERIVED_FROM"
+          },
+          "reasoning_state": {
+            "type": "string",
+            "title": "Reasoning State",
+            "default": "POSSIBLE"
+          },
+          "temporal": {
+            "$ref": "#/components/schemas/TemporalInterval"
+          },
+          "evidence": {
+            "items": {
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Evidence"
+          },
+          "d14_warning": {
+            "type": "boolean",
+            "title": "D14 Warning",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "edge_id",
+          "source",
+          "target",
+          "temporal"
+        ],
+        "title": "LineageEdge"
+      },
+      "LineageGraphResponse": {
+        "properties": {
+          "center_node": {
+            "$ref": "#/components/schemas/LineageNode"
+          },
+          "nodes": {
+            "items": {
+              "$ref": "#/components/schemas/LineageNode"
+            },
+            "type": "array",
+            "title": "Nodes"
+          },
+          "edges": {
+            "items": {
+              "$ref": "#/components/schemas/LineageEdge"
+            },
+            "type": "array",
+            "title": "Edges"
+          },
+          "stats": {
+            "$ref": "#/components/schemas/LineageGraphStats"
+          },
+          "temporal": {
+            "$ref": "#/components/schemas/TemporalContextModel"
+          },
+          "evidence_information": {
+            "type": "object",
+            "title": "Evidence Information"
+          }
+        },
+        "type": "object",
+        "required": [
+          "center_node",
+          "nodes",
+          "edges",
+          "stats",
+          "temporal"
+        ],
+        "title": "LineageGraphResponse"
+      },
+      "LineageGraphStats": {
+        "properties": {
+          "total_nodes": {
+            "type": "integer",
+            "title": "Total Nodes"
+          },
+          "total_edges": {
+            "type": "integer",
+            "title": "Total Edges"
+          },
+          "depth": {
+            "type": "integer",
+            "title": "Depth"
+          },
+          "truncated": {
+            "type": "boolean",
+            "title": "Truncated",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "total_nodes",
+          "total_edges",
+          "depth"
+        ],
+        "title": "LineageGraphStats"
+      },
+      "LineageNode": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "type": {
+            "type": "string",
+            "title": "Type"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "display_name": {
+            "type": "string",
+            "title": "Display Name"
+          },
+          "namespace": {
+            "type": "string",
+            "title": "Namespace"
+          },
+          "schema_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Schema Version"
+          },
+          "columns": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Columns"
+          },
+          "metadata": {
+            "type": "object",
+            "title": "Metadata"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "type",
+          "name",
+          "display_name",
+          "namespace"
+        ],
+        "title": "LineageNode"
+      },
+      "RawEventInfo": {
+        "properties": {
+          "event_id": {
+            "type": "string",
+            "title": "Event Id"
+          },
+          "payload": {
+            "type": "object",
+            "title": "Payload"
+          },
+          "payload_hash": {
+            "type": "string",
+            "title": "Payload Hash"
+          },
+          "source_system": {
+            "type": "string",
+            "title": "Source System"
+          },
+          "ingestion_time": {
+            "type": "string",
+            "title": "Ingestion Time"
+          }
+        },
+        "type": "object",
+        "required": [
+          "event_id",
+          "payload",
+          "payload_hash",
+          "source_system",
+          "ingestion_time"
+        ],
+        "title": "RawEventInfo"
+      },
+      "SearchResponse": {
+        "properties": {
+          "query": {
+            "type": "string",
+            "title": "Query"
+          },
+          "results": {
+            "items": {
+              "$ref": "#/components/schemas/EntitySearchItem"
+            },
+            "type": "array",
+            "title": "Results"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cursor"
+          }
+        },
+        "type": "object",
+        "required": [
+          "query",
+          "results",
+          "total"
+        ],
+        "title": "SearchResponse"
+      },
+      "TemporalContextModel": {
+        "properties": {
+          "valid_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Valid At",
+            "description": "T_v: Real-world validity time (half-open [valid_from, valid_to))"
+          },
+          "known_as_of": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Known As Of",
+            "description": "T_k: Knowledge transaction time [transaction_from, transaction_to)"
+          }
+        },
+        "type": "object",
+        "title": "TemporalContextModel"
+      },
+      "TemporalInterval": {
+        "properties": {
+          "valid_from": {
+            "type": "string",
+            "title": "Valid From"
+          },
+          "valid_to": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Valid To"
+          },
+          "transaction_from": {
+            "type": "string",
+            "title": "Transaction From"
+          },
+          "transaction_to": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Transaction To"
+          },
+          "effective_time_status": {
+            "type": "string",
+            "title": "Effective Time Status",
+            "default": "VERIFIED"
+          },
+          "is_current": {
+            "type": "boolean",
+            "title": "Is Current",
+            "default": true
+          },
+          "is_correction": {
+            "type": "boolean",
+            "title": "Is Correction",
+            "default": false
+          },
+          "correction_of": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Correction Of"
+          }
+        },
+        "type": "object",
+        "required": [
+          "valid_from",
+          "transaction_from"
+        ],
+        "title": "TemporalInterval"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      }
+    }
+  }
+}
