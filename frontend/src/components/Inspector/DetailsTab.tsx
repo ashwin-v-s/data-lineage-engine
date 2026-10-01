@@ -61,7 +61,7 @@ export const DetailsTab: React.FC<DetailsTabProps> = ({
           </div>
           <div className="flex items-center justify-between">
             <span className="text-outline">Row Count:</span>
-            <span className="text-tertiary font-bold">{node.metadata?.row_count?.toLocaleString() || '1,120,410'}</span>
+            <span className="text-tertiary font-bold">{node.metadata?.row_count?.toLocaleString() || '—'}</span>
           </div>
         </div>
 
@@ -89,6 +89,18 @@ export const DetailsTab: React.FC<DetailsTabProps> = ({
 
   // Edge / Dependency view
   const state = dependencyData?.state || selectedEdge?.data?.reasoning_state || 'UNKNOWN';
+
+  // Show empty state when nothing is selected
+  if (!selectedEdge && !selectedNode) {
+    return (
+      <div className="flex flex-col items-center justify-center h-48 gap-3 text-outline">
+        <span className="material-symbols-outlined text-[36px]">query_stats</span>
+        <span className="font-mono-sm text-xs text-center">
+          Click a node or edge on the canvas<br />to inspect its details
+        </span>
+      </div>
+    );
+  }
   const interp =
     dependencyData?.interpretation ||
     (state === 'OBSERVED'
@@ -117,11 +129,13 @@ export const DetailsTab: React.FC<DetailsTabProps> = ({
         <span className="font-headline-sm text-sm font-bold text-on-surface leading-tight mt-0.5">
           {sourceName} → {targetName}
         </span>
-        <div className="flex items-center gap-1.5 font-mono-sm text-xs text-outline mt-0.5">
-          <span className="text-outline font-semibold">gross_amount</span>
-          <span className="material-symbols-outlined text-[14px]">trending_flat</span>
-          <span className="text-on-surface font-semibold">net_revenue</span>
-        </div>
+        {dependencyData && (
+          <div className="flex items-center gap-1.5 font-mono-sm text-xs text-outline mt-0.5">
+            <span className="text-outline font-semibold">{dependencyData.source.display}</span>
+            <span className="material-symbols-outlined text-[14px]">trending_flat</span>
+            <span className="text-on-surface font-semibold">{dependencyData.target.display}</span>
+          </div>
+        )}
       </div>
 
       {/* 4-State Reasoning Card with Verbatim Interpretation (Section 12) */}
@@ -140,10 +154,10 @@ export const DetailsTab: React.FC<DetailsTabProps> = ({
           </span>
         </div>
         <p className="font-body-sm text-xs text-on-surface leading-relaxed">{interp}</p>
-        {isHistorical && (
+        {isHistorical && dependencyData && (
           <div className="flex items-center justify-between bg-surface-container-lowest px-2.5 py-1 rounded-xl font-mono-sm text-[11px] border border-outline-variant/30 mt-0.5">
-            <span className="text-outline">Prior Run Valid at Aug 15:</span>
-            <span className="text-outline font-semibold truncate ml-1">run_2026_08_14_230000 (v1.9)</span>
+            <span className="text-outline">Run ID:</span>
+            <span className="text-outline font-semibold truncate ml-1">{dependencyData.run_id}</span>
           </div>
         )}
       </div>
@@ -169,7 +183,9 @@ export const DetailsTab: React.FC<DetailsTabProps> = ({
           </div>
           <div className="flex items-center justify-between">
             <span className="text-outline">Edge Effective Range:</span>
-            <span className="text-outline font-mono text-[11px]">[2026-09-01, ∞)</span>
+            <span className="text-outline font-mono text-[11px]">
+              {dependencyData ? dependencyData.temporal_context.as_of : '—'}
+            </span>
           </div>
         </div>
 
@@ -187,33 +203,35 @@ export const DetailsTab: React.FC<DetailsTabProps> = ({
         )}
       </div>
 
-      {/* Directional Adjacency */}
-      <div className="flex flex-col gap-2 p-3 rounded-xl bg-surface-container border border-outline-variant/30">
-        <div className="flex items-center justify-between">
-          <span className="font-label-caps text-[10px] uppercase text-outline font-semibold">
-            Directional Adjacency
-          </span>
-          <div className="flex items-center gap-2 font-mono-sm text-[11px]">
-            <span className="text-primary font-semibold">Upstream: 4</span>
-            <span className="text-outline">|</span>
-            <span className="text-on-surface font-semibold">Downstream: 2</span>
+      {/* Directional Adjacency — only shown when real edge is selected */}
+      {selectedEdge && (
+        <div className="flex flex-col gap-2 p-3 rounded-xl bg-surface-container border border-outline-variant/30">
+          <div className="flex items-center justify-between">
+            <span className="font-label-caps text-[10px] uppercase text-outline font-semibold">
+              Directional Adjacency
+            </span>
+            <div className="flex items-center gap-2 font-mono-sm text-[11px]">
+              <span className="text-primary font-semibold">Source: {sourceName}</span>
+              <span className="text-outline">→</span>
+              <span className="text-on-surface font-semibold">Target: {targetName}</span>
+            </div>
           </div>
+          {dependencyData?.evidence && dependencyData.evidence.length > 0 ? (
+            <div className="flex flex-col gap-1.5 font-mono-sm text-[11px]">
+              {dependencyData.evidence.map((ev) => (
+                <div key={ev.evidence_id} className="flex items-center justify-between p-1.5 rounded-xl bg-surface-container-high">
+                  <span className="text-outline font-medium truncate">{ev.evidence_type}</span>
+                  <span className="text-on-surface font-bold shrink-0">{ev.source_system}</span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <span className="font-mono-sm text-[11px] text-outline">
+              No evidence records for this edge yet.
+            </span>
+          )}
         </div>
-        <div className="flex flex-col gap-1.5 font-mono-sm text-[11px]">
-          <div className="flex items-center justify-between p-1.5 rounded-xl bg-surface-container-high">
-            <span className="text-outline font-medium truncate">‹ gross_amount (Upstream source)</span>
-            <span className="text-outline font-bold shrink-0">{isHistorical ? 'UNKNOWN AT T_v' : 'OBSERVED'}</span>
-          </div>
-          <div className="flex items-center justify-between p-1.5 rounded-xl bg-surface-container-high">
-            <span className="text-on-surface font-medium truncate">‹ customer_id (Upstream source)</span>
-            <span className="text-tertiary font-bold shrink-0">POSSIBLE</span>
-          </div>
-          <div className="flex items-center justify-between p-1.5 rounded-xl bg-surface-container-high">
-            <span className="text-on-surface font-medium truncate">monthly_total (Downstream consumer) ›</span>
-            <span className="text-primary font-bold shrink-0">DERIVED</span>
-          </div>
-        </div>
-      </div>
+      )}
 
       {/* Benchmark Oracle Block (Hazard Mode Only) */}
       <BenchmarkOracleCard runId={runId} enabled={benchmarkMode} />

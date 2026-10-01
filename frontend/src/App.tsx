@@ -35,19 +35,9 @@ const InvestigatorCockpit: React.FC = () => {
   const [rightInspectorOpen, setRightInspectorOpen] = useState<boolean>(true);
   const [popoverNode, setPopoverNode] = useState<string | null>(null);
 
-  // Selected graph items
+  // Selected graph items — start empty, populated when user clicks a node/edge
   const [selectedNode, setSelectedNode] = useState<any | null>(null);
-  const [selectedEdge, setSelectedEdge] = useState<any | null>({
-    id: 'edge_stg_to_fact',
-    source: 'stg_customer_orders',
-    target: 'orders_fact',
-    data: {
-      reasoning_state: 'OBSERVED',
-      relationship_type: 'DERIVED_FROM',
-      d14_warning: true,
-      evidence_ids: ['ev_stg_orders_01', 'ev_stg_orders_02'],
-    },
-  });
+  const [selectedEdge, setSelectedEdge] = useState<any | null>(null);
 
   // State filters
   const [selectedStates, setSelectedStates] = useState<Record<string, boolean>>({
