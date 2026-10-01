@@ -35,19 +35,9 @@ const InvestigatorCockpit: React.FC = () => {
   const [rightInspectorOpen, setRightInspectorOpen] = useState<boolean>(true);
   const [popoverNode, setPopoverNode] = useState<string | null>(null);
 
-  // Selected graph items
+  // Selected graph items — start empty, populated when user clicks a node/edge
   const [selectedNode, setSelectedNode] = useState<any | null>(null);
-  const [selectedEdge, setSelectedEdge] = useState<any | null>({
-    id: 'edge_stg_to_fact',
-    source: 'stg_customer_orders',
-    target: 'orders_fact',
-    data: {
-      reasoning_state: 'OBSERVED',
-      relationship_type: 'DERIVED_FROM',
-      d14_warning: true,
-      evidence_ids: ['ev_stg_orders_01', 'ev_stg_orders_02'],
-    },
-  });
+  const [selectedEdge, setSelectedEdge] = useState<any | null>(null);
 
   // State filters
   const [selectedStates, setSelectedStates] = useState<Record<string, boolean>>({
@@ -74,8 +64,13 @@ const InvestigatorCockpit: React.FC = () => {
   const { data: dependencyData } = useDependencyQuery(runId, depSource, depTarget, validAt, knownAsOf);
 
   // Filter edges based on reasoning state selection
+  // Edges from the real DB have {source, target, granularity} — no reasoning_state yet.
+  // Keep the filter ready for when M4 reasoning is wired; default to showing all edges.
   const rawEdges = lineageData?.edges || [];
-  const filteredEdges = rawEdges.filter((e) => selectedStates[e.reasoning_state] ?? true);
+  const filteredEdges = rawEdges.filter((e) => {
+    const state = (e as any).reasoning_state;
+    return state ? (selectedStates[state] ?? true) : true;
+  });
   const rawNodes = lineageData?.nodes || [];
 
   return (

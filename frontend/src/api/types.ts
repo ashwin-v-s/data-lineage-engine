@@ -38,48 +38,33 @@ export interface EntitySummary {
   row_count?: number;
 }
 
-export interface SearchResponse {
-  query: string;
-  results: EntitySummary[];
-  total: number;
-  cursor?: string;
+// Matches backend SearchResult schema: {id, type, name}
+export interface SearchResult {
+  id: string;
+  type: string;   // e.g. "TABLE", "COLUMN"
+  name: string;   // qualified: "db.schema.table" or "db.schema.table.column"
 }
 
+export interface SearchResponse {
+  results: SearchResult[];
+  total: number;
+}
+
+// Matches backend LineageNode schema
 export interface LineageNodeData {
   id: string;
   name: string;
-  entity_type: EntityType;
-  namespace: string;
+  type: string;
+  display_name?: string;
+  namespace?: string;
   schema_version?: string;
-  columns: string[];
-  metadata: Record<string, any>;
 }
 
-export interface LineageEdgeData {
-  edge_id: string;
-  source_id: string;
-  target_id: string;
-  relationship_type: RelationshipType;
-  granularity: 'DATASET' | 'COLUMN';
-  reasoning_state: ReasoningState;
-  operator?: string;
-  d14_warning: boolean;
-  temporal_range: {
-    valid_from: string;
-    valid_to: string | null;
-    tx_from: string;
-    tx_to: string | null;
-  };
-}
-
+// Matches backend LineageResponse schema
 export interface LineageResponse {
-  anchor_entity_id: string;
+  asset_id: string;
   nodes: LineageNodeData[];
-  edges: LineageEdgeData[];
-  temporal_context: TemporalContext;
-  granularity: 'DATASET' | 'COLUMN';
-  depth: number;
-  truncated: boolean;
+  edges: Array<{ edge_id: string; source: string; target: string; granularity: string }>;
 }
 
 export interface CoverageVector {
@@ -102,18 +87,34 @@ export interface EvidenceRef {
   raw_payload_hash?: string;
 }
 
+// Matches backend DependencyStateResponse
 export interface DependencyResponse {
   run_id: string;
   source: { column_id: string; display: string };
   target: { column_id: string; display: string };
   granularity: string;
   state: ReasoningState;
-  interpretation: string; // Locked verbatim 4-state sentence
-  temporal_context: TemporalContext;
-  coverage: CoverageVector;
-  evidence: EvidenceRef[];
-  reasoning: { engine_version: string; rule_id: string };
-  warnings: string[];
+  interpretation: string;
+  explanation: string;
+  rule_id: string;
+  reasoning_version: string;
+  flags: string[];
+  evidence: Array<{
+    evidence_id: string;
+    evidence_type: string;
+    source_system: string;
+    event_time?: string | null;
+  }>;
+  coverage?: {
+    run_covered: boolean;
+    operator_covered: boolean;
+    source_dataset_covered: boolean;
+    target_dataset_covered: boolean;
+    branches_covered: boolean;
+    coverage_mode: string;
+    parser_status: string;
+  } | null;
+  temporal_context: { as_of: string; recorded_as_of: string };
   is_mock: boolean;
 }
 

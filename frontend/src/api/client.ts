@@ -69,12 +69,15 @@ async function request<T>(endpoint: string, options?: RequestInit): Promise<T> {
 export const api = {
   getHealth: () => request<HealthResponse>('/health'),
 
-  search: (query: string, type?: string, limit = 20) => {
-    const params = new URLSearchParams({ q: query, limit: String(limit) });
-    if (type) params.append('type', type);
+  // Backend: GET /api/v1/search?q=&asset_type=&page=&page_size=&sort_by=&sort_order=
+  search: (query: string, type?: string, pageSize = 20) => {
+    const params = new URLSearchParams({ page_size: String(pageSize) });
+    if (query) params.append('q', query);
+    if (type) params.append('asset_type', type);
     return request<SearchResponse>(`/search?${params.toString()}`);
   },
 
+  // Backend: GET /api/v1/assets/{asset_id}/lineage?as_of=&recorded_as_of=&depth=&granularity=
   getLineage: (
     entity: string,
     params?: {
@@ -90,14 +93,15 @@ export const api = {
     if (params?.granularity) q.append('granularity', params.granularity);
     if (params?.depth) q.append('depth', String(params.depth));
     const qs = q.toString() ? `?${q.toString()}` : '';
-    return request<LineageResponse>(`/lineage/${encodeURIComponent(entity)}${qs}`);
+    return request<LineageResponse>(`/assets/${encodeURIComponent(entity)}/lineage${qs}`);
   },
 
+  // Convenience wrappers — reuse the main lineage endpoint with depth=1
   getLineageUpstream: (entity: string, depth = 1) =>
-    request<LineageResponse>(`/lineage/${encodeURIComponent(entity)}/upstream?depth=${depth}`),
+    request<LineageResponse>(`/assets/${encodeURIComponent(entity)}/lineage?depth=${depth}`),
 
   getLineageDownstream: (entity: string, depth = 1) =>
-    request<LineageResponse>(`/lineage/${encodeURIComponent(entity)}/downstream?depth=${depth}`),
+    request<LineageResponse>(`/assets/${encodeURIComponent(entity)}/lineage?depth=${depth}`),
 
   getRun: (runId: string) => request<RunResponse>(`/runs/${encodeURIComponent(runId)}`),
 

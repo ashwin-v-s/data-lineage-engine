@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { api } from '../../api/client';
-import { EntitySummary } from '../../api/types';
+import { SearchResult } from '../../api/types';
 
 interface HeaderProps {
   density: 'investigator' | 'research';
@@ -20,7 +20,7 @@ export const Header: React.FC<HeaderProps> = ({
   onSelectEntity,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<EntitySummary[]>([]);
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -150,9 +150,9 @@ export const Header: React.FC<HeaderProps> = ({
                   }}
                 >
                   <div className="flex flex-col">
-                    <span className="font-mono-sm text-xs font-bold text-on-surface">{item.display_name || item.name}</span>
+                    <span className="font-mono-sm text-xs font-bold text-on-surface">{item.name}</span>
                     <span className="font-mono-sm text-[10px] text-outline">
-                      {item.namespace} • {item.entity_type} {item.column_count ? `(${item.column_count} cols)` : ''}
+                      {item.type}
                     </span>
                   </div>
                   <span className="px-1.5 py-0.5 rounded bg-surface-container-lowest text-primary font-label-caps text-[10px]">
