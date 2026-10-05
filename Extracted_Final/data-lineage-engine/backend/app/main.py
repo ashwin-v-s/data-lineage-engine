@@ -289,23 +289,26 @@ def get_lineage_upstream(entity: str, depth: int = Query(1)):
                        src.asset_type AS src_type, tgt.asset_type AS tgt_type,
                        src.source_system AS src_system
                 FROM lineage_edge le
-                JOIN edge_temporal_version etv ON etv.edge_id = le.id
+                LEFT JOIN edge_temporal_version etv ON etv.edge_id = le.id
                 LEFT JOIN dataset src ON src.id = le.source_id
                 LEFT JOIN dataset tgt ON tgt.id = le.target_id
-                WHERE tgt.name = %s
-                   OR tgt.id::text = %s
+                WHERE (tgt.name = %s OR tgt.id::text = %s)
+                  AND le.granularity = 'DATASET'
             """, [entity, entity])
             rows = cur.fetchall()
             edges = [{"id": str(r["id"]), "source": str(r["source_id"]),
                       "target": str(r["target_id"]), "reasoning_state": "OBSERVED",
                       "relationship_type": "DERIVED_FROM", "is_mock": False} for r in rows]
             node_ids = {str(r["source_id"]) for r in rows} | {str(r["target_id"]) for r in rows}
-            cur.execute("SELECT id, name, schema_name, asset_type, source_system FROM dataset WHERE id::text = ANY(%s)",
-                        [list(node_ids)])
-            node_rows = cur.fetchall()
-            nodes = [{"id": str(r["id"]), "label": r["name"], "type": r["asset_type"],
-                      "system": r["source_system"], "schema": r["schema_name"], "is_mock": False}
-                     for r in node_rows]
+            if node_ids:
+                cur.execute("SELECT id, name, schema_name, asset_type, source_system FROM dataset WHERE id::text = ANY(%s)",
+                            [list(node_ids)])
+                node_rows = cur.fetchall()
+                nodes = [{"id": str(r["id"]), "label": r["name"], "type": r["asset_type"],
+                          "system": r["source_system"], "schema": r["schema_name"], "is_mock": False}
+                         for r in node_rows]
+            else:
+                nodes = []
         return {"anchor": entity, "nodes": nodes, "edges": edges, "direction": "upstream", "is_mock": False}
     except Exception as e:
         upstream_edges = [e for e in MOCK_EDGES if e["target"] == entity]
@@ -322,24 +325,31 @@ def get_lineage_downstream(entity: str, depth: int = Query(1)):
         with get_cursor() as cur:
             cur.execute("""
                 SELECT le.id, le.source_id, le.target_id,
-                       src.name AS source_name, tgt.name AS target_name
+                       src.name AS source_name, tgt.name AS target_name,
+                       src.schema_name AS src_schema, tgt.schema_name AS tgt_schema,
+                       src.asset_type AS src_type, tgt.asset_type AS tgt_type,
+                       tgt.source_system AS tgt_system
                 FROM lineage_edge le
-                JOIN edge_temporal_version etv ON etv.edge_id = le.id
+                LEFT JOIN edge_temporal_version etv ON etv.edge_id = le.id
                 LEFT JOIN dataset src ON src.id = le.source_id
                 LEFT JOIN dataset tgt ON tgt.id = le.target_id
-                WHERE src.name = %s OR src.id::text = %s
+                WHERE (src.name = %s OR src.id::text = %s)
+                  AND le.granularity = 'DATASET'
             """, [entity, entity])
             rows = cur.fetchall()
             edges = [{"id": str(r["id"]), "source": str(r["source_id"]),
                       "target": str(r["target_id"]), "reasoning_state": "OBSERVED",
                       "relationship_type": "DERIVED_FROM", "is_mock": False} for r in rows]
             node_ids = {str(r["source_id"]) for r in rows} | {str(r["target_id"]) for r in rows}
-            cur.execute("SELECT id, name, schema_name, asset_type, source_system FROM dataset WHERE id::text = ANY(%s)",
-                        [list(node_ids)])
-            node_rows = cur.fetchall()
-            nodes = [{"id": str(r["id"]), "label": r["name"], "type": r["asset_type"],
-                      "system": r["source_system"], "schema": r["schema_name"], "is_mock": False}
-                     for r in node_rows]
+            if node_ids:
+                cur.execute("SELECT id, name, schema_name, asset_type, source_system FROM dataset WHERE id::text = ANY(%s)",
+                            [list(node_ids)])
+                node_rows = cur.fetchall()
+                nodes = [{"id": str(r["id"]), "label": r["name"], "type": r["asset_type"],
+                          "system": r["source_system"], "schema": r["schema_name"], "is_mock": False}
+                         for r in node_rows]
+            else:
+                nodes = []
         return {"anchor": entity, "nodes": nodes, "edges": edges, "direction": "downstream", "is_mock": False}
     except Exception as e:
         downstream_edges = [e for e in MOCK_EDGES if e["source"] == entity]
