@@ -126,7 +126,7 @@ def main():
                         """,
                         (
                             evidence_id,
-                            "RUNTIME_OBSERVED",
+                            "RUNTIME_POSITIVE",
                             "synthetic_openlineage",
                             run_id,
                             source_row[0],

@@ -403,20 +403,120 @@ def get_asset(entity: str):
 
 @app.get("/api/v1/runs/{run_id}")
 def get_run(run_id: str):
-    """Mock run endpoint (PLUMBING)."""
+    """Run metadata — real from Supabase, fallback to mock."""
+    try:
+        from backend.app.db import get_cursor
+        with get_cursor() as cur:
+            cur.execute("""
+                SELECT er.run_id, er.status, er.started_at, er.completed_at,
+                       j.name AS job_name, j.namespace
+                FROM execution_run er
+                JOIN job j ON j.id = er.job_id
+                WHERE er.run_id = %s
+                LIMIT 1
+            """, [run_id])
+            row = cur.fetchone()
+            if row:
+                return {
+                    "run_id": row["run_id"],
+                    "job_id": row["job_name"],
+                    "status": row["status"],
+                    "started_at": str(row["started_at"]) if row["started_at"] else None,
+                    "is_mock": False,
+                }
+    except Exception:
+        pass
     return {"run_id": run_id, "job_id": "kairos_demo_job", "status": "COMPLETE",
             "started_at": "2026-09-23T09:32:14Z", "is_mock": True}
 
 
-@app.get("/api/v1/evidence/{dependency}")
-def get_evidence(dependency: str):
-    """Mock evidence endpoint (PLUMBING)."""
-    return {"dependency": dependency, "evidence": [
-        {"evidence_id": "ev_static_001", "type": "STATIC", "source": "SQLGlot",
-         "parser_status": "SUPPORTED", "is_mock": True},
-        {"evidence_id": "ev_runtime_001", "type": "RUNTIME", "source": "OpenLineage",
-         "observed": True, "is_mock": True},
-    ], "is_mock": True}
+@app.get("/api/v1/evidence/{evidence_id}")
+def get_evidence(evidence_id: str):
+    """
+    Real evidence from Supabase.
+    Returns all evidence records for a given evidence_id, column name,
+    or dataset name — supports the UI's evidence panel.
+    """
+    try:
+        from backend.app.db import get_cursor
+        with get_cursor() as cur:
+            # Try direct evidence_id match first
+            cur.execute("""
+                SELECT
+                    ev.evidence_id,
+                    ev.evidence_type,
+                    ev.source_system,
+                    ev.run_id,
+                    ev.granularity,
+                    ev.operator,
+                    ev.query_fingerprint,
+                    ev.parser_status,
+                    ev.ingestion_time,
+                    ev.diagnostics,
+                    src_ds.name AS source_dataset,
+                    src_ds.schema_name AS source_schema,
+                    tgt_ds.name AS target_dataset,
+                    tgt_ds.schema_name AS target_schema,
+                    src_col.column_name AS source_column,
+                    tgt_col.column_name AS target_column
+                FROM evidence ev
+                LEFT JOIN dataset src_ds ON src_ds.id = ev.source_dataset_id
+                LEFT JOIN dataset tgt_ds ON tgt_ds.id = ev.target_dataset_id
+                LEFT JOIN column_record src_col ON src_col.id = ev.source_column_id
+                LEFT JOIN column_record tgt_col ON tgt_col.id = ev.target_column_id
+                WHERE ev.evidence_id = %s
+                   OR src_col.column_name ILIKE %s
+                   OR tgt_col.column_name ILIKE %s
+                   OR src_ds.name ILIKE %s
+                ORDER BY ev.ingestion_time DESC
+                LIMIT 20
+            """, [evidence_id, f"%{evidence_id}%", f"%{evidence_id}%", f"%{evidence_id}%"])
+            rows = cur.fetchall()
+
+            if rows:
+                evidence_list = [
+                    {
+                        "evidence_id": r["evidence_id"],
+                        "type": r["evidence_type"],
+                        "source_system": r["source_system"],
+                        "run_id": r["run_id"],
+                        "granularity": r["granularity"],
+                        "operator": r["operator"],
+                        "query_fingerprint": r["query_fingerprint"],
+                        "parser_status": r["parser_status"],
+                        "ingestion_time": str(r["ingestion_time"]) if r["ingestion_time"] else None,
+                        "source": f"{r['source_schema']}.{r['source_dataset']}.{r['source_column']}"
+                                  if r["source_column"] else
+                                  f"{r['source_schema']}.{r['source_dataset']}" if r["source_dataset"] else None,
+                        "target": f"{r['target_schema']}.{r['target_dataset']}.{r['target_column']}"
+                                  if r["target_column"] else
+                                  f"{r['target_schema']}.{r['target_dataset']}" if r["target_dataset"] else None,
+                        "diagnostics": r["diagnostics"],
+                        "is_mock": False,
+                    }
+                    for r in rows
+                ]
+                return {
+                    "query": evidence_id,
+                    "count": len(evidence_list),
+                    "evidence": evidence_list,
+                    "is_mock": False,
+                }
+    except Exception as e:
+        pass
+
+    # Fallback mock
+    return {
+        "query": evidence_id,
+        "count": 2,
+        "evidence": [
+            {"evidence_id": "ev_static_001", "type": "STATIC_DEPENDENCY",
+             "source_system": "sqlglot", "parser_status": "SUPPORTED", "is_mock": True},
+            {"evidence_id": "ev_runtime_001", "type": "RUNTIME_POSITIVE",
+             "source_system": "openlineage", "is_mock": True},
+        ],
+        "is_mock": True,
+    }
 
 
 @app.get("/api/v1/evaluation/oracle/{run_id}")

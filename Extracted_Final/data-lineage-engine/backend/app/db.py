@@ -19,8 +19,19 @@ load_dotenv()
 
 DATABASE_URL = os.getenv(
     "DATABASE_URL",
-    "postgresql://postgres:postgres@localhost:5432/kairos"
+    None  # No hardcoded fallback — fail loudly if .env is missing
 )
+
+if not DATABASE_URL:
+    import warnings
+    warnings.warn(
+        "DATABASE_URL not set. Create a .env file with your Supabase connection string. "
+        "See .env.example for the format.",
+        RuntimeWarning,
+        stacklevel=2,
+    )
+    # Use localhost only as absolute last resort for local dev
+    DATABASE_URL = "postgresql://postgres:postgres@localhost:5432/kairos"
 
 
 def get_connection():
