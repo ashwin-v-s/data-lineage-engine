@@ -50,7 +50,14 @@ def _resolve_asset(cur, asset_id: str) -> dict | None:
         )
         row = cur.fetchone()
         if row:
-            return dict(row)
+            return {
+                "id": row["id"],
+                "name": row["name"],
+                "type": row["type"],
+                "schema_name": row.get("schema_name"),
+                "database_name": row.get("database_name"),
+                "source_system": row.get("source_system"),
+            }
 
     cur.execute(
         """
@@ -64,7 +71,16 @@ def _resolve_asset(cur, asset_id: str) -> dict | None:
         (asset_id,),
     )
     row = cur.fetchone()
-    return dict(row) if row else None
+    if row:
+        return {
+            "id": row["id"],
+            "name": row["name"],
+            "type": row["type"],
+            "schema_name": row.get("schema_name"),
+            "database_name": row.get("database_name"),
+            "source_system": row.get("source_system"),
+        }
+    return None
 
 
 def _walk_lineage(
@@ -97,7 +113,15 @@ def _walk_lineage(
             (list(frontier),),
         )
         for r in cur.fetchall():
-            nodes[r["id"]] = dict(r)
+            # RealDictCursor returns dict-like objects
+            nodes[r["id"]] = {
+                "id": r["id"],
+                "name": r["name"],
+                "type": r["type"],
+                "schema_name": r.get("schema_name"),
+                "database_name": r.get("database_name"),
+                "source_system": r.get("source_system"),
+            }
 
         # Find edges touching any frontier node, respecting bitemporal filters
         cur.execute(
@@ -157,7 +181,14 @@ def _walk_lineage(
             (unresolved,),
         )
         for r in cur.fetchall():
-            nodes[r["id"]] = dict(r)
+            nodes[r["id"]] = {
+                "id": r["id"],
+                "name": r["name"],
+                "type": r["type"],
+                "schema_name": r.get("schema_name"),
+                "database_name": r.get("database_name"),
+                "source_system": r.get("source_system"),
+            }
 
     return nodes, edges
 

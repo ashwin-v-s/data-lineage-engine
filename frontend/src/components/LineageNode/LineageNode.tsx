@@ -3,10 +3,12 @@ import { Handle, Position, NodeProps } from '@xyflow/react';
 
 export interface LineageCustomNodeData {
   id: string;
-  name: string;
-  display_name: string;
+  name?: string;
+  label?: string;
+  display_name?: string;
   type: string;
-  namespace: string;
+  namespace?: string;
+  schema?: string;
   schema_version?: string;
   columns?: string[];
   metadata?: Record<string, any>;
@@ -88,10 +90,10 @@ export const LineageNodeComponent: React.FC<NodeProps> = memo(({ data, selected 
 
       {/* Node Name */}
       <span className="font-mono-sm text-xs font-bold text-on-surface truncate">
-        {node.display_name || node.name}
+        {node.display_name || node.name || node.label}
       </span>
       <span className="font-mono-sm text-[10px] text-outline mt-0.5">
-        {node.namespace} {node.schema_version ? `• ${node.schema_version}` : ''}
+        {node.namespace || node.schema} {node.schema_version ? `• ${node.schema_version}` : ''}
       </span>
 
       {/* Column Preview if present */}

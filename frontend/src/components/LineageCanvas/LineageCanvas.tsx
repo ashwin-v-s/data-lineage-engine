@@ -84,15 +84,19 @@ export const LineageCanvas: React.FC<LineageCanvasProps> = ({
   // Convert API nodes to React Flow format
   const initialNodes: Node[] = useMemo(() => {
     return rawNodes.map((n) => {
-      const isAnchor = n.id === anchorId || n.name === anchorId;
+      // Handle both old (name) and new (label) field names from backend
+      const displayName = n.display_name || n.name || n.label || n.id;
+      const isAnchor = n.id === anchorId || n.name === anchorId || n.label === anchorId;
       return {
         id: n.id,           // use UUID so edges (source/target UUIDs) connect correctly
         type: 'lineageNode',
         position: { x: 0, y: 0 },
         data: {
           ...n,
-          display_name: n.display_name || n.name,
-          namespace: n.namespace || '',
+          display_name: displayName,
+          namespace: n.namespace || n.schema || '',
+          name: n.name || n.label,
+          label: n.label || n.name,
           isAnchor,
           onExpandDirection,
           onOpenPopover,
