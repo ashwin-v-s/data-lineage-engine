@@ -73,3 +73,19 @@ export function useBenchmarkOracleQuery(runId: string, enabled = false) {
     staleTime: 60_000,
   });
 }
+
+export function useLineageUpstreamQuery(entity: string, depth = 1) {
+  return useQuery({
+    queryKey: ['lineage', 'upstream', entity, depth],
+    queryFn: () => api.getLineageUpstream(entity, depth),
+    staleTime: 10_000,
+  });
+}
+
+export function useLineageDownstreamQuery(entity: string, depth = 1) {
+  return useQuery({
+    queryKey: ['lineage', 'downstream', entity, depth],
+    queryFn: () => api.getLineageDownstream(entity, depth),
+    staleTime: 10_000,
+  });
+}

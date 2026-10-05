@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query';
 
 import { Header } from './components/Header/Header';
 import { BitemporalBar } from './components/BitemporalBar/BitemporalBar';
@@ -20,6 +20,7 @@ const queryClient = new QueryClient({
 });
 
 const InvestigatorCockpit: React.FC = () => {
+  const queryClient = useQueryClient();
   // Bitemporal & Investigation State
   const [activeEntity, setActiveEntity] = useState<string>('orders_fact');
   const [runId, setRunId] = useState<string>('run_2026_09_23_093214');
@@ -48,6 +49,9 @@ const InvestigatorCockpit: React.FC = () => {
       evidence_ids: ['ev_stg_orders_01', 'ev_stg_orders_02'],
     },
   });
+
+  // Track expanded nodes to avoid duplicates
+  const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
 
   // State filters
   const [selectedStates, setSelectedStates] = useState<Record<string, boolean>>({
@@ -155,7 +159,42 @@ const InvestigatorCockpit: React.FC = () => {
             }
             anchorId={activeEntity}
             onExpandDirection={(dir, id) => {
-              alert(`Expanding ${dir} lineage for ${id}`);
+              const currentNodes = lineageData?.nodes || [];
+              const currentEdges = lineageData?.edges || [];
+              
+              // Fetch expanded data
+              const endpoint = `/assets/${encodeURIComponent(id)}/lineage?depth=1`;
+              
+              fetch(`${import.meta.env.VITE_API_BASE_URL || ''}/api/v1${endpoint}`)
+                .then(res => res.json())
+                .then((expandedData: any) => {
+                  // Merge nodes (avoid duplicates)
+                  const existingNodeIds = new Set(currentNodes.map((n: any) => n.id));
+                  const newNodes = expandedData.nodes?.filter((n: any) => !existingNodeIds.has(n.id)) || [];
+                  
+                  // Merge edges (avoid duplicates)
+                  const existingEdgeIds = new Set(currentEdges.map((e: any) => e.id));
+                  const newEdges = expandedData.edges?.filter((e: any) => !existingEdgeIds.has(e.id)) || [];
+                  
+                  // Update lineageData with merged results
+                  if (lineageData && (newNodes.length > 0 || newEdges.length > 0)) {
+                    const merged = {
+                      ...lineageData,
+                      nodes: [...currentNodes, ...newNodes],
+                      edges: [...currentEdges, ...newEdges],
+                    };
+                    
+                    // Update query cache
+                    queryClient.setQueryData(
+                      ['lineage', activeEntity, validAt, knownAsOf, granularity, depth],
+                      merged
+                    );
+                  }
+                  
+                  // Mark node as expanded to prevent re-fetching
+                  setExpandedNodes(prev => new Set([...prev, id]));
+                })
+                .catch(err => console.error('Expansion error:', err));
             }}
             onOpenPopover={(nodeId) => setPopoverNode(nodeId)}
           />
