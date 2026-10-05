@@ -149,33 +149,35 @@ def get_lineage(entity: str,
                 recorded_as_of: Optional[str] = Query(None),
                 granularity: str = Query("COLUMN"),
                 depth: int = Query(3)):
-    """Real lineage graph from Supabase."""
+    """Real lineage graph from Supabase — filtered to entity and its neighbors."""
     try:
         from backend.app.db import get_cursor
         with get_cursor() as cur:
-            # Get all datasets as nodes
+            # First, find the entity dataset by name or UUID
             cur.execute("""
-                SELECT id, name, schema_name, source_system, asset_type
-                FROM dataset
-                ORDER BY schema_name, name
-            """)
-            datasets = cur.fetchall()
-            nodes = [
-                {
-                    "id": str(row["id"]),
-                    "label": row["name"],
-                    "type": row["asset_type"],
-                    "system": row["source_system"],
-                    "schema": row["schema_name"],
-                    "description": f"{row['schema_name']}.{row['name']}",
+                SELECT id, name FROM dataset
+                WHERE name = %s OR id::text = %s
+                LIMIT 1
+            """, [entity, entity])
+            entity_row = cur.fetchone()
+            if not entity_row:
+                return {
+                    "anchor": entity,
+                    "nodes": [],
+                    "edges": [],
+                    "as_of": as_of,
+                    "recorded_as_of": recorded_as_of,
+                    "granularity": granularity,
+                    "depth": depth,
                     "is_mock": False,
+                    "warnings": [f"Entity '{entity}' not found"],
                 }
-                for row in datasets
-            ]
-
-            # Get lineage edges with temporal filter
+            
+            entity_id = entity_row["id"]
+            
+            # Get all edges connected to this entity (as source or target)
             time_filter = ""
-            params = []
+            params = [entity_id, entity_id]
             if as_of:
                 time_filter += " AND etv.valid_from <= %s AND (etv.valid_to IS NULL OR %s < etv.valid_to)"
                 params += [as_of, as_of]
@@ -195,10 +197,44 @@ def get_lineage(entity: str,
                 LEFT JOIN edge_temporal_version etv ON etv.edge_id = le.id
                 LEFT JOIN dataset src ON src.id = le.source_id
                 LEFT JOIN dataset tgt ON tgt.id = le.target_id
-                WHERE 1=1 {time_filter}
+                WHERE (le.source_id = %s OR le.target_id = %s)
+                {time_filter}
                 ORDER BY src.name, tgt.name
             """, params)
             edge_rows = cur.fetchall()
+            
+            # Build node list from edges (only connected nodes)
+            node_ids = set([entity_id])
+            for row in edge_rows:
+                if row["source_id"]:
+                    node_ids.add(str(row["source_id"]))
+                if row["target_id"]:
+                    node_ids.add(str(row["target_id"]))
+            
+            # Fetch dataset info for these nodes
+            if node_ids:
+                cur.execute(f"""
+                    SELECT id, name, schema_name, source_system, asset_type
+                    FROM dataset
+                    WHERE id::text = ANY(%s)
+                """, [list(node_ids)])
+                dataset_rows = cur.fetchall()
+            else:
+                dataset_rows = []
+            
+            nodes = [
+                {
+                    "id": str(row["id"]),
+                    "label": row["name"],
+                    "type": row["asset_type"],
+                    "system": row["source_system"],
+                    "schema": row["schema_name"],
+                    "description": f"{row['schema_name']}.{row['name']}",
+                    "is_mock": False,
+                }
+                for row in dataset_rows
+            ]
+            
             edges = [
                 {
                     "id": str(row["id"]),
@@ -237,7 +273,7 @@ def get_lineage(entity: str,
             "granularity": granularity,
             "depth": depth,
             "is_mock": True,
-            "warnings": [f"DB_UNAVAILABLE: {str(e)} — showing mock data"],
+            "warnings": [f"DB_ERROR: {str(e)}"],
         }
 
 
