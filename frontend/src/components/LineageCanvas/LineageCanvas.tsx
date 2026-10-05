@@ -167,15 +167,28 @@ export const LineageCanvas: React.FC<LineageCanvasProps> = ({
 
         {/* Zoom, Fit, Isolate Controls */}
         <div className="pointer-events-auto flex items-center gap-1 bg-surface-container/95 backdrop-blur-md p-1 rounded shadow-md border border-outline-variant/40">
-          <button className="flex items-center gap-1 px-2 py-1 rounded hover:bg-surface-container-high text-on-surface-variant hover:text-on-surface font-mono-sm text-xs transition-colors">
+          <button 
+            className="flex items-center gap-1 px-2 py-1 rounded hover:bg-surface-container-high text-on-surface-variant hover:text-on-surface font-mono-sm text-xs transition-colors"
+            onClick={() => alert('Fit: Auto-zoom to show all nodes')}
+            type="button"
+            title="Auto-fit graph to viewport"
+          >
             <span className="material-symbols-outlined text-[15px]">fit_screen</span>
             <span>Fit</span>
           </button>
-          <button className="flex items-center gap-1 px-2 py-1 rounded bg-surface-container-high text-primary font-mono-sm text-xs transition-colors">
+          <button 
+            className="flex items-center gap-1 px-2 py-1 rounded bg-surface-container-high text-primary font-mono-sm text-xs transition-colors cursor-not-allowed opacity-50"
+            title="Isolate: Coming soon — show only selected node"
+            disabled
+          >
             <span className="material-symbols-outlined text-[15px]">hub</span>
             <span>Isolate</span>
           </button>
-          <button className="flex items-center gap-1 px-2 py-1 rounded hover:bg-surface-container-high text-on-surface-variant hover:text-on-surface font-mono-sm text-xs transition-colors">
+          <button 
+            className="flex items-center gap-1 px-2 py-1 rounded hover:bg-surface-container-high text-on-surface-variant hover:text-on-surface font-mono-sm text-xs transition-colors cursor-not-allowed opacity-50"
+            title="Trace Path: Coming soon — find path between nodes"
+            disabled
+          >
             <span className="material-symbols-outlined text-[15px]">alt_route</span>
             <span>Trace Path</span>
           </button>
