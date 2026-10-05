@@ -96,12 +96,15 @@ export const api = {
     return request<LineageResponse>(`/assets/${encodeURIComponent(entity)}/lineage${qs}`);
   },
 
-  // Convenience wrappers — reuse the main lineage endpoint with depth=1
-  getLineageUpstream: (entity: string, depth = 1) =>
-    request<LineageResponse>(`/assets/${encodeURIComponent(entity)}/lineage?depth=${depth}`),
+  // Get upstream lineage for expansion
+  getLineageUpstream: (entity: string, depth = 1) => {
+    return request<LineageResponse>(`/lineage/${encodeURIComponent(entity)}/upstream?depth=${depth}`);
+  },
 
-  getLineageDownstream: (entity: string, depth = 1) =>
-    request<LineageResponse>(`/assets/${encodeURIComponent(entity)}/lineage?depth=${depth}`),
+  // Get downstream lineage for expansion
+  getLineageDownstream: (entity: string, depth = 1) => {
+    return request<LineageResponse>(`/lineage/${encodeURIComponent(entity)}/downstream?depth=${depth}`);
+  },
 
   getRun: (runId: string) => request<RunResponse>(`/runs/${encodeURIComponent(runId)}`),
 
