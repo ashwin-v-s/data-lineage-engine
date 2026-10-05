@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import {
   ReactFlow,
   MiniMap,
@@ -81,6 +81,8 @@ export const LineageCanvas: React.FC<LineageCanvasProps> = ({
   onExpandDirection,
   onOpenPopover,
 }) => {
+  const reactFlowInstance = useRef<any>(null);
+
   // Convert API nodes to React Flow format
   const initialNodes: Node[] = useMemo(() => {
     return rawNodes.map((n) => {
@@ -127,12 +129,77 @@ export const LineageCanvas: React.FC<LineageCanvasProps> = ({
 
   const [nodes, setNodes, onNodesChange] = useNodesState(layoutedNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(layoutedEdges);
+  const [selectedNodeIds, setSelectedNodeIds] = useState<Set<string>>(new Set());
+  const [isolateMode, setIsolateMode] = useState(false);
 
   // Sync state if layouted elements change
   React.useEffect(() => {
     setNodes(layoutedNodes);
     setEdges(layoutedEdges);
   }, [layoutedNodes, layoutedEdges, setNodes, setEdges]);
+
+  // Handle node click - track selection
+  const handleNodeClick = (node: any) => {
+    setSelectedNodeIds(new Set([node.id]));
+    onNodeClick(node);
+  };
+
+  // Fit view handler - zoom to show all nodes
+  const handleFitView = () => {
+    if (reactFlowInstance.current) {
+      reactFlowInstance.current.fitView({ padding: 0.3, duration: 300 });
+    }
+  };
+
+  // Isolate handler - show only selected node + direct neighbors
+  const handleIsolate = () => {
+    if (selectedNodeIds.size === 0) {
+      alert('Please select a node first');
+      return;
+    }
+    
+    const selectedNodeId = Array.from(selectedNodeIds)[0];
+    const connectedEdges = layoutedEdges.filter(
+      e => e.source === selectedNodeId || e.target === selectedNodeId
+    );
+    const connectedNodeIds = new Set<string>([selectedNodeId]);
+    
+    connectedEdges.forEach(e => {
+      connectedNodeIds.add(e.source);
+      connectedNodeIds.add(e.target);
+    });
+
+    // Filter nodes and edges to show only isolated subgraph
+    const isolatedNodes = layoutedNodes.filter(n => connectedNodeIds.has(n.id));
+    const isolatedEdges = layoutedEdges.filter(
+      e => connectedNodeIds.has(e.source) && connectedNodeIds.has(e.target)
+    );
+
+    // Recalculate layout for isolated subgraph
+    const { nodes: newNodes, edges: newEdges } = getLayoutedElements(
+      isolatedNodes,
+      isolatedEdges,
+      'LR'
+    );
+
+    setNodes(newNodes);
+    setEdges(newEdges);
+    setIsolateMode(true);
+
+    // Fit the isolated view
+    setTimeout(() => {
+      if (reactFlowInstance.current) {
+        reactFlowInstance.current.fitView({ padding: 0.3, duration: 300 });
+      }
+    }, 50);
+  };
+
+  // Reset from isolate mode
+  const handleResetIsolate = () => {
+    setNodes(layoutedNodes);
+    setEdges(layoutedEdges);
+    setIsolateMode(false);
+  };
 
   // Empty state check
   const isEmpty = initialNodes.length === 0 && initialEdges.length === 0;
@@ -173,7 +240,7 @@ export const LineageCanvas: React.FC<LineageCanvasProps> = ({
         <div className="pointer-events-auto flex items-center gap-1 bg-surface-container/95 backdrop-blur-md p-1 rounded shadow-md border border-outline-variant/40">
           <button 
             className="flex items-center gap-1 px-2 py-1 rounded hover:bg-surface-container-high text-on-surface-variant hover:text-on-surface font-mono-sm text-xs transition-colors"
-            onClick={() => alert('Fit: Auto-zoom to show all nodes')}
+            onClick={handleFitView}
             type="button"
             title="Auto-fit graph to viewport"
           >
@@ -181,12 +248,17 @@ export const LineageCanvas: React.FC<LineageCanvasProps> = ({
             <span>Fit</span>
           </button>
           <button 
-            className="flex items-center gap-1 px-2 py-1 rounded bg-surface-container-high text-primary font-mono-sm text-xs transition-colors cursor-not-allowed opacity-50"
-            title="Isolate: Coming soon — show only selected node"
-            disabled
+            className={`flex items-center gap-1 px-2 py-1 rounded font-mono-sm text-xs transition-colors ${
+              isolateMode
+                ? 'bg-primary text-on-primary hover:bg-primary-container'
+                : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high'
+            }`}
+            onClick={isolateMode ? handleResetIsolate : handleIsolate}
+            title={isolateMode ? 'Reset to full graph' : 'Show only selected node + neighbors'}
+            type="button"
           >
             <span className="material-symbols-outlined text-[15px]">hub</span>
-            <span>Isolate</span>
+            <span>{isolateMode ? 'Reset' : 'Isolate'}</span>
           </button>
           <button 
             className="flex items-center gap-1 px-2 py-1 rounded hover:bg-surface-container-high text-on-surface-variant hover:text-on-surface font-mono-sm text-xs transition-colors cursor-not-allowed opacity-50"
@@ -217,11 +289,12 @@ export const LineageCanvas: React.FC<LineageCanvasProps> = ({
       ) : (
         /* React Flow Viewport with Grid Background */
         <ReactFlow
+          ref={reactFlowInstance}
           nodes={nodes}
           edges={edges}
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
-          onNodeClick={(_, node) => onNodeClick(node)}
+          onNodeClick={(_, node) => handleNodeClick(node)}
           onEdgeClick={(_, edge) => onEdgeClick(edge)}
           nodeTypes={nodeTypes}
           edgeTypes={edgeTypes}
