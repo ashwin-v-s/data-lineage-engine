@@ -192,7 +192,7 @@ def get_lineage(entity: str,
                     src.name AS source_name,
                     tgt.name AS target_name
                 FROM lineage_edge le
-                JOIN edge_temporal_version etv ON etv.edge_id = le.id
+                LEFT JOIN edge_temporal_version etv ON etv.edge_id = le.id
                 LEFT JOIN dataset src ON src.id = le.source_id
                 LEFT JOIN dataset tgt ON tgt.id = le.target_id
                 WHERE 1=1 {time_filter}
