@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 
 interface BitemporalBarProps {
   validAt: string | null;
@@ -17,6 +17,23 @@ export const BitemporalBar: React.FC<BitemporalBarProps> = ({
   onResetToLive,
   isHistorical,
 }) => {
+  const [showValidAtPicker, setShowValidAtPicker] = useState(false);
+  const [showKnownAsOfPicker, setShowKnownAsOfPicker] = useState(false);
+  const [tempValidAt, setTempValidAt] = useState(validAt || '2026-08-15T00:00:00Z');
+  const [tempKnownAsOf, setTempKnownAsOf] = useState(knownAsOf || '2026-09-23T11:45:00Z');
+
+  const handleValidAtChange = (newVal: string) => {
+    setTempValidAt(newVal);
+    onValidAtChange(newVal);
+    setShowValidAtPicker(false);
+  };
+
+  const handleKnownAsOfChange = (newVal: string) => {
+    setTempKnownAsOf(newVal);
+    onKnownAsOfChange(newVal);
+    setShowKnownAsOfPicker(false);
+  };
+
   return (
     <section className="h-10 bg-surface-container px-4 border-b border-surface-container-highest flex items-center justify-between gap-3 shrink-0 z-40 text-xs">
       <div className="flex items-center gap-3 min-w-0 overflow-x-auto py-1">
@@ -31,8 +48,8 @@ export const BitemporalBar: React.FC<BitemporalBarProps> = ({
             if (isHistorical) {
               onResetToLive();
             } else {
-              onValidAtChange('2026-08-15T00:00:00Z');
-              onKnownAsOfChange('2026-09-23T11:45:00Z');
+              handleValidAtChange('2026-08-15T00:00:00Z');
+              handleKnownAsOfChange('2026-09-23T11:45:00Z');
             }
           }}
           title={isHistorical ? 'Click to switch to live mode' : 'Click to jump to historical slice (2026-08-15)'}
@@ -45,36 +62,58 @@ export const BitemporalBar: React.FC<BitemporalBarProps> = ({
 
         {/* Dual Separate Pickers Box */}
         <div className="flex items-center bg-surface-container-lowest/90 backdrop-blur-md rounded-xl border border-tertiary/40 px-3 py-1 gap-2.5 font-mono-sm text-xs shadow-inner">
-          {/* 1. Valid at (T_v) */}
-          <div className="flex items-center gap-1.5">
+          {/* 1. Valid at (T_v) — CLICKABLE DATE INPUT */}
+          <div
+            className="flex items-center gap-1.5 cursor-pointer hover:bg-tertiary-container/20 px-2 py-0.5 rounded transition-colors"
+            onClick={() => setShowValidAtPicker(!showValidAtPicker)}
+          >
             <span className="material-symbols-outlined text-tertiary text-[13px]">schedule</span>
             <span className="text-tertiary font-label-caps text-[10px] uppercase font-bold">
-              Valid at (T_v):
+              Valid at:
             </span>
             <span className="text-tertiary font-bold">
-              {validAt ? validAt.replace('T', ' ').replace('Z', ' UTC') : 'CURRENT (LIVE)'}
+              {validAt ? validAt.substring(0, 10) : 'CURRENT'}
             </span>
+            {showValidAtPicker && (
+              <input
+                type="datetime-local"
+                value={tempValidAt.replace('Z', '').substring(0, 16)}
+                onChange={(e) => {
+                  const val = e.target.value + ':00Z';
+                  handleValidAtChange(val);
+                }}
+                className="ml-2 px-2 py-1 rounded bg-surface text-on-surface text-xs border border-outline-variant font-mono-sm"
+                autoFocus
+              />
+            )}
           </div>
 
-          <span className="text-outline-variant font-mono">◀──</span>
+          <span className="text-outline-variant font-mono">|</span>
 
-          {/* Delta Pill */}
-          <div className="flex items-center gap-1 text-tertiary font-bold bg-tertiary-container/30 px-1.5 py-0.5 rounded border border-tertiary/40">
-            <span className="material-symbols-outlined text-[12px]">compare_arrows</span>
-            <span>{validAt ? 'Δ -39d 11h' : 'Δ 0h'}</span>
-          </div>
-
-          <span className="text-outline-variant font-mono">──▶</span>
-
-          {/* 2. Known as of (T_k) */}
-          <div className="flex items-center gap-1.5">
+          {/* 2. Known as of (T_k) — CLICKABLE DATE INPUT */}
+          <div
+            className="flex items-center gap-1.5 cursor-pointer hover:bg-outline-variant/20 px-2 py-0.5 rounded transition-colors"
+            onClick={() => setShowKnownAsOfPicker(!showKnownAsOfPicker)}
+          >
             <span className="material-symbols-outlined text-outline text-[13px]">calendar_today</span>
-            <span className="text-outline font-label-caps text-[10px] uppercase">
-              Known as of (T_k):
+            <span className="text-outline font-label-caps text-[10px] uppercase font-bold">
+              Known as of:
             </span>
             <span className="text-on-surface font-semibold">
-              {knownAsOf ? knownAsOf.replace('T', ' ').replace('Z', ' UTC') : 'LATEST INGESTION'}
+              {knownAsOf ? knownAsOf.substring(0, 10) : 'LATEST'}
             </span>
+            {showKnownAsOfPicker && (
+              <input
+                type="datetime-local"
+                value={tempKnownAsOf.replace('Z', '').substring(0, 16)}
+                onChange={(e) => {
+                  const val = e.target.value + ':00Z';
+                  handleKnownAsOfChange(val);
+                }}
+                className="ml-2 px-2 py-1 rounded bg-surface text-on-surface text-xs border border-outline-variant font-mono-sm"
+                autoFocus
+              />
+            )}
           </div>
         </div>
 
@@ -83,7 +122,7 @@ export const BitemporalBar: React.FC<BitemporalBarProps> = ({
           <div className="hidden xl:flex items-center gap-1.5 text-outline font-mono-sm text-[11px] truncate ml-1">
             <span className="material-symbols-outlined text-tertiary text-[14px] shrink-0">history_toggle_off</span>
             <span className="truncate">
-              Showing historical lineage. Valid at <strong className="text-tertiary font-semibold">{validAt}</strong>. Known as of <strong className="text-on-surface font-semibold">{knownAsOf || 'latest'}</strong>.
+              Temporal slice: <strong className="text-tertiary font-semibold">{validAt.substring(0, 10)}</strong> viewed as of <strong className="text-on-surface font-semibold">{knownAsOf ? knownAsOf.substring(0, 10) : 'latest'}</strong>
             </span>
           </div>
         )}
@@ -93,7 +132,7 @@ export const BitemporalBar: React.FC<BitemporalBarProps> = ({
         {validAt && (
           <div className="hidden lg:flex items-center gap-1 px-2.5 py-0.5 rounded-xl bg-tertiary-container/20 border border-tertiary/40 text-[10px] font-mono-sm text-tertiary font-semibold">
             <span className="w-1.5 h-1.5 rounded-full bg-tertiary animate-pulse" />
-            <span>Temporal slice shifted: 1 edge reverted from OBSERVED to UNKNOWN</span>
+            <span>Temporal filtering active</span>
           </div>
         )}
         <button

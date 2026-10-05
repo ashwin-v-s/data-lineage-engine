@@ -130,6 +130,9 @@ export const LineageCanvas: React.FC<LineageCanvasProps> = ({
     setEdges(layoutedEdges);
   }, [layoutedNodes, layoutedEdges, setNodes, setEdges]);
 
+  // Empty state check
+  const isEmpty = initialNodes.length === 0 && initialEdges.length === 0;
+
   return (
     <main className="relative flex-1 bg-surface-container-lowest overflow-hidden flex flex-col shadow-inner">
       {/* Top HUD Floating Canvas Controls */}
@@ -155,6 +158,7 @@ export const LineageCanvas: React.FC<LineageCanvasProps> = ({
             }`}
             onClick={onGranularityToggle}
             type="button"
+            title={isEmpty && granularity === 'COLUMN' ? 'Column lineage data not available' : undefined}
           >
             <span className="w-1.5 h-1.5 rounded-full bg-on-primary-container animate-pulse" />
             Column Lineage
@@ -178,29 +182,46 @@ export const LineageCanvas: React.FC<LineageCanvasProps> = ({
         </div>
       </div>
 
-      {/* React Flow Viewport with Grid Background */}
-      <ReactFlow
-        nodes={nodes}
-        edges={edges}
-        onNodesChange={onNodesChange}
-        onEdgesChange={onEdgesChange}
-        onNodeClick={(_, node) => onNodeClick(node)}
-        onEdgeClick={(_, edge) => onEdgeClick(edge)}
-        nodeTypes={nodeTypes}
-        edgeTypes={edgeTypes}
-        fitView
-        fitViewOptions={{ padding: 0.3 }}
-        minZoom={0.2}
-        maxZoom={2}
-      >
-        <Background color="#87929a" gap={36} size={0.8} className="opacity-15" />
-        <MiniMap
-          nodeColor={(n: any) => (n.data?.isAnchor ? '#38bdf8' : '#273647')}
-          maskColor="rgba(5, 20, 36, 0.7)"
-          className="bg-surface-container-high/95 border border-surface-container-highest rounded shadow-lg !bottom-3 !right-4"
-        />
-        <Controls showInteractive={false} className="!bg-surface-container !border-outline-variant/40 !rounded" />
-      </ReactFlow>
+      {/* Empty State Overlay */}
+      {isEmpty ? (
+        <div className="flex flex-col items-center justify-center flex-1 gap-3 text-outline-variant">
+          <span className="material-symbols-outlined text-5xl opacity-30">branch</span>
+          <div className="text-center">
+            <p className="font-mono-sm text-sm font-semibold mb-1">
+              {granularity === 'COLUMN' ? 'No column-level lineage available' : 'No lineage data found'}
+            </p>
+            <p className="font-mono-sm text-xs opacity-70 max-w-xs">
+              {granularity === 'COLUMN'
+                ? 'Column-level lineage data is not yet loaded. Try switching back to Dataset Lineage or search for another entity.'
+                : 'The selected entity does not have any lineage relationships. Try searching for a different entity.'}
+            </p>
+          </div>
+        </div>
+      ) : (
+        /* React Flow Viewport with Grid Background */
+        <ReactFlow
+          nodes={nodes}
+          edges={edges}
+          onNodesChange={onNodesChange}
+          onEdgesChange={onEdgesChange}
+          onNodeClick={(_, node) => onNodeClick(node)}
+          onEdgeClick={(_, edge) => onEdgeClick(edge)}
+          nodeTypes={nodeTypes}
+          edgeTypes={edgeTypes}
+          fitView
+          fitViewOptions={{ padding: 0.3 }}
+          minZoom={0.2}
+          maxZoom={2}
+        >
+          <Background color="#87929a" gap={36} size={0.8} className="opacity-15" />
+          <MiniMap
+            nodeColor={(n: any) => (n.data?.isAnchor ? '#38bdf8' : '#273647')}
+            maskColor="rgba(5, 20, 36, 0.7)"
+            className="bg-surface-container-high/95 border border-surface-container-highest rounded shadow-lg !bottom-3 !right-4"
+          />
+          <Controls showInteractive={false} className="!bg-surface-container !border-outline-variant/40 !rounded" />
+        </ReactFlow>
+      )}
     </main>
   );
 };
