@@ -5,11 +5,13 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
+from backend.app.api.metadata import router as metadata_router
 from contracts.evidence import PredictorInput
 from contracts.mocks.loaders import load_case
 from research.reasoning.engine import FourStateEngine
 
-app = FastAPI(title="Kairos API", version="0.0.1")
+app = FastAPI(title="Kairos API", version="0.1.0")
+app.include_router(metadata_router)
 
 
 class ApiError(Exception):
