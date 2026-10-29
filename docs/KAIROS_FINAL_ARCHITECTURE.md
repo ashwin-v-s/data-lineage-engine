@@ -40,9 +40,9 @@ flowchart LR
 | Component | Responsibility | Current repository state |
 |---|---|---|
 | Web app | React/Vite application entry and shell; existing dashboard renderer/CSS retained during migration; auth and import experiences | Vite/React shell exists, dashboard remains bridged to legacy renderer; not a React rewrite |
-| Identity | Supabase email/password, verification, OAuth callback/session refresh | Frontend flow and backend token verification exist; provider settings and live end-to-end callback are not verified in this repository |
+| Identity | Supabase email/password, verification, OAuth callback/session refresh | Shared project check on 2026-10-29: email enabled with confirmation required; no Auth users yet; Google, GitHub, and Microsoft are disabled. Provider callbacks and email delivery still need an end-to-end account test. |
 | API | FastAPI, bearer verification, versioned routes and typed request/response schemas | Existing catalog/search/lineage/governance routes; no persistent import endpoint yet |
-| Workspace data | Shared Supabase Postgres, migrations, RLS, transaction boundary | Local `.env` has non-placeholder settings for the supplied project; migration 0003 still must be verified against the shared project before claiming tenant isolation is active there |
+| Workspace data | Shared Supabase Postgres, migrations, RLS, transaction boundary | Shared project checked on 2026-10-29: migrations 0001–0003 are present; all 17 business tables have forced workspace RLS; existing 23 assets and related rows remain in the private legacy workspace. A restricted-role read check sees no rows without workspace context. |
 | Ingestion | Format routing, parse, normalize, validation, preview, explicit commit, audit | Pure Python static-file adapters now dispatch metadata-graph JSON, dbt manifests, file inventories, and CSV headers into the shared v1 envelope; authenticated preview/commit and durable import remain M3 work |
 | Research | Offline reproducible experiments; SQLGlot static candidates, runtime evidence, four-state inference, independent truth | Research packages and tests exist; preserve contract and keep this outside product import claims |
 | Optional graph projection | Rebuildable projection only if measured traversal need exists | No production dependency; PostgreSQL remains authoritative |
@@ -84,7 +84,7 @@ Do not turn parser failures into empty success. Unsupported input produces a dia
 
 ## 4. Product flow for the first working demo
 
-1. Clone the GitHub branch. The current working checkout already has an ignored `.env` configured for the supplied shared Supabase project; on another teammate's machine, copy `.env.example` and use that project's URL, publishable key, and database pooler URI. Follow [`SUPABASE_SETUP.md`](SUPABASE_SETUP.md). Apply migrations 0001, 0002, and 0003 once to the shared project. No local database install is required for the product demo. Configure at least email/password; social providers require callback URLs and provider credentials in Supabase.
+1. Clone the GitHub branch. The current working checkout already has an ignored `.env` configured for the supplied shared Supabase project; on another teammate's machine, copy `.env.example` and use that project's URL, publishable key, and database pooler URI. Follow [`SUPABASE_SETUP.md`](SUPABASE_SETUP.md). Migrations 0001–0003 have been applied to the shared project. No local database install is required for the product demo. Email/password is enabled with confirmation required; social providers require callback URLs and provider credentials in Supabase.
 2. Create/sign in to Kairos. Verify email when Supabase requires it. The API validates the Supabase access token. The first authenticated API request provisions/returns the user's personal workspace.
 3. In Import Metadata, upload one documented `kairos.ingest.v1` metadata graph JSON fixture. The fixture is labelled as a sample until committed. For a public GitHub demo, select an explicitly supported fixture path/revision; public browse alone is not an import.
 4. Show preview counts, source provenance, warnings, and unsupported content. Confirm Import.

@@ -53,7 +53,10 @@ Adds a personal workspace for each Supabase user on that user's first
 authenticated API request. PostgreSQL row-level security scopes every business
 table query to that workspace. Existing rows are kept in a separate
 `Legacy catalog` workspace and are intentionally not assigned to whoever signs
-in first.
+in first. The workspace registry itself has forced RLS and no direct grants to
+browser/API roles; provisioning is through the restricted SECURITY DEFINER
+function. The shared Supabase project was verified with this migration applied
+on 2026-10-29.
 
 Apply 0003 only after 0001 and 0002, using the privileged database connection
 used for schema migrations:

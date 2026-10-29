@@ -13,6 +13,13 @@ CREATE TABLE IF NOT EXISTS kairos_workspace (
         CHECK (NOT is_legacy OR owner_user_id IS NULL)
 );
 
+-- Workspace records are accessed only through the SECURITY DEFINER
+-- provisioning function. Never expose the workspace registry through the
+-- PostgREST API or directly to browser roles.
+ALTER TABLE kairos_workspace ENABLE ROW LEVEL SECURITY;
+ALTER TABLE kairos_workspace FORCE ROW LEVEL SECURITY;
+REVOKE ALL ON TABLE kairos_workspace FROM PUBLIC, anon, authenticated, service_role;
+
 INSERT INTO kairos_workspace (id, owner_user_id, name, is_legacy)
 VALUES ('00000000-0000-4000-8000-000000000001', NULL, 'Legacy catalog', TRUE)
 ON CONFLICT (id) DO NOTHING;
@@ -62,10 +69,15 @@ DO $$
 BEGIN
     IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'kairos_app') THEN
         CREATE ROLE kairos_app NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOBYPASSRLS;
+    ELSIF EXISTS (
+        SELECT 1 FROM pg_roles
+        WHERE rolname = 'kairos_app'
+          AND (rolcanlogin OR rolsuper OR rolcreatedb OR rolcreaterole OR rolinherit OR rolbypassrls)
+    ) THEN
+        RAISE EXCEPTION 'Existing kairos_app role has unsafe attributes; a database superuser must repair it before migration';
     END IF;
 END;
 $$;
-ALTER ROLE kairos_app NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOBYPASSRLS;
 
 DO $$
 BEGIN
@@ -126,7 +138,7 @@ $$;
 ALTER TABLE raw_event ENABLE TRIGGER raw_event_immutable;
 
 -- Natural identifiers are unique within a workspace rather than globally.
-ALTER TABLE dataset DROP CONSTRAINT IF EXISTS dataset_source_system_namespace_database_name_schema_name_name_;
+ALTER TABLE dataset DROP CONSTRAINT IF EXISTS dataset_source_system_namespace_database_name_schema_name_n_key;
 CREATE UNIQUE INDEX IF NOT EXISTS dataset_workspace_identity_key
     ON dataset (workspace_id, source_system, namespace, database_name, schema_name, name, asset_type);
 
@@ -139,7 +151,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS execution_run_workspace_run_id_key ON executio
 ALTER TABLE evidence DROP CONSTRAINT IF EXISTS evidence_evidence_id_key;
 CREATE UNIQUE INDEX IF NOT EXISTS evidence_workspace_evidence_id_key ON evidence (workspace_id, evidence_id);
 
-ALTER TABLE lineage_edge DROP CONSTRAINT IF EXISTS lineage_edge_source_id_target_id_granularity_operator_fingerpri;
+ALTER TABLE lineage_edge DROP CONSTRAINT IF EXISTS lineage_edge_source_id_target_id_granularity_operator_finge_key;
 CREATE UNIQUE INDEX IF NOT EXISTS lineage_edge_workspace_identity_key
     ON lineage_edge (workspace_id, source_id, target_id, granularity, operator_fingerprint, query_fingerprint);
 

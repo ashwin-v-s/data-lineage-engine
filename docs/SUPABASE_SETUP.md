@@ -52,6 +52,23 @@ database login grants described in [`../backend/migrations/README.md`](../backen
 Verify the migration and cross-workspace isolation with a controlled test
 before putting real user data into the demo.
 
+### Shared project verification (2026-10-29)
+
+The configured shared project was checked directly. Migrations 0001–0003 are
+applied. The 17 existing business tables have a `workspace_id` column and a
+forced `kairos_workspace_isolation` policy. Existing catalog data was preserved
+in one `Legacy catalog` workspace; new users start with an empty personal
+workspace. A restricted-role check returned zero catalog rows without a
+workspace context, and the workspace provisioning function passed a rolled-back
+synthetic-user check.
+
+Auth currently has email enabled with email confirmation required and zero
+registered users. Google, GitHub, and Microsoft providers are disabled. No
+Storage buckets exist; the current metadata-import demo does not require raw
+file retention. Provider setup and email delivery still need an end-to-end
+account verification. The M3 persistent import/preview API remains application
+work and is not created by these database migrations.
+
 ## Each teammate's local app
 
 Each teammate clones the same GitHub branch, creates their own ignored `.env`
