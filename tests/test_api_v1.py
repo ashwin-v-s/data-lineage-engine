@@ -74,6 +74,8 @@ _PROTECTED_PATHS = [
     "/api/v1/me/starred-assets",
     "/api/v1/assets/anything/downstream-impact",
     "/api/v1/integrations/github/status",
+    "/api/v1/integrations/github/connect-url",
+    "/api/v1/integrations/github/connections",
 ]
 
 

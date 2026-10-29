@@ -187,6 +187,51 @@ deploy (see `.github/workflows/ci.yml`); release is a manual/team decision.
    So: 401 = "you are not signed in"; 503 = "the server cannot verify you
    right now". A healthy signed-in request should be 200.
 
+### Verifying a deployment (automated)
+
+`scripts/check_deployment.py` automates the checks above for an operator or a
+CI job:
+
+- it issues `GET {--base-url}/health` and asserts the documented success shape
+  (`{"status": "ok", "db": ...}` from
+  [`../backend/app/api/routes/health.py`](../backend/app/api/routes/health.py)),
+  printing the HTTP status and latency;
+- it asserts that every variable a deployment needs — `DATABASE_URL`,
+  `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `FRONTEND_ORIGIN` (see §2) — is
+  present and non-empty, reading `.env` with `python-dotenv` like the other
+  operator scripts. **Secret values are checked for presence only and are never
+  printed.**
+
+`--base-url` is the deployed API base that serves the health route: the FastAPI
+prefix plus the router path, i.e. `.../api/v1` so the request resolves to
+`.../api/v1/health`. Pass `--timeout` to override the default 10 s HTTP
+timeout.
+
+```bash
+python scripts/check_deployment.py --base-url https://kairos.example.com/api/v1
+python scripts/check_deployment.py --base-url https://kairos.example.com/api/v1 --timeout 15
+```
+
+Each check prints one `PASS`/`FAIL` line followed by a summary, and the process
+exits non-zero if any check fails (exit code 2 when `--base-url` is missing).
+
+The `.github/workflows/live-smoke.yml` workflow runs the same command against a
+deployed environment. It is **not** part of the default CI: trigger it manually
+from **Actions → live-smoke → Run workflow**, or let its nightly `schedule`
+(every day at 03:00 UTC) run it. It reads the deployment target and the required
+variables from repository secrets (set them under **Settings → Secrets and
+variables → Actions**):
+
+| Secret | Meaning |
+| --- | --- |
+| `KAIROS_DEPLOY_BASE_URL` | deployed API base serving `GET /health`, e.g. `https://kairos.example.com/api/v1` |
+| `DATABASE_URL` | Supabase transaction-pooler URI (secret) |
+| `SUPABASE_URL` | public Supabase project URL |
+| `SUPABASE_PUBLISHABLE_KEY` | Supabase publishable/anon key |
+| `FRONTEND_ORIGIN` | exact deployed frontend origin (CORS) |
+
+The job fails when any check fails.
+
 ---
 
 ## 6. Rollback
