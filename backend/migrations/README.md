@@ -58,6 +58,12 @@ browser/API roles; provisioning is through the restricted SECURITY DEFINER
 function. The shared Supabase project was verified with this migration applied
 on 2026-10-29.
 
+### 0004_ingestion_import_runs.sql
+Local proposal only; it was not applied to the shared project. It adds the
+workspace-scoped import provenance/idempotency record described in the product
+architecture. M3 must review its contract fields and authorize deployment
+before it is applied.
+
 Apply 0003 only after 0001 and 0002, using the privileged database connection
 used for schema migrations:
 

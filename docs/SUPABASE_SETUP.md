@@ -67,7 +67,9 @@ registered users. Google, GitHub, and Microsoft providers are disabled. No
 Storage buckets exist; the current metadata-import demo does not require raw
 file retention. Provider setup and email delivery still need an end-to-end
 account verification. The M3 persistent import/preview API remains application
-work and is not created by these database migrations.
+work and is not created by these database migrations. Its proposed `import_run`
+table is drafted in `backend/migrations/0004_ingestion_import_runs.sql` but was
+not applied; M3 must review the fields and authorize deployment first.
 
 ## Each teammate's local app
 
