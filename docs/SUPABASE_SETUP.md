@@ -70,6 +70,9 @@ account verification. The M3 persistent import/preview API remains application
 work and is not created by these database migrations. Its proposed `import_run`
 table is drafted in `backend/migrations/0004_ingestion_import_runs.sql` but was
 not applied; M3 must review the fields and authorize deployment first.
+See [`SUPABASE_FEATURE_ADOPTION.md`](SUPABASE_FEATURE_ADOPTION.md) for the
+feature-by-feature status and reasons Storage, Realtime, and Edge Functions
+are not part of the current request path.
 
 ## Each teammate's local app
 
