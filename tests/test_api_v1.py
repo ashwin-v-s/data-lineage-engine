@@ -44,6 +44,13 @@ def test_auth_config_is_public_and_fails_closed():
     assert body["auth_disabled"] is False
 
 
+def test_liveness_healthz_is_public_and_needs_no_credentials():
+    """GET /healthz is the unauthenticated probe hosting platforms poll."""
+    res = client.get("/healthz")
+    assert res.status_code == 200
+    assert res.json() == {"status": "ok", "service": "kairos-api"}
+
+
 _PROTECTED_PATHS = [
     "/api/v1/health",
     "/api/v1/search",

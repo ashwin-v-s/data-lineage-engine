@@ -9,6 +9,7 @@
     }
   },
   "rewrites": [
+    { "source": "/healthz", "destination": "/backend/api/index.py" },
     { "source": "/api/(.*)", "destination": "/backend/api/index.py" },
     { "source": "/ingestion.html", "destination": "/backend/api/index.py" }
   ]

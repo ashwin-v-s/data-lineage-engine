@@ -81,6 +81,17 @@ app.include_router(owner_router,      prefix="/api/v1")
 app.include_router(metadata_router,   prefix="/api/v1")
 
 
+# ── Liveness probe ────────────────────────────────────────────────────────────
+# Unauthenticated and dependency-free so a hosting platform (Vercel, a load
+# balancer, an uptime monitor) can confirm the process is up.  It deliberately
+# does NOT touch the database or Supabase: the authenticated, database-backed
+# readiness check lives at GET /api/v1/health.  Declared before the catch-all
+# StaticFiles mount below so it is never shadowed.
+@app.get("/healthz", tags=["health"])
+def liveness():
+    return {"status": "ok", "service": "kairos-api"}
+
+
 @app.get("/api/v1/auth/config", tags=["authentication"])
 def auth_config():
     """Expose only the public Supabase client settings needed by the sign-in page."""
