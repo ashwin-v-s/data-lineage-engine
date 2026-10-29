@@ -27,7 +27,7 @@ This workstream is format parsing only. Do not connect directly to Supabase or c
 
 ## Likely files
 
-- `ingestion/metadata_graph/` (create if absent), `ingestion/dbt/`, `ingestion/sql/`
+- `ingestion/metadata_graph/`, `ingestion/static_files/`, `ingestion/dbt/`, `ingestion/sql/`
 - `tests/fixtures/ingestion/`, focused adapter tests
 - Propose a contract change to M3 before touching a shared contract module.
 
@@ -41,8 +41,12 @@ This workstream is format parsing only. Do not connect directly to Supabase or c
 ## M1 implementation status
 
 The bounded metadata-graph v1 parser/validator is implemented in
-`ingestion/metadata_graph/`, with valid/invalid/version fixtures and focused
-tests in `tests/test_metadata_graph_adapter.py`. Current repository coverage
-for SQL, dbt, generic JSON, file inventory, and CSV is inventoried in
-`ingestion/ADAPTER_STATUS.md`. The parser is ready to hand normalized output to
-M3, but it is not yet wired to the Supabase import API.
+`ingestion/metadata_graph/`. `ingestion/static_files/` provides explicit
+format dispatch for metadata graphs, dbt manifests, file inventories, and CSV
+headers.
+`ingestion/dbt/manifest.py` normalizes supported dbt resources and declared
+dependencies; `ingestion/static_files/inventory.py` emits file assets without
+inventing data-flow edges; `ingestion/static_files/csv_headers.py` reads only
+CSV headers and leaves column types unknown. All adapters return the shared v1
+envelope with diagnostics and provenance. They are ready for M3 to call, but
+are not wired to the authenticated Supabase import API.

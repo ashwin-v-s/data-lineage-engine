@@ -43,7 +43,7 @@ flowchart LR
 | Identity | Supabase email/password, verification, OAuth callback/session refresh | Frontend flow and backend token verification exist; provider settings and live end-to-end callback are not verified in this repository |
 | API | FastAPI, bearer verification, versioned routes and typed request/response schemas | Existing catalog/search/lineage/governance routes; no persistent import endpoint yet |
 | Workspace data | Shared Supabase Postgres, migrations, RLS, transaction boundary | Local `.env` has non-placeholder settings for the supplied project; migration 0003 still must be verified against the shared project before claiming tenant isolation is active there |
-| Ingestion | Format routing, parse, normalize, validation, preview, explicit commit, audit | Browser-side format previews exist; durable unified import pipeline is not implemented |
+| Ingestion | Format routing, parse, normalize, validation, preview, explicit commit, audit | Pure Python static-file adapters now dispatch metadata-graph JSON, dbt manifests, file inventories, and CSV headers into the shared v1 envelope; authenticated preview/commit and durable import remain M3 work |
 | Research | Offline reproducible experiments; SQLGlot static candidates, runtime evidence, four-state inference, independent truth | Research packages and tests exist; preserve contract and keep this outside product import claims |
 | Optional graph projection | Rebuildable projection only if measured traversal need exists | No production dependency; PostgreSQL remains authoritative |
 
@@ -73,8 +73,8 @@ The server derives workspace/user identity from the verified Supabase token. An 
 | Input | Initial output | It does not prove |
 |---|---|---|
 | Kairos metadata graph JSON | Explicit assets/relationships, if schema-valid; provenance retained | That an explicitly declared edge ran |
-| File inventory / CSV | File, table, or schema metadata; optional column inventory | Column lineage or runtime behavior |
-| dbt `manifest.json` | Declared model dependencies and metadata | That a model executed in a particular run |
+| File inventory / CSV | File assets or CSV header/schema metadata; CSV column types remain unknown unless supplied separately | File membership is not data-flow lineage; header parsing does not inspect data rows or prove runtime behavior |
+| dbt `manifest.json` | Declared model dependencies and metadata; the Python adapter supports models, seeds, snapshots, sources, and exposures | That a model executed in a particular run |
 | SQL + schema | SQLGlot static dependency candidates for supported SQL subset | That the query ran or that all SQL constructs are supported |
 | OpenLineage event JSON | Job/run/dataset observations and only the column facets present | Cell/column propagation where the event has no such evidence; negative evidence from an absent event |
 | GitHub repository | Source transport to selected, authorized files/revisions | Import, private access, or lineage by itself |
