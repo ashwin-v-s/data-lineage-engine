@@ -41,3 +41,107 @@
     .toast-anim {
       transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s ease;
     }
+
+
+/* Kairos dashboard design system: Outfit + Instrument Sans, blueprint grid,
+   crisp ink borders, Google blue controls, and hard offset card shadows. */
+:root {
+  font-family: var(--font-body);
+}
+html, body { min-height: 100%; }
+body {
+  min-height: 100vh;
+  color: var(--ink);
+  font-family: var(--font-body);
+  background-color: var(--bg) !important;
+  background-image:
+    linear-gradient(to right, var(--grid) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--grid) 1px, transparent 1px) !important;
+  background-size: 36px 36px !important;
+}
+.auth-shell-card {
+  gap: 0 !important;
+  padding: 0 !important;
+  overflow: hidden;
+  border: 2px solid var(--ink) !important;
+  border-radius: 20px !important;
+  background: var(--surface) !important;
+  box-shadow: 8px 8px 0 var(--ink) !important;
+}
+.auth-brand-panel {
+  min-height: 600px !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+.auth-form-panel {
+  min-height: 600px !important;
+  padding: clamp(28px, 4vw, 52px) !important;
+  background: var(--surface);
+  color: var(--ink);
+}
+#signin-panel h1, #signup-panel h1 {
+  color: var(--ink) !important;
+  font-family: var(--font-display) !important;
+  font-weight: 800 !important;
+  letter-spacing: -.04em !important;
+}
+.auth-form-panel p { color: var(--muted); }
+.auth-form-panel label {
+  color: var(--ink) !important;
+  font-family: var(--font-mono);
+  font-size: 11px !important;
+  letter-spacing: .08em !important;
+}
+.auth-form-panel input,
+.auth-form-panel select {
+  min-height: 44px !important;
+  border: 2px solid var(--ink) !important;
+  border-radius: 11px !important;
+  background-color: var(--surface) !important;
+  color: var(--ink) !important;
+  font-family: var(--font-body) !important;
+  box-shadow: 2px 2px 0 var(--ink) !important;
+}
+.auth-form-panel input::placeholder { color: var(--muted) !important; opacity: .8; }
+.auth-form-panel input:focus,
+.auth-form-panel select:focus {
+  border-color: var(--blue) !important;
+  outline: 3px solid color-mix(in srgb, var(--blue) 24%, transparent) !important;
+  outline-offset: 1px;
+}
+.auth-form-panel button,
+.auth-form-panel a { font-family: var(--font-body); }
+.auth-form-panel .sso-btn,
+#auth-tab-group,
+#auth-tab-group button,
+.auth-form-panel [class*="bg-emerald-50"] {
+  border: 2px solid var(--ink) !important;
+  border-radius: 11px !important;
+  box-shadow: 2px 2px 0 var(--ink) !important;
+}
+.auth-form-panel .sso-btn { min-height: 44px !important; background: var(--surface) !important; color: var(--ink) !important; }
+.auth-form-panel .sso-btn:hover { background: var(--tint-blue) !important; transform: translateY(-1px); }
+#auth-tab-group { background: var(--code-bg) !important; }
+#auth-tab-group button[aria-selected="true"] { background: var(--surface) !important; color: var(--ink) !important; }
+.auth-form-panel button[type="submit"] {
+  min-height: 48px !important;
+  border: 2px solid var(--ink) !important;
+  border-radius: 999px !important;
+  background: var(--blue) !important;
+  color: #fff !important;
+  box-shadow: 3px 3px 0 var(--ink) !important;
+}
+.auth-form-panel button[type="submit"]:hover { transform: translate(1px, 1px); box-shadow: 2px 2px 0 var(--ink) !important; }
+.auth-form-panel :focus-visible { outline: 3px solid var(--blue); outline-offset: 3px; }
+#forgot-modal-box { border: 2px solid var(--ink) !important; border-radius: 18px !important; box-shadow: 6px 6px 0 var(--ink) !important; }
+@media (max-width: 767px) {
+  body { justify-content: flex-start !important; }
+  main { padding: 16px !important; }
+  .auth-shell-card { margin: 8px 0 16px !important; box-shadow: 5px 5px 0 var(--ink) !important; }
+  .auth-brand-panel { min-height: 250px !important; }
+  .auth-form-panel { min-height: auto !important; padding: 28px 22px !important; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; }
+}
