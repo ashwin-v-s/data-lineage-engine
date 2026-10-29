@@ -17,7 +17,14 @@ from backend.app.api.routes.audit import router as audit_router
 from backend.app.api.routes.owner import router as owner_router
 from backend.app.api.routes.metadata import router as metadata_router
 from backend.app.api.routes.personalization import router as personalization_router
+from backend.app.api.routes.integrations import router as integrations_router
 from backend.app.auth import auth_disabled, require_user, supabase_auth_url
+
+
+# Largest request body the API will accept, in bytes.  Import payloads are
+# untrusted input; capping the body keeps an oversized upload from consuming
+# worker memory before any validation runs.  Override per environment.
+MAX_REQUEST_BYTES = int(os.getenv("KAIROS_MAX_REQUEST_BYTES", str(1_000_000)))
 
 
 app = FastAPI(
@@ -59,6 +66,32 @@ async def add_request_id(request: Request, call_next):
     return response
 
 
+# ── Request body size guard ───────────────────────────────────────────────────
+@app.middleware("http")
+async def limit_request_body(request: Request, call_next):
+    """Reject oversized bodies before they are read or parsed.
+
+    A declared ``Content-Length`` over the limit is refused immediately; a
+    chunked body with no length is still bounded by the server's own read
+    limits.  This guard is cheap and applies to every route, including the
+    metadata import path.
+    """
+    declared = request.headers.get("content-length")
+    if declared is not None:
+        try:
+            too_large = int(declared) > MAX_REQUEST_BYTES
+        except ValueError:
+            too_large = True
+        if too_large:
+            return api_error(
+                request=request,
+                message=f"Request body exceeds the {MAX_REQUEST_BYTES}-byte limit",
+                status_code=413,
+                code="PAYLOAD_TOO_LARGE",
+            )
+    return await call_next(request)
+
+
 # ── Error handlers ────────────────────────────────────────────────────────────
 @app.exception_handler(404)
 async def not_found_handler(request: Request, exc):
@@ -81,6 +114,7 @@ app.include_router(audit_router,      prefix="/api/v1")
 app.include_router(owner_router,      prefix="/api/v1")
 app.include_router(metadata_router,   prefix="/api/v1")
 app.include_router(personalization_router, prefix="/api/v1")
+app.include_router(integrations_router, prefix="/api/v1")
 
 
 # ── Liveness probe ────────────────────────────────────────────────────────────

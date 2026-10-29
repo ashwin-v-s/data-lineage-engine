@@ -16,6 +16,8 @@ pytest.importorskip("httpx")
 from fastapi.testclient import TestClient
 
 from backend.app.main import app
+from backend.app.auth import require_user
+from backend.app.services import github_app
 
 client = TestClient(app)
 
@@ -71,6 +73,7 @@ _PROTECTED_PATHS = [
     "/api/v1/me/recently-viewed",
     "/api/v1/me/starred-assets",
     "/api/v1/assets/anything/downstream-impact",
+    "/api/v1/integrations/github/status",
 ]
 
 
@@ -87,6 +90,39 @@ def test_unknown_path_uses_the_stable_not_found_envelope():
     assert res.status_code == 404
     error = _assert_error_envelope(res)
     assert error["code"] == "NOT_FOUND"
+
+
+def test_github_connector_status_reports_the_configuration_shape(monkeypatch):
+    """An authenticated caller sees exactly the connector status contract."""
+    for name in github_app.GITHUB_ENV_VARS:
+        monkeypatch.delenv(name, raising=False)
+
+    app.dependency_overrides[require_user] = lambda: {"id": "test-user"}
+    try:
+        res = client.get("/api/v1/integrations/github/status")
+    finally:
+        app.dependency_overrides.pop(require_user, None)
+
+    assert res.status_code == 200, res.text
+    body = res.json()
+    assert set(body) == {
+        "configured",
+        "missing_env",
+        "token_encryption_configured",
+        "read_only",
+        "install_url",
+    }
+    assert body["configured"] is False
+    assert body["missing_env"]
+
+
+def test_oversized_request_body_is_rejected_before_routing(monkeypatch):
+    monkeypatch.setattr("backend.app.main.MAX_REQUEST_BYTES", 128)
+    payload = {"asset_ids": ["x" * 500]}
+    res = client.post("/api/v1/metadata/bulk-update", json=payload)
+    assert res.status_code == 413, (res.status_code, res.text)
+    error = _assert_error_envelope(res)
+    assert error["code"] == "PAYLOAD_TOO_LARGE"
 
 
 def test_openapi_exposes_the_expected_route_inventory():
