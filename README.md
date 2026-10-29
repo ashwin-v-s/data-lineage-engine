@@ -14,7 +14,13 @@ Bitemporal data lineage infrastructure and execution-conditioned reasoning engin
 │   └── requirements.txt      # Backend Python dependencies
 ├── configs/                  # Project and environment configuration files
 ├── contracts/                # Shared domain types, interfaces, fixtures, and test mocks
-├── docs/                     # Architectural specs, research pack, guides, and pattern analysis
+├── data/olist/               # Tracked Olist sample dataset used by research/demo workflows
+├── docs/                     # Current architecture, setup, research, and team documentation
+│   ├── archive/               # Historical notes and superseded setup/task documents
+│   └── workstreams/           # M1–M5 independent work assignments
+├── frontend/                 # React/Vite app, existing CSS, and dashboard compatibility runtime
+│   ├── src/                  # React app shell and dashboard view bridge
+│   └── *.css                 # Existing Kairos design system and page styles
 ├── ingestion/                # Lineage & metadata extractors
 │   ├── cli/                  # CLI ingestion utilities and configuration templates
 │   ├── dbt/                  # dbt manifest/catalog ingestion adapter
@@ -33,6 +39,10 @@ Bitemporal data lineage infrastructure and execution-conditioned reasoning engin
 │   ├── run_migration.py      # Database migration execution script
 │   └── test_connection.py    # Database connectivity test
 └── tests/                    # Core pytest test suite (engine, baselines, contracts, leakage)
+
+Local source snapshots (such as Hatchable exports and Stitch ZIPs) belong in
+`references/snapshots/`. ZIP files are ignored by Git; they remain local
+reference material and are not included in a clone.
 ```
 
 ---
@@ -46,10 +56,23 @@ python -m venv .venv
 source .venv/bin/activate       # On Linux/macOS
 # or: .venv\Scripts\Activate.ps1 # On Windows PowerShell
 
-# Install dependencies
-pip install -r backend/requirements.txt
-pip install pytest sqlglot
+# Install the application and test dependencies from the project manifest
+python -m pip install -e ".[dev]"
 ```
+
+### 1.1 Frontend Setup
+
+```bash
+cd frontend
+npm ci
+npm run build
+cd ..
+```
+
+The React/Vite build keeps the existing Kairos CSS, palette, and Stitch sign-in
+page. Dashboard views still use the existing `frontend/app.js` renderer while
+they are migrated into React components. `scripts/run_ui.py` rebuilds the
+frontend before starting FastAPI.
 
 ### 2. Verify Import Boundaries & Tests
 ```bash
@@ -61,16 +84,25 @@ python -m pytest -q
 ```
 
 ### 3. Database & Migrations
+
+Kairos uses the team's **shared Supabase project** for Auth and hosted Postgres.
+You do not need to install PostgreSQL locally for the product demo. Get the
+database pooler URI and API keys from the project's Supabase dashboard and
+follow [`docs/SUPABASE_SETUP.md`](docs/SUPABASE_SETUP.md). Local PostgreSQL is
+optional for isolated research experiments and offline development.
+
 ```bash
-# Copy and configure environment variables
-cp .env.example .env
+# Use the existing ignored .env; if it is missing, create it from .env.example
+# and fill it with the team's Supabase project settings. Do not overwrite an existing .env.
 
 # Test database connection
 python scripts/test_connection.py
 
-# Run migrations
-python scripts/run_migration.py
+# Apply migrations once as described in docs/SUPABASE_SETUP.md
 ```
+
+The legacy `scripts/run_migration.py` applies only migration 0001. Follow the
+numbered migration guide instead of using that script as a complete setup.
 
 ### 4. Run Backend Server
 ```bash

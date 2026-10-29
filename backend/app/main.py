@@ -1,7 +1,10 @@
-from fastapi import FastAPI, Request
+from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 import os
 import uuid
+from pathlib import Path
 
 from backend.app.api.errors import api_error
 from backend.app.api.routes.health import router as health_router
@@ -13,6 +16,15 @@ from backend.app.api.routes.rea import router as rea_router
 from backend.app.api.routes.audit import router as audit_router
 from backend.app.api.routes.owner import router as owner_router
 from backend.app.api.routes.metadata import router as metadata_router
+from backend.app.api.routes.personalization import router as personalization_router
+from backend.app.api.routes.integrations import router as integrations_router
+from backend.app.auth import auth_disabled, require_user, supabase_auth_url
+
+
+# Largest request body the API will accept, in bytes.  Import payloads are
+# untrusted input; capping the body keeps an oversized upload from consuming
+# worker memory before any validation runs.  Override per environment.
+MAX_REQUEST_BYTES = int(os.getenv("KAIROS_MAX_REQUEST_BYTES", str(1_000_000)))
 
 
 app = FastAPI(
@@ -54,6 +66,32 @@ async def add_request_id(request: Request, call_next):
     return response
 
 
+# ── Request body size guard ───────────────────────────────────────────────────
+@app.middleware("http")
+async def limit_request_body(request: Request, call_next):
+    """Reject oversized bodies before they are read or parsed.
+
+    A declared ``Content-Length`` over the limit is refused immediately; a
+    chunked body with no length is still bounded by the server's own read
+    limits.  This guard is cheap and applies to every route, including the
+    metadata import path.
+    """
+    declared = request.headers.get("content-length")
+    if declared is not None:
+        try:
+            too_large = int(declared) > MAX_REQUEST_BYTES
+        except ValueError:
+            too_large = True
+        if too_large:
+            return api_error(
+                request=request,
+                message=f"Request body exceeds the {MAX_REQUEST_BYTES}-byte limit",
+                status_code=413,
+                code="PAYLOAD_TOO_LARGE",
+            )
+    return await call_next(request)
+
+
 # ── Error handlers ────────────────────────────────────────────────────────────
 @app.exception_handler(404)
 async def not_found_handler(request: Request, exc):
@@ -75,3 +113,41 @@ app.include_router(rea_router,        prefix="/api/v1")
 app.include_router(audit_router,      prefix="/api/v1")
 app.include_router(owner_router,      prefix="/api/v1")
 app.include_router(metadata_router,   prefix="/api/v1")
+app.include_router(personalization_router, prefix="/api/v1")
+app.include_router(integrations_router, prefix="/api/v1")
+
+
+# ── Liveness probe ────────────────────────────────────────────────────────────
+# Unauthenticated and dependency-free so a hosting platform (Vercel, a load
+# balancer, an uptime monitor) can confirm the process is up.  It deliberately
+# does NOT touch the database or Supabase: the authenticated, database-backed
+# readiness check lives at GET /api/v1/health.  Declared before the catch-all
+# StaticFiles mount below so it is never shadowed.
+@app.get("/healthz", tags=["health"])
+def liveness():
+    return {"status": "ok", "service": "kairos-api"}
+
+
+@app.get("/api/v1/auth/config", tags=["authentication"])
+def auth_config():
+    """Expose only the public Supabase client settings needed by the sign-in page."""
+    return {
+        "url": supabase_auth_url(),
+        "publishable_key": os.getenv("SUPABASE_PUBLISHABLE_KEY")
+        or os.getenv("VITE_SUPABASE_PUBLISHABLE_KEY"),
+        "auth_disabled": auth_disabled(),
+    }
+
+
+@app.get("/ingestion.html", include_in_schema=False)
+def authenticated_ingestion_page(user: dict = Depends(require_user)):
+    """Serve the standalone ingestion workspace only to signed-in users."""
+    return FileResponse(FRONTEND_SOURCE_DIR / "ingestion.html", media_type="text/html")
+
+
+# Keep API routes above this catch-all mount so the Hatchable-exported browser
+# interface is served at / while API endpoints remain handled by FastAPI.
+FRONTEND_SOURCE_DIR = Path(__file__).resolve().parents[2] / "frontend"
+FRONTEND_DIR = FRONTEND_SOURCE_DIR / "dist"
+if FRONTEND_DIR.is_dir():
+    app.mount("/", StaticFiles(directory=FRONTEND_DIR, html=True), name="frontend")

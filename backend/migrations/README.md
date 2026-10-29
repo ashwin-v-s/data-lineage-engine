@@ -1,6 +1,9 @@
 # Database Migrations (M3)
 
-Numbered migration files that create and modify the PostgreSQL schema.
+Numbered migration files that create and modify the schema in the team's
+shared **Supabase Postgres** project. Supabase is the managed platform;
+PostgreSQL is its database engine. Installing PostgreSQL locally is not
+required for the product demo. See [`../../docs/SUPABASE_SETUP.md`](../../docs/SUPABASE_SETUP.md).
 
 ## Rules
 
@@ -9,42 +12,17 @@ Numbered migration files that create and modify the PostgreSQL schema.
 3. **Test** each migration on a clean database before committing
 4. **Document** what each migration does in its header comment
 
-## Setup
+## Shared Supabase setup
 
-### Install PostgreSQL
-
-**Windows (native):**
-```powershell
-winget install PostgreSQL.PostgreSQL
-```
-
-**Windows (WSL2) - recommended for ProvSQL compatibility:**
-```bash
-sudo apt update
-sudo apt install postgresql postgresql-contrib
-sudo service postgresql start
-```
-
-### Create Database
+One migration owner applies each numbered migration once to the shared project.
+Use Supabase SQL Editor or the project's database connection URI. The local
+server is optional for offline/research work and is not the shared product DB.
 
 ```bash
-# Create database
-createdb kairos
-
-# Or via psql:
-psql -U postgres
-CREATE DATABASE kairos;
-\q
-```
-
-### Apply Migrations
-
-```bash
-# Apply migration 0001
-psql kairos < backend/migrations/0001_core.sql
-
-# Verify tables were created
-psql kairos -c "\dt"
+# Apply in order; DATABASE_URL must target the intended Supabase project.
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f backend/migrations/0001_core.sql
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f backend/migrations/0002_audit_ownership_metadata.sql
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f backend/migrations/0003_personal_workspaces.sql
 ```
 
 ## Current Migrations
@@ -66,35 +44,75 @@ Creates foundational schema:
 - UUID primary keys with deterministic option
 - Indexes for traversal, time range queries, and lookups
 
-## Connection String Format
+### 0002_audit_ownership_metadata.sql
+Adds dataset ownership/description fields and the team, ownership, audit,
+version, and rollback tables used by the governance API.
+
+### 0003_personal_workspaces.sql
+Adds a personal workspace for each Supabase user on that user's first
+authenticated API request. PostgreSQL row-level security scopes every business
+table query to that workspace. Existing rows are kept in a separate
+`Legacy catalog` workspace and are intentionally not assigned to whoever signs
+in first. The workspace registry itself has forced RLS and no direct grants to
+browser/API roles; provisioning is through the restricted SECURITY DEFINER
+function. The shared Supabase project was verified with this migration applied
+on 2026-10-29.
+
+### 0004_ingestion_import_runs.sql
+Local proposal only; it was not applied to the shared project. It adds the
+workspace-scoped import provenance/idempotency record described in the product
+architecture. M3 must review its contract fields and authorize deployment
+before it is applied.
+
+### 0005_personalization.sql
+Adds the per-user `asset_view` (recently viewed) and `asset_star` (starred
+assets) tables used by the personalization endpoints under `/api/v1/me/*` and
+`/api/v1/assets/{asset_id}/star`. Both tables carry workspace RLS, are granted
+only to `kairos_app`, and are keyed on `(workspace_id, user_id, asset_id)` so a
+user's shortcuts stay private to that user inside that workspace.
+
+Apply 0003 only after 0001 and 0002, using the privileged database connection
+used for schema migrations:
+
+```powershell
+psql "$env:DATABASE_URL" -v ON_ERROR_STOP=1 -f backend/migrations/0003_personal_workspaces.sql
+```
+
+The API's `DATABASE_URL` role must be a member of `kairos_app`; the migration
+grants membership to its executing role and to `postgres` when that role
+exists. If the API uses a different login role, a database administrator must
+also grant it membership and permission to execute
+`public.kairos_ensure_personal_workspace(uuid)`. Do not run the API with a
+restricted or anonymous database role that cannot call that provisioning
+function. The API fails closed with HTTP 503 until the migration and grants are
+in place.
+
+For example, when the API login is `kairos`, run as a database administrator:
+
+```sql
+GRANT kairos_app TO kairos;
+GRANT EXECUTE ON FUNCTION public.kairos_ensure_personal_workspace(uuid) TO kairos;
+```
+
+To inspect migration state, verify that all 17 business tables have a
+`workspace_id` column, `kairos_workspace_isolation` policy, and RLS enabled.
+Do not manually assign the legacy workspace to a user unless that user is
+intended to receive the pre-isolation catalog.
+
+## Supabase connection string
 
 ```
-postgresql://username:password@localhost:5432/kairos
+Use the transaction-pooler URI copied from Supabase Project Settings → Database.
 ```
 
-Store in `.env` (never commit `.env`):
+Store the exact URI in `.env` (never commit `.env`):
 ```
-DATABASE_URL=postgresql://postgres:password@localhost:5432/kairos
-```
-
-## Testing Migrations
-
-```bash
-# Drop and recreate database
-dropdb kairos && createdb kairos
-
-# Apply migration
-psql kairos < backend/migrations/0001_core.sql
-
-# Should succeed without errors
-echo $?  # Should print 0
+DATABASE_URL=<Supabase transaction-pooler URI>
 ```
 
-## Rollback
+## Migration testing and rollback
 
-Migrations are forward-only. To "rollback":
-1. Drop the database: `dropdb kairos`
-2. Recreate it: `createdb kairos`
-3. Apply migrations up to the desired point
-
-For production, create explicit rollback scripts if needed.
+Do not run drop/recreate commands against the shared project. Test destructive
+or forward migration changes in a separate Supabase project/branch or isolated
+local database. Migrations are forward-only; production corrections require a
+reviewed follow-up migration and a backup/restore plan.

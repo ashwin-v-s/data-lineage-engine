@@ -1,0 +1,52 @@
+# M1 — Static and File Adapters
+
+**Owner:** Person 1 · **Timebox:** 2–3 hours · **Architecture:** [`../KAIROS_FINAL_ARCHITECTURE.md`](../KAIROS_FINAL_ARCHITECTURE.md)
+
+## Goal
+
+Produce typed, deterministic metadata from user-supplied files without writing directly to the database. Adapters return the shared `kairos.ingest.v1` concepts: assets, relationship candidates, evidence/provenance, and diagnostics. The orchestrator/storage owner (M3) controls final contract/API changes and persists accepted output to the team's shared Supabase project.
+
+## Inspect first
+
+- `ingestion/sql/` and its existing fixtures/tests.
+- `ingestion/dbt/` (README and any implementation; do not assume a README means an adapter exists).
+- Existing JSON normalization/preview in `frontend/ingestion.js` and the Hatchable v306 ZIP reference.
+- `contracts/` for existing asset/evidence types.
+
+## Work
+
+1. Inventory what actually parses today: SQL parser subset, dbt manifest support, generic metadata graph JSON, file inventory/CSV preview. Label each implemented, partial, or absent.
+2. Choose one bounded file adapter for the demo fixture. Validate required keys, types, identifiers, relationship endpoints, file size/count, and unknown version. Preserve source filename/revision and content hash.
+3. Add fixtures: a minimal valid graph with two assets and one explicitly declared edge; invalid endpoint; unknown version; oversized/unsupported example. Make output deterministic and diagnostics actionable.
+4. For SQL/dbt, retain static/declared classification. Unsupported SQL or malformed dbt metadata produces diagnostics; do not manufacture runtime events.
+5. Share the fixture and expected adapter output with M3/M5. Do not edit their API, DB migration, React app, or research truth provider.
+
+## Supabase boundary
+
+This workstream is format parsing only. Do not connect directly to Supabase or create local database state. M3 owns authenticated persistence to the shared Supabase Postgres project; local PostgreSQL is not needed for this adapter work.
+
+## Likely files
+
+- `ingestion/metadata_graph/`, `ingestion/static_files/`, `ingestion/dbt/`, `ingestion/sql/`
+- `tests/fixtures/ingestion/`, focused adapter tests
+- Propose a contract change to M3 before touching a shared contract module.
+
+## Acceptance
+
+- Same valid input yields identical normalized output.
+- Explicit links are distinguished from inferred static SQL candidates.
+- Invalid/unsupported content has diagnostics and cannot become a silent empty import.
+- No network access, SQL execution, DB writes, credentials, or ground-truth imports.
+
+## M1 implementation status
+
+The bounded metadata-graph v1 parser/validator is implemented in
+`ingestion/metadata_graph/`. `ingestion/static_files/` provides explicit
+format dispatch for metadata graphs, dbt manifests, file inventories, and CSV
+headers.
+`ingestion/dbt/manifest.py` normalizes supported dbt resources and declared
+dependencies; `ingestion/static_files/inventory.py` emits file assets without
+inventing data-flow edges; `ingestion/static_files/csv_headers.py` reads only
+CSV headers and leaves column types unknown. All adapters return the shared v1
+envelope with diagnostics and provenance. They are ready for M3 to call, but
+are not wired to the authenticated Supabase import API.

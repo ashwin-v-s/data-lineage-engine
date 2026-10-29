@@ -21,9 +21,15 @@ frontend/.env.local
 # Data and large datasets
 data/*
 !data/.gitkeep
+!data/olist/
+data/olist/*
+!data/olist/*.csv
 research/results/*
 !research/results/.gitkeep
-Olist dataset/
+# Consolidated benchmark-matrix summaries are committed deliverables;
+# the individual result_*.json artifacts remain ignored.
+!research/results/summary.json
+!research/results/summary.md
 *.zip
 *.tar.gz
 *.csv.gz

@@ -4,3 +4,4 @@ psycopg2-binary>=2.9,<3
 python-dotenv>=1,<2
 pydantic[email]>=2,<3
 sqlalchemy>=2,<3
+sqlglot>=26

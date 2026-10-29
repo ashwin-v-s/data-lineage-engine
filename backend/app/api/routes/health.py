@@ -1,6 +1,7 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
+from backend.app.auth import require_user
 from backend.app.db import health_check
 
 
@@ -9,7 +10,7 @@ class HealthResponse(BaseModel):
     db: str = "unknown"
 
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(require_user)])
 
 
 @router.get("/health", response_model=HealthResponse)

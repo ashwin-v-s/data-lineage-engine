@@ -77,3 +77,53 @@ Interactive Endpoints:
 | `/api/v1/evidence/entity/{entity_id}` | GET | List evidence associated with an entity | `tests/test_api_v1.py::test_evidence_endpoints` |
 | `/api/v1/runs/{run_id}/dependency/{source}/{target}` | GET | M4 FourStateEngine prediction serialization with fixed text | `tests/test_api_v1.py::test_m4_reasoning_and_fixed_interpretations` |
 | `/api/v1/evaluation/oracle/{run_id}` | GET | Hazard-mode benchmark ground truth oracle | `tests/test_api_v1.py::test_evaluation_oracle_isolated_mode` |
+
+## 5. Research Benchmark Matrix (M4 — PLUMBING only)
+
+> ⚠️ **PLUMBING EVIDENCE ONLY.** This runs the mock `w03_case_when` fixture through the
+> plumbing pipeline. The numbers it produces are **NOT research findings**. See
+> [`docs/BENCHMARK_RESULTS.md`](BENCHMARK_RESULTS.md) for the captured results, their
+> interpretation, and the decisions that still block a real run.
+
+### Prerequisites
+```bash
+# From repository root
+python -m pip install -e ".[dev]"
+```
+
+### Run a single plumbing cell
+```bash
+python research/experiments/run.py --protocol research/protocol/v1.yaml --plumbing --loss-level 0 --seed 1
+# Writes research/results/result_plumbing_mcar0_seed1.json
+```
+
+Valid loss levels: `0, 10, 30, 50, 70, 90` (the LOCKED matrix). Any integer seed is allowed.
+
+### Run the full benchmark matrix end to end
+```bash
+python scripts/run_benchmark_matrix.py
+```
+This invokes the real runner once per cell across the full loss-level matrix
+(`0, 10, 30, 50, 70, 90`) × seeds (`1, 7, 42`) = 18 cells, then consolidates every artifact
+into two committed deliverables under `research/results/`:
+
+- `research/results/summary.json` — machine-readable per-(level, seed, method) metrics plus
+  each artifact's `mask_hash` / `ground_truth_hash` / `git_sha`.
+- `research/results/summary.md` — human-readable report, one table per loss level.
+
+The individual `research/results/result_*.json` artifacts stay git-ignored; the two summary
+files are intentionally tracked.
+
+### Verify the plumbing pipeline against the protocol gates
+```bash
+python -m pytest tests/test_protocol_runner.py -q
+python scripts/check_import_boundaries.py
+```
+
+### Full test suite
+```bash
+python -m pytest -q
+```
+
+The captured matrix results and their interpretation live in
+[`docs/BENCHMARK_RESULTS.md`](BENCHMARK_RESULTS.md).
