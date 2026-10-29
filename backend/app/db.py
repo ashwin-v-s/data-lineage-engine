@@ -95,6 +95,66 @@ def get_conn() -> Generator[psycopg2.extensions.connection, None, None]:
         p.putconn(conn)
 
 
+class _PooledConnectionCompat:
+    """Pooled psycopg2 connection exposed with the connection API expected by
+    the audit / owner / metadata route modules.
+
+    Those modules call ``get_db_connection()`` and then use
+    ``conn.cursor(row_factory=dict)``, ``conn.commit()``, ``conn.rollback()``
+    and ``conn.close()``.  ``close()`` returns the connection to the pool
+    instead of closing it, and discards any uncommitted work.
+    """
+
+    def __init__(self, pool: pg_pool.ThreadedConnectionPool, conn) -> None:
+        self._pool = pool
+        self._conn = conn
+        self._returned = False
+
+    def cursor(self, *args, **kwargs):
+        row_factory = kwargs.pop("row_factory", None)
+        if row_factory is not None and "cursor_factory" not in kwargs:
+            kwargs["cursor_factory"] = RealDictCursor
+        return self._conn.cursor(*args, **kwargs)
+
+    def commit(self) -> None:
+        self._conn.commit()
+
+    def rollback(self) -> None:
+        self._conn.rollback()
+
+    def close(self) -> None:
+        if self._returned:
+            return
+        self._returned = True
+        conn = self._conn
+        try:
+            if conn.closed:
+                self._pool.putconn(conn, close=True)
+            else:
+                conn.rollback()  # drop any uncommitted work
+                self._pool.putconn(conn)
+        except Exception:
+            pass
+
+    def __del__(self) -> None:
+        """Safety net: routes call ``conn.close()`` inside their ``try`` block,
+        so an exception raised mid-query skips it.  Returning the connection
+        here guarantees it is never permanently leaked from the pool."""
+        try:
+            self.close()
+        except Exception:
+            pass
+
+    def __getattr__(self, name: str):
+        return getattr(object.__getattribute__(self, "_conn"), name)
+
+
+def get_db_connection() -> _PooledConnectionCompat:
+    """Return a pooled connection for the audit / owner / metadata routes."""
+    pool = _get_pool()
+    return _PooledConnectionCompat(pool, pool.getconn())
+
+
 def health_check() -> dict:
     """Quick connectivity check used by /health endpoint."""
     try:

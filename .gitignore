@@ -1,11 +1,45 @@
+# Byte-compiled / optimized / test caches
 __pycache__/
-*.pyc
+*.py[cod]
+*$py.class
 .pytest_cache/
+.coverage
+htmlcov/
+.cache/
+
+# Environments and Secrets
 .venv/
+env/
+venv/
+ENV/
 .env
+.env.local
+*.env
+backend/.env.local
+frontend/.env.local
+
+# Data and large datasets
 data/*
 !data/.gitkeep
 research/results/*
 !research/results/.gitkeep
+Olist dataset/
+*.zip
+*.tar.gz
+*.csv.gz
+
+# Temporary dumps and scratch files
+rea_*.json
+*.tsbuildinfo
+
+# Dependencies and build outputs
 node_modules/
+dist/
+build/
 *.egg-info/
+
+# IDE and OS artifacts
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

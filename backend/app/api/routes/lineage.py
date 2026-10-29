@@ -17,13 +17,14 @@ import re
 from datetime import datetime, timezone
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
+from backend.app.auth import optional_user
 from psycopg2.extras import RealDictCursor
 
 from backend.app.db import get_conn
 from backend.app.schemas.lineage import LineageEdge, LineageNode, LineageResponse
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(optional_user)])
 
 _UUID_RE = re.compile(
     r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$',
@@ -36,7 +37,7 @@ def _now_utc() -> str:
 
 
 def _resolve_asset(cur, asset_id: str) -> dict | None:
-    """Resolve by UUID or name; return full row including schema_name."""
+    """Resolve dataset or column IDs/names to a dataset graph anchor."""
     if _UUID_RE.match(asset_id):
         cur.execute(
             """
@@ -45,6 +46,30 @@ def _resolve_asset(cur, asset_id: str) -> dict | None:
             FROM   dataset
             WHERE  id = %s::uuid
             LIMIT  1
+            """,
+            (asset_id,),
+        )
+        row = cur.fetchone()
+        if row:
+            return {
+                "id": row["id"],
+                "name": row["name"],
+                "type": row["type"],
+                "schema_name": row.get("schema_name"),
+                "database_name": row.get("database_name"),
+                "source_system": row.get("source_system"),
+            }
+
+        # Catalog search returns column_record IDs. The lineage graph is
+        # currently dataset anchored, so resolve a column ID to its dataset.
+        cur.execute(
+            """
+            SELECT d.id::text, d.name, d.asset_type AS type,
+                   d.schema_name, d.database_name, d.source_system
+            FROM column_record cr
+            JOIN dataset d ON d.id = cr.dataset_id
+            WHERE cr.id = %s::uuid
+            LIMIT 1
             """,
             (asset_id,),
         )
@@ -90,8 +115,15 @@ def _walk_lineage(
     depth: int,
     as_of: str,
     recorded_as_of: str,
+    direction: str = "both",
 ) -> tuple[dict[str, dict], list[dict]]:
-    """BFS over lineage_edge / edge_temporal_version with bitemporal filters."""
+    """BFS over lineage_edge / edge_temporal_version with bitemporal filters.
+
+    direction:
+      "both"       – follow edges in either direction (full neighbourhood).
+      "upstream"   – only predecessors (edges whose target is in the frontier).
+      "downstream" – only successors   (edges whose source is in the frontier).
+    """
     nodes: dict[str, dict] = {}
     edges: list[dict] = []
     seen_edges: set[tuple[str, str]] = set()
@@ -123,9 +155,20 @@ def _walk_lineage(
                 "source_system": r.get("source_system"),
             }
 
+        # Restrict traversal to the requested direction
+        if direction == "upstream":
+            direction_sql = "le.target_id = ANY(%s::uuid[])"
+            direction_params: list = [list(frontier)]
+        elif direction == "downstream":
+            direction_sql = "le.source_id = ANY(%s::uuid[])"
+            direction_params = [list(frontier)]
+        else:
+            direction_sql = "(le.source_id = ANY(%s::uuid[]) OR le.target_id = ANY(%s::uuid[]))"
+            direction_params = [list(frontier), list(frontier)]
+
         # Find edges touching any frontier node, respecting bitemporal filters
         cur.execute(
-            """
+            f"""
             SELECT DISTINCT
                 le.id::text      AS le_id,
                 le.source_id::text AS source,
@@ -133,7 +176,7 @@ def _walk_lineage(
                 le.granularity
             FROM   lineage_edge le
             JOIN   edge_temporal_version etv ON etv.edge_id = le.id
-            WHERE  (le.source_id = ANY(%s::uuid[]) OR le.target_id = ANY(%s::uuid[]))
+            WHERE  {direction_sql}
               AND  le.granularity = %s
               AND  etv.valid_from        <= %s::timestamptz
               AND  (etv.valid_to         IS NULL OR etv.valid_to        > %s::timestamptz)
@@ -141,7 +184,7 @@ def _walk_lineage(
               AND  (etv.transaction_to   IS NULL OR etv.transaction_to  > %s::timestamptz)
             """,
             (
-                list(frontier), list(frontier),
+                *direction_params,
                 granularity,
                 as_of, as_of,
                 recorded_as_of, recorded_as_of,
@@ -158,7 +201,13 @@ def _walk_lineage(
                     "target": tgt,
                     "granularity": row["granularity"],
                 })
-            for nid in (src, tgt):
+            if direction == "upstream":
+                candidates = (src,)
+            elif direction == "downstream":
+                candidates = (tgt,)
+            else:
+                candidates = (src, tgt)
+            for nid in candidates:
                 if nid not in nodes:
                     next_frontier.add(nid)
 
@@ -220,6 +269,77 @@ def get_lineage(
                 depth=depth,
                 as_of=ts_as_of,
                 recorded_as_of=ts_rec,
+            )
+
+    # Ensure root is always present
+    if root["id"] not in nodes_map:
+        nodes_map[root["id"]] = root
+
+    nodes = [
+        LineageNode(
+            id=v["id"],
+            name=v["name"],
+            type=v.get("type", "TABLE").lower(),
+            display_name=v["name"],
+            namespace=v.get("schema_name", ""),
+            schema_version="v1",
+        )
+        for v in nodes_map.values()
+    ]
+
+    lineage_edges = [
+        LineageEdge(
+            edge_id=e["edge_id"],
+            source=e["source"],
+            target=e["target"],
+            granularity=e["granularity"],
+        )
+        for e in edges
+    ]
+
+    return LineageResponse(asset_id=root["id"], nodes=nodes, edges=lineage_edges)
+
+
+@router.get("/lineage/{asset_id}/{direction}", response_model=LineageResponse)
+def expand_lineage(
+    asset_id: str,
+    direction: str,
+    as_of: Optional[str] = Query(default=None),
+    recorded_as_of: Optional[str] = Query(default=None),
+    depth: int = Query(default=1, ge=1, le=10),
+    granularity: str = Query(default="DATASET", pattern="^(DATASET|COLUMN)$"),
+):
+    """Directional lineage expansion used by the UI's Upstream / Downstream arrows.
+
+    GET /api/v1/lineage/{asset_id}/upstream    → predecessors only
+    GET /api/v1/lineage/{asset_id}/downstream  → successors only
+    """
+    if direction not in ("upstream", "downstream"):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid direction '{direction}'. Use 'upstream' or 'downstream'.",
+        )
+
+    ts_as_of = as_of or _now_utc()
+    ts_rec   = recorded_as_of or _now_utc()
+
+    with get_conn() as conn:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            root = _resolve_asset(cur, asset_id)
+            if not root:
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"Asset '{asset_id}' not found.",
+                )
+
+            nodes_map, edges = _walk_lineage(
+                cur,
+                root_id=root["id"],
+                granularity=granularity,
+                depth=depth,
+                as_of=ts_as_of,
+                recorded_as_of=ts_rec,
+                direction=direction,
             )
 
     # Ensure root is always present

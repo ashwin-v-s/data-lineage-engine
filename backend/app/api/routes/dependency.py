@@ -36,7 +36,8 @@ import json
 from datetime import datetime, timezone
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
+from backend.app.auth import optional_user
 from psycopg2.extras import RealDictCursor
 from pydantic import BaseModel
 
@@ -54,7 +55,7 @@ from contracts.types import (
 )
 from research.reasoning.engine import FourStateEngine
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(optional_user)])
 
 # ── Response schema ───────────────────────────────────────────────────────────
 

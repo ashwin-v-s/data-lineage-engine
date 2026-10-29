@@ -25,13 +25,14 @@ from __future__ import annotations
 
 from typing import Optional
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Depends, Query
+from backend.app.auth import optional_user
 from psycopg2.extras import RealDictCursor
 
 from backend.app.db import get_conn
 from backend.app.schemas.search import SearchResponse, SearchResult
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(optional_user)])
 
 # Columns we allow sort_by on (whitelist to prevent SQL injection)
 _SORTABLE = {"name", "schema_name", "asset_type", "source_system"}
@@ -67,7 +68,16 @@ def search(
                 SELECT
                     d.id::text                                              AS id,
                     d.asset_type                                            AS type,
-                    d.database_name || '.' || d.schema_name || '.' || d.name AS name
+                    d.database_name || '.' || d.schema_name || '.' || d.name AS name,
+                    d.name                                                  AS label,
+                    d.schema_name                                           AS schema,
+                    NULL::text                                              AS owner,
+                    NULL::text                                              AS description,
+                    d.created_at                                            AS created,
+                    d.created_at                                            AS updated,
+                    NULL::int                                               AS row_count,
+                    NULL::text                                              AS steward,
+                    NULL::text[]                                            AS tags
                 FROM dataset d
                 WHERE {' '.join(dataset_filters)}
                 {dataset_type_filter}
@@ -80,12 +90,21 @@ def search(
                     cr.id::text                                                        AS id,
                     'COLUMN'                                                           AS type,
                     d.database_name || '.' || d.schema_name || '.' || d.name
-                        || '.' || cr.column_name                                       AS name
+                        || '.' || cr.column_name                                       AS name,
+                    cr.column_name                                                     AS label,
+                    d.schema_name                                                      AS schema,
+                    NULL::text                                                         AS owner,
+                    NULL::text                                                         AS description,
+                    d.created_at                                                       AS created,
+                    d.created_at                                                       AS updated,
+                    NULL::int                                                          AS row_count,
+                    NULL::text                                                         AS steward,
+                    NULL::text[]                                                       AS tags
                 FROM column_record cr
                 JOIN dataset d ON d.id = cr.dataset_id
                 WHERE ( lower(cr.column_name) ILIKE lower(%(pat)s)
                      OR lower(cr.data_type)   ILIKE lower(%(pat)s) )
-            """ if not asset_type or asset_type.upper() == "COLUMN" else "SELECT NULL::text, NULL::text, NULL::text WHERE false"
+            """ if not asset_type or asset_type.upper() == "COLUMN" else "SELECT NULL::text, NULL::text, NULL::text, NULL::text, NULL::text, NULL::text, NULL::text, NULL::timestamptz, NULL::timestamptz, NULL::int, NULL::text, NULL::text[] WHERE false"
 
             # ── Union + count ───────────────────────────────────────────────
             union_sql = f"({dataset_sql}) UNION ALL ({column_sql})"
@@ -95,7 +114,7 @@ def search(
             total: int = cur.fetchone()["total"]
 
             page_sql = f"""
-                SELECT id, type, name
+                SELECT id, type, name, label, schema, owner, description, created, updated, row_count, steward, tags
                 FROM   ({union_sql}) sub
                 ORDER  BY {sort_col} {order}
                 LIMIT  %(limit)s OFFSET %(offset)s
@@ -104,7 +123,20 @@ def search(
             rows = cur.fetchall()
 
     results = [
-        SearchResult(id=r["id"], type=r["type"], name=r["name"])
+        SearchResult(
+            id=r["id"],
+            type=r["type"],
+            name=r["name"],
+            label=r["label"],
+            schema=r["schema"],
+            owner=r["owner"],
+            description=r["description"],
+            created=r["created"],
+            updated=r["updated"],
+            row_count=r["row_count"],
+            steward=r["steward"],
+            tags=r["tags"],
+        )
         for r in rows
         if r["id"] is not None
     ]
