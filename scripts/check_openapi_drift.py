@@ -1,0 +1,212 @@
+#!/usr/bin/env python
+"""OpenAPI contract-drift gate for the Kairos FastAPI application.
+
+This script freezes the HTTP contract owned by workstreams M1-M5.  It
+regenerates the OpenAPI 3.1 schema from the live application, normalizes it so
+the result is deterministic and free of environment-specific values, and
+compares it against a committed snapshot.
+
+The application object is obtained through the canonical deployed entrypoint
+``backend.api.index:app`` declared in ``pyproject.toml`` ``[tool.vercel]`` and
+asserted by CI; that module simply re-exports ``backend.app.main:app`` (the
+object ``scripts/export_openapi.py`` imports), so both names resolve to the same
+application.  This script never modifies the application -- it only imports and
+introspects it.
+
+Usage::
+
+    python scripts/check_openapi_drift.py            # check (exit 0/1/2)
+    python scripts/check_openapi_drift.py --write    # refresh the snapshot
+    python scripts/check_openapi_drift.py --update   # alias of --write
+
+Exit codes::
+
+    0  snapshot matches the live schema, or the snapshot was (re)written
+    1  the schema drifted from the snapshot (check mode only)
+    2  setup error, e.g. the application failed to import or the snapshot is
+       missing / not valid JSON
+"""
+from __future__ import annotations
+
+import argparse
+import difflib
+import json
+import sys
+from pathlib import Path
+from typing import Any, Dict, List, Sequence
+
+ROOT_DIR = Path(__file__).resolve().parent.parent
+if str(ROOT_DIR) not in sys.path:
+    sys.path.insert(0, str(ROOT_DIR))
+
+# Kept under contracts/api/ so it is unambiguously the *API* contract and cannot
+# be confused with the M4 research contract fixtures in contracts/fixtures/.
+SNAPSHOT_PATH = ROOT_DIR / "contracts" / "api" / "openapi.json"
+
+EXIT_OK = 0
+EXIT_DRIFT = 1
+EXIT_SETUP_ERROR = 2
+
+# Cap on how many unified-diff lines the drift report prints before truncating.
+MAX_DIFF_LINES = 200
+
+
+def _load_app() -> Any:
+    """Import and return the canonical FastAPI application object."""
+    from backend.api.index import app
+
+    return app
+
+
+def generate_schema() -> Dict[str, Any]:
+    """Return the raw OpenAPI schema produced by the live application."""
+    return _load_app().openapi()
+
+
+def normalize(schema: Dict[str, Any]) -> Dict[str, Any]:
+    """Return a deterministic, environment-independent copy of ``schema``.
+
+    The schema round-trips through JSON so that the comparison is a pure data
+    comparison and key ordering/formatting cannot cause false diffs.  A
+    ``servers`` block, if present, is dropped because it can embed the host the
+    schema happened to be generated on.  The current application emits no
+    ``servers`` block and no credentials, tokens or absolute URLs anywhere else
+    in the schema, so this is a defensive normalization.
+    """
+    data = json.loads(json.dumps(schema))
+    data.pop("servers", None)
+    return data
+
+
+def dumps(schema: Dict[str, Any]) -> str:
+    """Serialize a schema deterministically (sorted keys, 2-space indent)."""
+    return json.dumps(schema, indent=2, sort_keys=True) + "\n"
+
+
+def _methods(operation_map: Dict[str, Any]) -> str:
+    return ", ".join(sorted(m.upper() for m in operation_map)) or "-"
+
+
+def summarize(old: Dict[str, Any], new: Dict[str, Any]) -> List[str]:
+    """Return human-readable lines describing the contract differences."""
+    old_paths = old.get("paths") or {}
+    new_paths = new.get("paths") or {}
+    lines: List[str] = []
+
+    added = sorted(set(new_paths) - set(old_paths))
+    removed = sorted(set(old_paths) - set(new_paths))
+    if added:
+        lines.append("Added API paths:")
+        lines.extend(f"  + {p}  (methods: {_methods(new_paths[p])})" for p in added)
+    if removed:
+        lines.append("Removed API paths:")
+        lines.extend(f"  - {p}  (methods: {_methods(old_paths[p])})" for p in removed)
+
+    method_changes: List[str] = []
+    for path in sorted(set(old_paths) & set(new_paths)):
+        old_ops = old_paths[path] or {}
+        new_ops = new_paths[path] or {}
+        for method in sorted(set(new_ops) - set(old_ops)):
+            method_changes.append(f"  + {path} [{method.upper()}] method added")
+        for method in sorted(set(old_ops) - set(new_ops)):
+            method_changes.append(f"  - {path} [{method.upper()}] method removed")
+        for method in sorted(set(old_ops) & set(new_ops)):
+            if old_ops[method] != new_ops[method]:
+                method_changes.append(f"  ~ {path} [{method.upper()}] definition changed")
+    if method_changes:
+        lines.append("Changed methods:")
+        lines.extend(method_changes)
+
+    if not added and not removed and not method_changes:
+        lines.append("No API paths or methods changed; other schema content differs.")
+
+    return lines
+
+
+def unified_diff(old_text: str, new_text: str) -> List[str]:
+    """Return a bounded unified diff between the snapshot and the live schema."""
+    diff = list(
+        difflib.unified_diff(
+            old_text.splitlines(),
+            new_text.splitlines(),
+            fromfile="committed snapshot",
+            tofile="live schema",
+            lineterm="",
+        )
+    )
+    if len(diff) > MAX_DIFF_LINES:
+        omitted = len(diff) - MAX_DIFF_LINES
+        diff = diff[:MAX_DIFF_LINES] + [f"... ({omitted} more diff lines omitted)"]
+    return diff
+
+
+def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="Check or refresh the committed OpenAPI contract snapshot.",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    parser.add_argument(
+        "--write",
+        "--update",
+        dest="write",
+        action="store_true",
+        help="regenerate and overwrite the committed snapshot instead of checking it",
+    )
+    return parser.parse_args(argv)
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    args = parse_args(argv)
+
+    try:
+        live = normalize(generate_schema())
+    except Exception as exc:  # noqa: BLE001 - any import/generation failure is a setup error
+        print(f"setup-error: could not generate the OpenAPI schema: {exc}", file=sys.stderr)
+        return EXIT_SETUP_ERROR
+
+    live_text = dumps(live)
+    live_count = len(live.get("paths", {}))
+
+    if args.write:
+        SNAPSHOT_PATH.parent.mkdir(parents=True, exist_ok=True)
+        SNAPSHOT_PATH.write_text(live_text, encoding="utf-8")
+        print(f"Wrote OpenAPI snapshot ({live_count} paths) to {SNAPSHOT_PATH}")
+        return EXIT_OK
+
+    if not SNAPSHOT_PATH.is_file():
+        print(
+            f"setup-error: snapshot not found at {SNAPSHOT_PATH}; "
+            "run: python scripts/check_openapi_drift.py --write",
+            file=sys.stderr,
+        )
+        return EXIT_SETUP_ERROR
+
+    try:
+        committed = normalize(json.loads(SNAPSHOT_PATH.read_text(encoding="utf-8")))
+    except (json.JSONDecodeError, OSError) as exc:
+        print(
+            f"setup-error: could not read the snapshot at {SNAPSHOT_PATH}: {exc}",
+            file=sys.stderr,
+        )
+        return EXIT_SETUP_ERROR
+
+    committed_text = dumps(committed)
+
+    if committed_text == live_text:
+        print(f"OpenAPI contract unchanged ({live_count} paths).")
+        return EXIT_OK
+
+    print("OpenAPI contract drift detected between the snapshot and the live application.")
+    print(f"  snapshot: {SNAPSHOT_PATH}")
+    print()
+    for line in summarize(committed, live):
+        print(line)
+    print()
+    print("Unified diff (snapshot -> live schema):")
+    for line in unified_diff(committed_text, live_text):
+        print(line)
+    return EXIT_DRIFT
+
+
+if __name__ == "__main__":
+    sys.exit(main())

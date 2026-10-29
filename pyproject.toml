@@ -22,7 +22,10 @@ dependencies = [
 entrypoint = "backend.api.index:app"
 
 [project.optional-dependencies]
-dev = ["pytest>=8"]
+dev = [
+    "pytest>=8",
+    "ruff>=0.14,<0.18",
+]
 # Exact versions are NOT YET FROZEN: freeze at the first working build (Pack Section 42).
 
 [tool.setuptools.packages.find]
@@ -30,3 +33,17 @@ include = ["backend*", "contracts*", "ingestion*", "research*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+# Generated and vendored trees only; source trees are linted in full by CI, which
+# passes an explicit path list (see .github/workflows/ci.yml).
+extend-exclude = ["node_modules", "dist", "build", ".pw-browsers"]
+
+[tool.ruff.lint]
+# Deliberately narrow and high-signal: only real defects (E9 syntax/IO errors,
+# pyflakes F) and import hygiene (I).  Style and modernization rules are omitted
+# on purpose -- they would flag large volumes of pre-existing code owned by the
+# M1-M5 workstreams, which this change must not touch.
+select = ["E9", "F", "I"]

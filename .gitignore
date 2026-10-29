@@ -44,6 +44,11 @@ dist/
 build/
 *.egg-info/
 
+# Playwright artifacts
+playwright-report/
+test-results/
+.pw-browsers/
+
 # IDE and OS artifacts
 .DS_Store
 Thumbs.db

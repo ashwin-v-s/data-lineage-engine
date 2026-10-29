@@ -34,15 +34,22 @@ import sys
 import psycopg2
 from dotenv import load_dotenv
 
-
 # Workspace-scoped business tables that must be hardened.  Hard-coded from the
-# verified Kairos migrations:
+# Kairos migrations:
 #   * 0003_personal_workspaces.sql - the "ALTER TABLE ... ENABLE/FORCE ROW LEVEL
 #     SECURITY" loop over the 17 business tables.
 #   * 0005_personalization.sql     - asset_view, asset_star.
+#   * 0006_github_connections.sql  - github_connection.
+#
 # 0004_ingestion_import_runs.sql (import_run) is intentionally omitted because it
 # is marked "PROPOSAL ONLY: NOT APPLIED" and would otherwise break the gate on
-# the shared project.
+# the shared project.  0006_github_connections.sql is *also* still a proposal,
+# but its github_connection table is listed here because it previously slipped
+# past this gate entirely; run this check only against a database where 0006 has
+# been applied, otherwise github_connection is reported as missing.  See
+# backend/migrations/README.md for per-migration apply status, and
+# scripts/db/check_migrations.py for the static cross-check that keeps this list
+# in sync with the migrations.
 WORKSPACE_SCOPED_TABLES = (
     # 0003_personal_workspaces.sql
     "dataset",
@@ -65,6 +72,8 @@ WORKSPACE_SCOPED_TABLES = (
     # 0005_personalization.sql
     "asset_view",
     "asset_star",
+    # 0006_github_connections.sql
+    "github_connection",
 )
 
 # Exit codes.
