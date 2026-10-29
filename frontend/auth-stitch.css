@@ -41,3 +41,7 @@
     .toast-anim {
       transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s ease;
     }
+
+
+/* Official Supabase icon shown in the provider option. */
+.supabase-logo { display: block; width: 24px; height: 24px; flex: none; object-fit: contain; }
