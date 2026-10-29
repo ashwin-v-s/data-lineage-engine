@@ -1,6 +1,9 @@
 # Database Migrations (M3)
 
-Numbered migration files that create and modify the PostgreSQL schema.
+Numbered migration files that create and modify the schema in the team's
+shared **Supabase Postgres** project. Supabase is the managed platform;
+PostgreSQL is its database engine. Installing PostgreSQL locally is not
+required for the product demo. See [`../../docs/SUPABASE_SETUP.md`](../../docs/SUPABASE_SETUP.md).
 
 ## Rules
 
@@ -9,42 +12,17 @@ Numbered migration files that create and modify the PostgreSQL schema.
 3. **Test** each migration on a clean database before committing
 4. **Document** what each migration does in its header comment
 
-## Setup
+## Shared Supabase setup
 
-### Install PostgreSQL
-
-**Windows (native):**
-```powershell
-winget install PostgreSQL.PostgreSQL
-```
-
-**Windows (WSL2) - recommended for ProvSQL compatibility:**
-```bash
-sudo apt update
-sudo apt install postgresql postgresql-contrib
-sudo service postgresql start
-```
-
-### Create Database
+One migration owner applies each numbered migration once to the shared project.
+Use Supabase SQL Editor or the project's database connection URI. The local
+server is optional for offline/research work and is not the shared product DB.
 
 ```bash
-# Create database
-createdb kairos
-
-# Or via psql:
-psql -U postgres
-CREATE DATABASE kairos;
-\q
-```
-
-### Apply Migrations
-
-```bash
-# Apply migration 0001
-psql kairos < backend/migrations/0001_core.sql
-
-# Verify tables were created
-psql kairos -c "\dt"
+# Apply in order; DATABASE_URL must target the intended Supabase project.
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f backend/migrations/0001_core.sql
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f backend/migrations/0002_audit_ownership_metadata.sql
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f backend/migrations/0003_personal_workspaces.sql
 ```
 
 ## Current Migrations
@@ -105,35 +83,20 @@ To inspect migration state, verify that all 17 business tables have a
 Do not manually assign the legacy workspace to a user unless that user is
 intended to receive the pre-isolation catalog.
 
-## Connection String Format
+## Supabase connection string
 
 ```
-postgresql://username:password@localhost:5432/kairos
+Use the transaction-pooler URI copied from Supabase Project Settings → Database.
 ```
 
-Store in `.env` (never commit `.env`):
+Store the exact URI in `.env` (never commit `.env`):
 ```
-DATABASE_URL=postgresql://postgres:password@localhost:5432/kairos
-```
-
-## Testing Migrations
-
-```bash
-# Drop and recreate database
-dropdb kairos && createdb kairos
-
-# Apply migration
-psql kairos < backend/migrations/0001_core.sql
-
-# Should succeed without errors
-echo $?  # Should print 0
+DATABASE_URL=<Supabase transaction-pooler URI>
 ```
 
-## Rollback
+## Migration testing and rollback
 
-Migrations are forward-only. To "rollback":
-1. Drop the database: `dropdb kairos`
-2. Recreate it: `createdb kairos`
-3. Apply migrations up to the desired point
-
-For production, create explicit rollback scripts if needed.
+Do not run drop/recreate commands against the shared project. Test destructive
+or forward migration changes in a separate Supabase project/branch or isolated
+local database. Migrations are forward-only; production corrections require a
+reviewed follow-up migration and a backup/restore plan.

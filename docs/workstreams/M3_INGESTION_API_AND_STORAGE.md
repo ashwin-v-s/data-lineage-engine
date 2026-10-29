@@ -32,4 +32,4 @@ Implement the thin server-side ingestion orchestrator and authenticated preview/
 - Preview creates no catalog rows. Commit creates one workspace-scoped import. Same idempotency key repeated creates no duplicate.
 - A second workspace cannot read/import the first workspace’s records.
 - Invalid input returns actionable diagnostics, not successful zero-row import.
-- If no configured PostgreSQL/Supabase test DB is available, record this as unverified; do not claim tenant isolation has passed.
+- If no configured shared Supabase project is available, record this as unverified; do not claim tenant isolation has passed.

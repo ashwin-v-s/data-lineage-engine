@@ -7,7 +7,7 @@
 ## 1. Decisions and boundaries
 
 1. **Two related deliverables, two bounded contexts.** Kairos Product handles identity, workspaces, source access, metadata import, catalog/lineage views, and operations. Kairos Research evaluates execution-conditioned lineage reasoning under the contract in `FINAL_ARCHITECTURE_AND_RESEARCH_EXECUTION_PACK.md`. Product connectors may feed versioned evidence into research contracts later; neither context imports the other.
-2. **One authoritative product database.** PostgreSQL is authoritative for product catalog data, workspace membership, imported evidence, and audit records. Supabase Auth supplies identity; Supabase Postgres may host that PostgreSQL database. “Supabase” is not a second catalog store. Neo4j remains optional and derived, only after a measured need and rebuild test.
+2. **Supabase is the shared product backend platform.** The team uses one shared Supabase project for Auth and its hosted Postgres database (plus Storage if file retention is needed). That hosted Postgres is the authoritative store for catalog, workspace, import, and audit records; a separate local PostgreSQL server is not required for product development/demo. Local PostgreSQL remains optional for offline/research experiments. Neo4j remains optional and derived, only after a measured need and rebuild test.
 3. **One workspace per new user for the demo.** The current migration provisions a personal workspace. Every catalog record and import belongs to one workspace, enforced by PostgreSQL RLS. Existing rows remain in the isolated `Legacy catalog`; they are not assigned to the first user.
 4. **Source access and Kairos sign-in are separate.** Google/GitHub/Microsoft OAuth into Supabase proves the person’s identity to Kairos. It does not grant access to that person’s private GitHub repositories or databases. A GitHub App/OAuth grant or a user-supplied file/connection is a separate, least-privilege source authorization.
 5. **One ingestion pipeline, many typed adapters.** Do not make one parser guess every format. A shared orchestrator runs format-specific adapters, validates their typed output, previews it, then commits it idempotently. Unknown formats are rejected with actionable diagnostics.
@@ -42,7 +42,7 @@ flowchart LR
 | Web app | React/Vite application entry and shell; existing dashboard renderer/CSS retained during migration; auth and import experiences | Vite/React shell exists, dashboard remains bridged to legacy renderer; not a React rewrite |
 | Identity | Supabase email/password, verification, OAuth callback/session refresh | Frontend flow and backend token verification exist; provider settings and live end-to-end callback are not verified in this repository |
 | API | FastAPI, bearer verification, versioned routes and typed request/response schemas | Existing catalog/search/lineage/governance routes; no persistent import endpoint yet |
-| Workspace data | PostgreSQL, migrations, RLS, transaction boundary | Personal-workspace migration is committed; must be applied and verified against the actual DB before claiming tenant isolation is active there |
+| Workspace data | Supabase Postgres, migrations, RLS, transaction boundary | Personal-workspace migration is committed; must be applied and verified against the shared project before claiming tenant isolation is active there |
 | Ingestion | Format routing, parse, normalize, validation, preview, explicit commit, audit | Browser-side format previews exist; durable unified import pipeline is not implemented |
 | Research | Offline reproducible experiments; SQLGlot static candidates, runtime evidence, four-state inference, independent truth | Research packages and tests exist; preserve contract and keep this outside product import claims |
 | Optional graph projection | Rebuildable projection only if measured traversal need exists | No production dependency; PostgreSQL remains authoritative |
@@ -84,7 +84,7 @@ Do not turn parser failures into empty success. Unsupported input produces a dia
 
 ## 4. Product flow for the first working demo
 
-1. Clone the GitHub branch and configure local Supabase Auth + PostgreSQL using `.env.example`; apply migrations 0001, 0002, and 0003 to the intended database. Configure at least email/password. Social providers are enabled only after callback URLs, provider credentials, and Supabase settings are supplied by the project owner.
+1. Clone the GitHub branch and configure `.env` to use the shared Supabase URL, publishable key, and database pooler URI; follow [`SUPABASE_SETUP.md`](SUPABASE_SETUP.md). Apply migrations 0001, 0002, and 0003 once to the shared project. No local database install is required for the product demo. Configure at least email/password; social providers require callback URLs and provider credentials in Supabase.
 2. Create/sign in to Kairos. Verify email when Supabase requires it. The API validates the Supabase access token. The first authenticated API request provisions/returns the user's personal workspace.
 3. In Import Metadata, upload one documented `kairos.ingest.v1` metadata graph JSON fixture. The fixture is labelled as a sample until committed. For a public GitHub demo, select an explicitly supported fixture path/revision; public browse alone is not an import.
 4. Show preview counts, source provenance, warnings, and unsupported content. Confirm Import.
@@ -104,12 +104,12 @@ Do not turn parser failures into empty success. Unsupported input produces a dia
 Until these gates pass, describe the experience as a local prototype/preview rather than a working production connector.
 ## 5. Boundaries, security, and operational rules
 
-- Supabase publishable/anon key is browser-visible by design; service-role keys, DB passwords, GitHub App private keys, OAuth client secrets, and user access tokens are server-only. Do not commit credentials or ZIP environment files.
+- Supabase publishable/anon key is browser-visible by design; service-role keys, DB pooler passwords, GitHub App private keys, OAuth client secrets, and user access tokens are server-only. Do not commit credentials or ZIP environment files.
 - API validates bearer tokens with Supabase Auth; database transactions set a server-derived workspace context and run as a non-owner, non-BYPASSRLS role. Every business table must have enforced workspace RLS. Migration execution role and API role are distinct operational concerns.
 - GitHub private access should use a GitHub App installation scoped to selected repositories with metadata/content read only. Bind installation/repository grants to the Kairos workspace, validate state and webhook signatures, encrypt tokens, and never log token material. GitHub sign-in alone is insufficient.
 - Database source credentials should be read-only, schema-scoped, secret-managed, tested, and revocable. Do not persist raw credentials in browser storage or logs.
 - Import validation should cap request bytes, file count, nesting/row/asset count, and parse time. Treat repository and uploaded data as untrusted input; do not execute SQL from uploads.
-- Use the repository's migrations as the schema history. Do not apply migrations to the live Supabase project until the target DB, API DB role grants, and a backup/rollback plan have been checked.
+- Use the repository's migrations as the schema history. Apply each migration to the shared Supabase project once, after checking the project ref, API DB role grants, and backup/rollback plan. Never run destructive local reset commands against the shared project.
 - Keep sample/demo data in a visibly separate mode or namespace. Do not mix sample records with Connected Catalog output.
 - Keep the 3D Observatory and the existing CSS/palette as product surfaces; their presence does not change data semantics or constitute an ingestion capability.
 

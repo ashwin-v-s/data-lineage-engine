@@ -78,16 +78,25 @@ python -m pytest -q
 ```
 
 ### 3. Database & Migrations
+
+Kairos uses the team's **shared Supabase project** for Auth and hosted Postgres.
+You do not need to install PostgreSQL locally for the product demo. Get the
+database pooler URI and API keys from the project's Supabase dashboard and
+follow [`docs/SUPABASE_SETUP.md`](docs/SUPABASE_SETUP.md). Local PostgreSQL is
+optional for isolated research experiments and offline development.
+
 ```bash
-# Copy and configure environment variables
-cp .env.example .env
+# Use the existing ignored .env; if it is missing, create it from .env.example
+# and fill it with the team's Supabase project settings. Do not overwrite an existing .env.
 
 # Test database connection
 python scripts/test_connection.py
 
-# Run migrations
-python scripts/run_migration.py
+# Apply migrations once as described in docs/SUPABASE_SETUP.md
 ```
+
+The legacy `scripts/run_migration.py` applies only migration 0001. Follow the
+numbered migration guide instead of using that script as a complete setup.
 
 ### 4. Run Backend Server
 ```bash
