@@ -1,0 +1,10 @@
+{
+  "contract_version": "kairos.ingest.v1",
+  "source": {"kind": "upload", "ref": "fixture:invalid-endpoint"},
+  "assets": [
+    {"id": "only-asset", "name": "only_asset", "namespace": "demo"}
+  ],
+  "relationships": [
+    {"source_id": "missing-asset", "target_id": "only-asset", "edge_type": "declared_dependency"}
+  ]
+}

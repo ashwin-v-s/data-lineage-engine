@@ -1,0 +1,54 @@
+{
+  "contract_version": "kairos.ingest.v1",
+  "source": {
+    "kind": "upload",
+    "ref": "fixture:orders"
+  },
+  "assets": [
+    {
+      "id": "orders-model",
+      "kind": "transform",
+      "metadata": {
+        "owner": "data-team",
+        "tags": [
+          "demo",
+          "orders"
+        ]
+      },
+      "name": "orders_model",
+      "namespace": "analytics",
+      "type": "model",
+      "qualified_name": "analytics/orders_model"
+    },
+    {
+      "id": "raw-orders",
+      "kind": "source",
+      "metadata": {
+        "description": "Raw order records"
+      },
+      "name": "orders",
+      "namespace": "warehouse.raw",
+      "type": "table",
+      "qualified_name": "warehouse.raw/orders"
+    }
+  ],
+  "relationships": [
+    {
+      "edge_type": "declared_dependency",
+      "provenance": "dbt manifest declaration",
+      "source_id": "raw-orders",
+      "target_id": "orders-model",
+      "evidence_class": "DECLARED_METADATA"
+    }
+  ],
+  "runs": [],
+  "evidence": [],
+  "diagnostics": [],
+  "provenance": {
+    "adapter": "kairos.metadata_graph",
+    "adapter_version": "1.0.0",
+    "original_filename": "orders.json",
+    "source_revision": "git:abc123",
+    "content_sha256": "57891d623c888338bad9224965be397fd2bc3521bc477d5d85ed63fcc1a9d310"
+  }
+}

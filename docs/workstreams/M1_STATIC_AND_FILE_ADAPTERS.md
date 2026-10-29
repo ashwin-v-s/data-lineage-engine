@@ -37,3 +37,12 @@ This workstream is format parsing only. Do not connect directly to Supabase or c
 - Explicit links are distinguished from inferred static SQL candidates.
 - Invalid/unsupported content has diagnostics and cannot become a silent empty import.
 - No network access, SQL execution, DB writes, credentials, or ground-truth imports.
+
+## M1 implementation status
+
+The bounded metadata-graph v1 parser/validator is implemented in
+`ingestion/metadata_graph/`, with valid/invalid/version fixtures and focused
+tests in `tests/test_metadata_graph_adapter.py`. Current repository coverage
+for SQL, dbt, generic JSON, file inventory, and CSV is inventoried in
+`ingestion/ADAPTER_STATUS.md`. The parser is ready to hand normalized output to
+M3, but it is not yet wired to the Supabase import API.
