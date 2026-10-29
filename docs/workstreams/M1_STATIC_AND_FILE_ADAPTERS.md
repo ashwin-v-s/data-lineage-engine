@@ -4,7 +4,7 @@
 
 ## Goal
 
-Produce typed, deterministic metadata from user-supplied files without writing to PostgreSQL. Adapters return the shared `kairos.ingest.v1` concepts: assets, relationship candidates, evidence/provenance, and diagnostics. The orchestrator/storage owner (M3) controls final contract/API changes.
+Produce typed, deterministic metadata from user-supplied files without writing directly to the database. Adapters return the shared `kairos.ingest.v1` concepts: assets, relationship candidates, evidence/provenance, and diagnostics. The orchestrator/storage owner (M3) controls final contract/API changes and persists accepted output to the team's shared Supabase project.
 
 ## Inspect first
 
@@ -20,6 +20,10 @@ Produce typed, deterministic metadata from user-supplied files without writing t
 3. Add fixtures: a minimal valid graph with two assets and one explicitly declared edge; invalid endpoint; unknown version; oversized/unsupported example. Make output deterministic and diagnostics actionable.
 4. For SQL/dbt, retain static/declared classification. Unsupported SQL or malformed dbt metadata produces diagnostics; do not manufacture runtime events.
 5. Share the fixture and expected adapter output with M3/M5. Do not edit their API, DB migration, React app, or research truth provider.
+
+## Supabase boundary
+
+This workstream is format parsing only. Do not connect directly to Supabase or create local database state. M3 owns authenticated persistence to the shared Supabase Postgres project; local PostgreSQL is not needed for this adapter work.
 
 ## Likely files
 

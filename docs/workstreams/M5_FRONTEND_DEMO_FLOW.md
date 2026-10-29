@@ -4,7 +4,7 @@
 
 ## Goal
 
-Make the existing React/Vite entry and Kairos visual system show a truthful file import journey: select → preview diagnostics → explicit confirm → persisted catalog readback. Preserve the Stitch sign-in page, animation, existing CSS palette, and 3D Observatory.
+Make the existing React/Vite entry and Kairos visual system show a truthful file import journey backed by the shared Supabase project: select → preview diagnostics → explicit confirm → authenticated API persistence to Supabase Postgres → catalog readback. Preserve the Stitch sign-in page, animation, existing CSS palette, and 3D Observatory.
 
 ## Inspect first
 
@@ -19,6 +19,12 @@ Make the existing React/Vite entry and Kairos visual system show a truthful file
 3. Call M3 preview and commit endpoints using the authenticated API client. Handle loading, empty, validation-error, expired-session, duplicate/idempotency, and success states.
 4. On success, refresh data from the authenticated catalog API and link to the imported assets/lineage. Never treat browser-local preview data as a persisted catalog.
 5. Ensure keyboard/focus use, narrow viewport layout, readable contrast, and retained Kairos CSS. Build with `npm ci` and `npm run build`.
+
+## Supabase boundary
+
+- Use the current Supabase Auth session through the existing Kairos auth bridge and the M3 API. The browser must not write catalog rows directly or receive a database password/service-role key.
+- If uploaded file retention is needed, coordinate with M3 on Supabase Storage bucket/policies. For the first slice, keep parsed preview in memory and send validated metadata to the authenticated API.
+- Do not add a local/mock database success path that looks like a Supabase import. Clearly label any offline sample preview.
 
 ## Likely files
 

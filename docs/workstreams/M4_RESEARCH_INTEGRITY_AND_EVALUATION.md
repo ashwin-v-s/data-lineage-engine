@@ -4,7 +4,7 @@
 
 ## Goal
 
-Protect Kairos’ research claims and evidence semantics while product ingestion is expanded. Deliver a short, reproducible status of what currently passes and what remains untested; do not add product features.
+Protect Kairos’ research claims and evidence semantics while product ingestion is expanded. Deliver a short, reproducible status of what currently passes and what remains untested; do not add product features. The product demo data path uses shared Supabase; this research workstream must not write research fixtures or ground truth into the shared product workspace.
 
 ## Inspect first
 
@@ -20,6 +20,10 @@ Protect Kairos’ research claims and evidence semantics while product ingestion
 3. Add one regression test only for a confirmed semantic gap (unsupported input, incomplete coverage, or forbidden truth import). Do not rewrite correct rules just to fit a product screen.
 4. Check import-boundary guard and ground-truth leakage tests. Report any mismatch between current implementation and research doc status labels.
 5. Give M3/M5 precise display language for evidence classes and testable import diagnostics.
+
+## Database boundary
+
+Run the pure engine and leakage tests locally without a database where possible. If a research experiment specifically needs PostgreSQL/ProvSQL, use an isolated research database or dedicated Supabase project/branch, never the shared product project. Local Postgres is optional and only for that offline/research case; it is not the product source of truth.
 
 ## Likely files
 

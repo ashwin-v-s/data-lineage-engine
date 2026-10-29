@@ -4,7 +4,7 @@
 
 ## Goal
 
-Normalize OpenLineage event JSON into runtime evidence without overstating what an event proves. Keep this work isolated from the product DB/API and from independent ground truth.
+Normalize OpenLineage event JSON into runtime evidence without overstating what an event proves. Keep this work isolated from the product API/persistence and from independent ground truth. Accepted normalized records can later be persisted by M3 to shared Supabase; this adapter itself has no database connection.
 
 ## Inspect first
 
@@ -19,6 +19,10 @@ Normalize OpenLineage event JSON into runtime evidence without overstating what 
 3. Preserve event identity/order and event-time semantics. Keep dataset-level read/write observations dataset-level. Column evidence is emitted only where a valid column-lineage facet explicitly supplies it.
 4. Emit structured diagnostics for unsupported/missing data. Missing event/capture is unknown or incomplete; never generate a negative edge or `REFUTED_FOR_RUN` from absence.
 5. Report current coverage limits to M3/M4. Propose schema mapping changes in writing; M3 owns the shared ingest contract.
+
+## Supabase boundary
+
+Do not create a local database or connect to Supabase in this workstream. Keep raw event fixtures local and non-sensitive; M3 owns workspace-scoped writes to the shared Supabase project.
 
 ## Likely files
 

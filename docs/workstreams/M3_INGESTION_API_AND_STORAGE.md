@@ -4,7 +4,7 @@
 
 ## Goal
 
-Implement the thin server-side ingestion orchestrator and authenticated preview/commit path for one supported `kairos.ingest.v1` file. Commit must be explicit, workspace-scoped, transactional, auditable, and idempotent. M3 owns the shared envelope and tells M1/M2/M5 about any contract change before merge.
+Implement the thin server-side ingestion orchestrator and authenticated preview/commit path for one supported `kairos.ingest.v1` file. The configured shared Supabase project is the product database: the API connects to Supabase-hosted Postgres, and no separate local product database is created. Commit must be explicit, workspace-scoped, transactional, auditable, and idempotent. M3 owns the shared envelope and tells M1/M2/M5 about any contract change before merge.
 
 ## Inspect first
 
@@ -25,6 +25,13 @@ Implement the thin server-side ingestion orchestrator and authenticated preview/
 - `backend/app/api/routes/ingest.py` (new), schemas/services under `backend/app/`
 - `backend/app/main.py`, numbered `backend/migrations/0004_*.sql` only if justified
 - `tests/` focused API/storage tests
+
+## Shared Supabase setup
+
+- Use the existing ignored `.env` on the primary checkout. Other teammates use their own ignored `.env` with the same Supabase project URL and publishable key plus the server-side transaction-pooler URI. Never copy credentials into the repo.
+- Verify connectivity with `python scripts/test_connection.py`; this reaches the configured shared project. Do not run destructive test/reset commands against it.
+- Apply a new migration to the shared project once, through the migration owner. For isolated/destructive migration tests, use a separate Supabase project/branch or an optional local research database.
+- Do not replace this FastAPI path with Edge Functions as part of today's slice. That would require a separately planned runtime migration.
 
 ## Acceptance
 

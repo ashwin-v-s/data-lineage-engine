@@ -4,10 +4,10 @@
 
 ## Before parallel work (first 15 minutes)
 
-1. Everyone pulls the branch and reads the architecture plus their numbered workstream file.
+1. Everyone pulls the branch and reads the architecture plus their numbered workstream file. Use the shared Supabase project for product data; local PostgreSQL setup is not part of this demo.
 2. Agree the smallest `kairos.ingest.v1` JSON fixture and field meanings. The backend workstream owns changes to the draft contract; adapter/UI workers report proposed changes before changing it.
 3. Agree one shared Supabase project and API base URL. Apply schema migrations once through the migration owner. Do not share `.env`, OAuth secrets, database passwords, or private source tokens in chat/Git.
-4. Assign one person to merge and run the acceptance checklist; workers commit to separate branches and open PRs. Do not edit the same files across tracks.
+4. Assign one migration owner to check the shared project's migration state and apply any missing migration once. Assign one person to merge and run the acceptance checklist; workers commit to separate branches and open PRs. Do not edit the same files across tracks.
 
 ## Workstreams
 
@@ -29,6 +29,7 @@
 ## Stop conditions
 
 - If migration 0003 is not applied to the shared Supabase DB, keep the database import integration behind a clearly reported setup dependency; never bypass RLS for the demo.
+- Do not run local database install, drop, reset, or seed commands as a substitute for the shared Supabase project. Use only a separate isolated database for research-specific experiments.
 - If OAuth providers are not configured, email/password may be used if available. Do not fake a provider sign-in.
 - If a file format does not validate, show diagnostics and use the agreed sample fixture. Do not silently turn unsupported content into an empty successful import.
 - Keep the public GitHub browser as discovery/preview until an actual authenticated import route is complete.
