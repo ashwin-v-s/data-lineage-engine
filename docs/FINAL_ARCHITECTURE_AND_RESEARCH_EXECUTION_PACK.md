@@ -29,6 +29,15 @@ Every claim in this document carries, or sits under, one of these status labels.
 
 > **Reading order.** Everyone reads Sections 1 to 19, 28 and 29 first. Then read your own section (30 to 34) and Sections 35 to 37. Read Sections 46 and 47 last: they list what is still open and where sources disagreed.
 
+> **Product architecture reconciliation (2026-10-29).** This pack remains the
+> authoritative *research* contract, including its scope, evidence semantics,
+> and ground-truth isolation. The current product delivery architecture
+> (React/Vite shell, Supabase Auth, personal workspaces, typed file/source
+> adapters, and the demo ingestion path) is documented separately in
+> [`KAIROS_FINAL_ARCHITECTURE.md`](KAIROS_FINAL_ARCHITECTURE.md). That document
+> is additive; it does not change this pack's locked research decisions or
+> turn unvalidated research/connector behavior into implemented capability.
+
 ## 1. Executive Summary
 
 Kairos is an open-source, self-hostable data lineage and metadata engine built as a university project. It has two separable parts.
