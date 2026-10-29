@@ -31,4 +31,3 @@ Normalize OpenLineage event JSON into runtime evidence without overstating what 
 - Runtime evidence retains run ID and original event provenance.
 - Dataset-only evidence does not masquerade as column-level propagation.
 - No imports from `research/ground_truth`, no ground-truth labels, no DB/API/frontend edits.
-

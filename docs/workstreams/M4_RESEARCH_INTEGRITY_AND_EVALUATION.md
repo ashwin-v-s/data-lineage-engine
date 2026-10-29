@@ -32,4 +32,3 @@ Protect Kairos’ research claims and evidence semantics while product ingestion
 - Four-state reasoning stays execution-conditioned and explanation-bearing.
 - Ground-truth inputs/labels remain unavailable to predictors.
 - No product demo claim is added without a test or runtime evidence.
-

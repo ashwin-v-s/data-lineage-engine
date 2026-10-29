@@ -33,4 +33,3 @@ Produce typed, deterministic metadata from user-supplied files without writing t
 - Explicit links are distinguished from inferred static SQL candidates.
 - Invalid/unsupported content has diagnostics and cannot become a silent empty import.
 - No network access, SQL execution, DB writes, credentials, or ground-truth imports.
-

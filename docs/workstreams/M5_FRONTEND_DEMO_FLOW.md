@@ -32,4 +32,3 @@ Make the existing React/Vite entry and Kairos visual system show a truthful file
 - A successful import is verified by API readback after refresh.
 - No tokens or provider secrets are rendered, logged, or sent to non-Kairos endpoints.
 - `npm run build` succeeds; sign-in/dashboard visual surfaces remain intact.
-

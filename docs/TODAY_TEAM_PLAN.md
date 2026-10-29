@@ -32,4 +32,3 @@
 - If OAuth providers are not configured, email/password may be used if available. Do not fake a provider sign-in.
 - If a file format does not validate, show diagnostics and use the agreed sample fixture. Do not silently turn unsupported content into an empty successful import.
 - Keep the public GitHub browser as discovery/preview until an actual authenticated import route is complete.
-

@@ -1,7 +1,7 @@
 # Kairos Product and Research Architecture
 
-**Status:** working architecture for the current product/demo build  
-**Reconciles:** local GitHub checkout at `720d89b`, the checked-in research architecture, and the Hatchable v306 ZIP snapshot supplied in the repository.  
+**Status:** working architecture for the current product/demo build
+**Reconciles:** local GitHub checkout at `720d89b`, the checked-in research architecture, and the Hatchable v306 ZIP snapshot supplied in the repository.
 **Purpose:** define one implementable demo path without conflating product ingestion with the independent lineage research engine.
 
 ## 1. Decisions and boundaries
@@ -102,7 +102,6 @@ Do not turn parser failures into empty success. Unsupported input produces a dia
 - Demo fixtures are visibly distinguishable from a user’s imported catalog.
 
 Until these gates pass, describe the experience as a local prototype/preview rather than a working production connector.
-
 ## 5. Boundaries, security, and operational rules
 
 - Supabase publishable/anon key is browser-visible by design; service-role keys, DB passwords, GitHub App private keys, OAuth client secrets, and user access tokens are server-only. Do not commit credentials or ZIP environment files.
