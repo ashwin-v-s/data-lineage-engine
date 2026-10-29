@@ -4,10 +4,11 @@ The product demo uses the team's shared Supabase project for authentication and 
 
 ## Run against the shared Supabase project
 
-1. Use the existing ignored `.env` if one is present. Do not overwrite it. If it is missing, create it from the root `.env.example` and fill in the shared Supabase settings.
-2. Follow [`../docs/SUPABASE_SETUP.md`](../docs/SUPABASE_SETUP.md) to check configuration and apply migrations once.
-3. Test the database connection with `python scripts/test_connection.py`.
-4. Start the combined frontend/backend with `python scripts/run_ui.py`.
+1. From the repository root, install the project with `python -m pip install -e ".[dev]"`. This installs the API, ingestion adapters, and test tools from the single project manifest. `backend/requirements.txt` is retained for backend-only deployment environments.
+2. Use the existing ignored `.env` if one is present. Do not overwrite it. If it is missing, create it from the root `.env.example` and fill in the shared Supabase settings.
+3. Follow [`../docs/SUPABASE_SETUP.md`](../docs/SUPABASE_SETUP.md) to check configuration and apply migrations once.
+4. Test the database connection with `python scripts/test_connection.py`.
+5. From the repository root, install/build the frontend with `npm --prefix frontend ci` and `npm --prefix frontend run build`, or start the combined frontend/backend with `python scripts/run_ui.py`.
 
 The legacy `scripts/run_migration.py` applies only `0001_core.sql`; it is not a complete migration runner. Apply migrations in numeric order using the Supabase setup guide.
 

@@ -3,7 +3,10 @@
   "buildCommand": "npm --prefix frontend ci && npm --prefix frontend run build",
   "outputDirectory": "frontend/dist",
   "functions": {
-    "backend/api/index.py": { "maxDuration": 30 }
+    "backend/api/index.py": {
+      "maxDuration": 30,
+      "excludeFiles": "{data/**,docs/**,tests/**,references/**,**/*.zip}"
+    }
   },
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/backend/api/index.py" },

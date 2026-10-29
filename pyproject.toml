@@ -14,6 +14,7 @@ dependencies = [
     "python-dotenv>=1,<2",
     "pydantic[email]>=2,<3",
     "sqlalchemy>=2,<3",
+    "sqlglot>=26",
 ]
 
 [tool.vercel]
@@ -24,7 +25,7 @@ dev = ["pytest>=8"]
 # Exact versions are NOT YET FROZEN: freeze at the first working build (Pack Section 42).
 
 [tool.setuptools.packages.find]
-include = ["backend*", "contracts*", "research*"]
+include = ["backend*", "contracts*", "ingestion*", "research*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

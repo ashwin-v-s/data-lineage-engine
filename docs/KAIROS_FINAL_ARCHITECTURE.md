@@ -115,7 +115,7 @@ Until these gates pass, describe the experience as a local prototype/preview rat
 
 ## 6. Local checkout, Hatchable snapshot, and repository documentation
 
-The current GitHub checkout is the working source for this plan. The supplied Hatchable v306 ZIP is a separate snapshot/reference, not a live synced workspace. Its serverless ingestion/UI patterns and documentation are useful design input; its code, auth configuration, database, and “implemented” labels must not be assumed to match this FastAPI/Supabase branch. Reconcile useful behavior behind the versioned contract instead of copying an entire app or maintaining two authoritative APIs.
+The current GitHub checkout is the working source for this plan. The Hatchable v306 ZIP, when present locally under `references/snapshots/`, is a separate ignored snapshot/reference, not a live synced workspace or a file included in a Git clone. Its serverless ingestion/UI patterns and documentation are useful design input; its code, auth configuration, database, and “implemented” labels must not be assumed to match this FastAPI/Supabase branch. Reconcile useful behavior behind the versioned contract instead of copying an entire app or maintaining two authoritative APIs.
 
 `FINAL_ARCHITECTURE_AND_RESEARCH_EXECUTION_PACK.md` remains the research contract. It intentionally excludes authentication, product connectors, and cloud deployment from the research MVP. This product architecture adds a delivery layer around it and does not reopen its locked claims, truth-separation rule, or three research inputs: SQLGlot, dbt manifest, OpenLineage.
 

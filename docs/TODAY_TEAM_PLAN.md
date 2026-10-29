@@ -1,6 +1,6 @@
 # Kairos: Five-Person Working Session (2–3 Hours)
 
-**Shared target:** deliver one honest end-to-end demo slice using the team's shared Supabase project: authenticated personal workspace → validate/preview a small metadata graph JSON file → explicitly import once → read persisted assets/relationships back in the dashboard. Architecture contract: [`KAIROS_FINAL_ARCHITECTURE.md`](KAIROS_FINAL_ARCHITECTURE.md). The implementation branch is `codex/supabase-auth-hardening`.
+**Shared target:** deliver one honest end-to-end demo slice using the team's shared Supabase project: authenticated personal workspace → validate/preview a small metadata graph JSON file → explicitly import once → read persisted assets/relationships back in the dashboard. Architecture contract: [`KAIROS_FINAL_ARCHITECTURE.md`](KAIROS_FINAL_ARCHITECTURE.md). Work from the branch assigned to your task; check `git status -sb` and its upstream before pulling or pushing, and do not assume a branch name from an earlier sprint.
 
 ## Before parallel work (first 15 minutes)
 

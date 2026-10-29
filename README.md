@@ -14,7 +14,10 @@ Bitemporal data lineage infrastructure and execution-conditioned reasoning engin
 │   └── requirements.txt      # Backend Python dependencies
 ├── configs/                  # Project and environment configuration files
 ├── contracts/                # Shared domain types, interfaces, fixtures, and test mocks
-├── docs/                     # Architectural specs, research pack, guides, and pattern analysis
+├── data/olist/               # Tracked Olist sample dataset used by research/demo workflows
+├── docs/                     # Current architecture, setup, research, and team documentation
+│   ├── archive/               # Historical notes and superseded setup/task documents
+│   └── workstreams/           # M1–M5 independent work assignments
 ├── frontend/                 # React/Vite app, existing CSS, and dashboard compatibility runtime
 │   ├── src/                  # React app shell and dashboard view bridge
 │   └── *.css                 # Existing Kairos design system and page styles
@@ -36,6 +39,10 @@ Bitemporal data lineage infrastructure and execution-conditioned reasoning engin
 │   ├── run_migration.py      # Database migration execution script
 │   └── test_connection.py    # Database connectivity test
 └── tests/                    # Core pytest test suite (engine, baselines, contracts, leakage)
+
+Local source snapshots (such as Hatchable exports and Stitch ZIPs) belong in
+`references/snapshots/`. ZIP files are ignored by Git; they remain local
+reference material and are not included in a clone.
 ```
 
 ---
@@ -49,9 +56,8 @@ python -m venv .venv
 source .venv/bin/activate       # On Linux/macOS
 # or: .venv\Scripts\Activate.ps1 # On Windows PowerShell
 
-# Install dependencies
-pip install -r backend/requirements.txt
-pip install pytest sqlglot
+# Install the application and test dependencies from the project manifest
+python -m pip install -e ".[dev]"
 ```
 
 ### 1.1 Frontend Setup

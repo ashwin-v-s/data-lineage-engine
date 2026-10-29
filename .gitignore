@@ -21,9 +21,11 @@ frontend/.env.local
 # Data and large datasets
 data/*
 !data/.gitkeep
+!data/olist/
+data/olist/*
+!data/olist/*.csv
 research/results/*
 !research/results/.gitkeep
-Olist dataset/
 *.zip
 *.tar.gz
 *.csv.gz

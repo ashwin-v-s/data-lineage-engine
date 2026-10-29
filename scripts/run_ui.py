@@ -1,5 +1,6 @@
 """CLI script to start the Kairos backend server and serve the frontend."""
 import argparse
+import os
 import subprocess
 import sys
 import webbrowser
@@ -25,8 +26,9 @@ def main():
             "React frontend dependencies are missing. Run `npm install` in "
             "the frontend directory, then start Kairos again."
         )
+    build_command = ["cmd.exe", "/d", "/c", "npm", "run", "build"] if os.name == "nt" else ["npm", "run", "build"]
     subprocess.run(
-        ["cmd.exe", "/d", "/c", "npm", "run", "build"],
+        build_command,
         cwd=frontend_dir,
         check=True,
     )
