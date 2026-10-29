@@ -1,13 +1,13 @@
-"""Contract and integration tests for Kairos API layer (Section 17, 24).
+"""Offline contract tests for the Kairos API layer.
 
-Verifies:
-- M3 Entity lookup (by id, by fqn)
-- M3 Lineage graph (whole-graph, upstream, downstream, bitemporal slicing, truncation headers)
-- Invalid temporal parameters (400 INVALID_TEMPORAL_PARAMETER)
-- M3 Evidence dossier (by id, by entity, search, raw_event payload_hash)
-- M4 Reasoning integration (OBSERVED, REFUTED_FOR_RUN, POSSIBLE, UNKNOWN with verbatim Section 12 text)
-- Error handling shapes
-- Benchmark evaluation oracle isolation
+The API is fail-closed: every route except ``/api/v1/auth/config`` requires a
+verified Supabase session (see ``backend/app/auth.py::require_user``) and a
+workspace-scoped database connection.  These tests therefore assert the
+*contract* — the public endpoint, the route inventory, and the fail-closed
+error envelope — without needing a live Supabase project.
+
+Integration tests that exercise real data are gated by
+``tests.conftest.requires_live_backend`` (opt in with ``KAIROS_LIVE_API_TESTS=1``).
 """
 import pytest
 
@@ -19,122 +19,86 @@ from backend.app.main import app
 
 client = TestClient(app)
 
+# "You are not allowed in": 401 when Supabase is configured but no token was
+# supplied, 503 when authentication is not configured at all.
+_FAIL_CLOSED_STATUS = {401, 503}
+_FAIL_CLOSED_CODES = {"UNAUTHENTICATED", "AUTH_UNAVAILABLE"}
 
-def test_health():
-    res = client.get("/api/v1/health")
+
+def _assert_error_envelope(response):
+    """Every API error must use the single, stable ``{"error": {...}}`` shape."""
+    body = response.json()
+    assert set(body) == {"error"}, body
+    assert set(body["error"]) == {"code", "message", "request_id"}, body
+    assert isinstance(body["error"]["request_id"], str) and body["error"]["request_id"]
+    assert "X-Request-ID" in response.headers
+    return body["error"]
+
+
+def test_auth_config_is_public_and_fails_closed():
+    res = client.get("/api/v1/auth/config")
     assert res.status_code == 200
-    data = res.json()
-    assert data["status"] == "ok"
-    assert data["db"] == "connected"
+    body = res.json()
+    assert set(body) == {"url", "publishable_key", "auth_disabled"}
+    # Authentication must never be silently disabled by the server config.
+    assert body["auth_disabled"] is False
 
 
-def test_entity_endpoints():
-    # By ID
-    res = client.get("/api/v1/entities/orders_fact")
-    assert res.status_code == 200
-    assert res.json()["data"]["name"] == "orders_fact"
-
-    # By FQN
-    res_fqn = client.get("/api/v1/entities/by-name?fqn=kairos_dw.hr.employees.salary")
-    assert res_fqn.status_code == 200
-    assert res_fqn.json()["data"]["column_name"] == "salary"
-
-    # 404 Entity Not Found
-    res_404 = client.get("/api/v1/entities/unknown_entity_id")
-    assert res_404.status_code == 404
-    err = res_404.json()
-    assert err["success"] is False
-    assert err["error"]["code"] == "ENTITY_NOT_FOUND"
-
-
-def test_lineage_graph_and_truncation_headers():
-    res = client.get("/api/v1/lineage/orders_fact/graph?depth=2")
-    assert res.status_code == 200
-    data = res.json()
-    assert data["center_node"]["name"] == "orders_fact"
-    assert len(data["nodes"]) >= 3
-    assert len(data["edges"]) >= 3
-
-    # Check Truncation headers per Section 16
-    assert "x-result-truncated" in res.headers
-    assert res.headers["x-result-truncated"] in ("true", "false")
-    assert "x-total-count" in res.headers
-    assert "x-returned-count" in res.headers
+_PROTECTED_PATHS = [
+    "/api/v1/health",
+    "/api/v1/search",
+    "/api/v1/catalog",
+    "/api/v1/assets/anything",
+    "/api/v1/assets/anything/lineage",
+    "/api/v1/lineage/anything/upstream",
+    "/api/v1/evidence-at-time?valid_as_of=2026-01-01T00:00:00Z",
+    "/api/v1/column-lineage",
+    "/api/v1/runs/run_x/dependency/a/b",
+    "/api/v1/owner/team-members",
+    "/api/v1/owner/stats/overview",
+    "/api/v1/audit/anything/trail",
+    "/api/v1/audit/anything/versions",
+    "/api/v1/metadata/anything/editable",
+    "/api/v1/rea/recommendations",
+    "/api/v1/raw-events",
+]
 
 
-def test_lineage_upstream_downstream():
-    up = client.get("/api/v1/lineage/orders_fact/upstream?depth=1").json()
-    for e in up["edges"]:
-        assert e["target"] in ("orders_fact", "e3b1c4a0-7f28-4c8d-965a-8d7b32c694a1")
-
-    down = client.get("/api/v1/lineage/orders_fact/downstream?depth=1").json()
-    for e in down["edges"]:
-        assert e["source"] in ("orders_fact", "e3b1c4a0-7f28-4c8d-965a-8d7b32c694a1")
+@pytest.mark.parametrize("path", _PROTECTED_PATHS)
+def test_protected_routes_fail_closed_without_a_session(path):
+    res = client.get(path)
+    assert res.status_code in _FAIL_CLOSED_STATUS, (path, res.status_code, res.text)
+    error = _assert_error_envelope(res)
+    assert error["code"] in _FAIL_CLOSED_CODES
 
 
-def test_bitemporal_temporal_filtering():
-    # Live query -> stg_customer_orders is OBSERVED
-    res_live = client.get("/api/v1/lineage/orders_fact/graph").json()
-    stg_live = [e for e in res_live["edges"] if e["source"] == "stg_customer_orders"][0]
-    assert stg_live["reasoning_state"] == "OBSERVED"
-
-    # Historical slice before 2026-09-01 -> stg_customer_orders reverts to UNKNOWN
-    res_hist = client.get("/api/v1/lineage/orders_fact/graph?valid_at=2026-08-15T00:00:00Z").json()
-    stg_hist = [e for e in res_hist["edges"] if e["source"] == "stg_customer_orders"][0]
-    assert stg_hist["reasoning_state"] == "UNKNOWN"
+def test_unknown_path_uses_the_stable_not_found_envelope():
+    res = client.get("/api/v1/this-route-does-not-exist")
+    assert res.status_code == 404
+    error = _assert_error_envelope(res)
+    assert error["code"] == "NOT_FOUND"
 
 
-def test_invalid_temporal_parameter():
-    res = client.get("/api/v1/lineage/orders_fact/graph?valid_at=not-a-date")
-    assert res.status_code == 400
-    err = res.json()
-    assert err["success"] is False
-    assert err["error"]["code"] == "INVALID_TEMPORAL_PARAMETER"
-    assert err["error"]["parameter"] == "valid_at"
-
-
-def test_evidence_endpoints():
-    # Detail by ID
-    res = client.get("/api/v1/evidence/ev_stg_orders_01")
-    assert res.status_code == 200
-    dossier = res.json()["data"]
-    assert dossier["evidence_id"] == "ev_stg_orders_01"
-    assert dossier["raw_event"]["payload_hash"].startswith("sha256:")
-    assert dossier["parser_status"] == "SUPPORTED"
-
-    # Search
-    res_search = client.get("/api/v1/evidence/search?evidence_type=STATIC_AST")
-    assert res_search.status_code == 200
-    assert res_search.json()["total"] >= 1
-
-    # Entity evidence
-    res_ent = client.get("/api/v1/evidence/entity/orders_fact")
-    assert res_ent.status_code == 200
-    assert "data" in res_ent.json()
-
-
-def test_m4_reasoning_and_fixed_interpretations():
-    # Run B -> REFUTED_FOR_RUN
-    b_res = client.get("/api/v1/runs/run_B/dependency/employees.salary/out.adjusted_salary").json()
-    assert b_res["state"] == "REFUTED_FOR_RUN"
-    assert b_res["interpretation"] == "No propagation was established for this run under complete-evaluation conditions."
-
-    # Run C -> POSSIBLE
-    c_res = client.get("/api/v1/runs/run_C/dependency/employees.salary/out.adjusted_salary").json()
-    assert c_res["state"] == "POSSIBLE"
-    assert c_res["interpretation"] == "Static analysis permits this dependency, but available evidence is insufficient to establish whether propagation occurred in this run."
-    assert "NO_RUNTIME_EVENT_IS_NOT_NEGATIVE_EVIDENCE" in c_res["warnings"]
-
-    # Run A -> OBSERVED
-    a_res = client.get("/api/v1/runs/run_A/dependency/employees.salary/out.adjusted_salary").json()
-    assert a_res["state"] == "OBSERVED"
-    assert a_res["interpretation"] == "Positive runtime evidence establishes observed propagation for this run."
-
-
-def test_evaluation_oracle_isolated_mode():
-    res = client.get("/api/v1/evaluation/oracle/run_2026_09_23_093214")
-    assert res.status_code == 200
-    data = res.json()
-    assert data["is_evaluation_mode"] is True
-    assert "BENCHMARK EVALUATION ONLY" in data["warning"]
-    assert len(data["records"]) > 0
+def test_openapi_exposes_the_expected_route_inventory():
+    paths = app.openapi()["paths"]
+    expected = {
+        "/api/v1/auth/config",
+        "/api/v1/health",
+        "/api/v1/search",
+        "/api/v1/catalog",
+        "/api/v1/assets/{asset_id}",
+        "/api/v1/assets/{asset_id}/lineage",
+        "/api/v1/lineage/{asset_id}/{direction}",
+        "/api/v1/evidence-at-time",
+        "/api/v1/column-lineage",
+        "/api/v1/runs/{run_id}/dependency/{source}/{target}",
+        "/api/v1/owner/team-members",
+        "/api/v1/owner/assign/{asset_id}",
+        "/api/v1/audit/{asset_id}/trail",
+        "/api/v1/audit/{asset_id}/export-audit",
+        "/api/v1/metadata/{asset_id}/editable",
+        "/api/v1/raw-events",
+        "/api/v1/rea/recommendations",
+    }
+    missing = expected - set(paths)
+    assert not missing, f"Routes missing from the OpenAPI schema: {sorted(missing)}"
