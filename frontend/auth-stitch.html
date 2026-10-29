@@ -3,7 +3,7 @@
 
 <!DOCTYPE html>
 
-<html lang="en" data-theme="light"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0" name="viewport"/><meta content="web_blank" name="shell-type"/><title>Kairos — Enterprise Authentication</title><link href="/styles.neo.css?v=305" rel="stylesheet"/><link href="/assets.css?v=4" rel="stylesheet"/><link href="/layout.css?v=304" rel="stylesheet"/><link href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;600;700;800&amp;family=Instrument+Sans:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500;600&amp;display=swap" rel="stylesheet"/><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/><link href="/auth-stitch.css?v=4" rel="stylesheet"/><script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script><script id="tailwind-config">
+<html lang="en" style=""><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0" name="viewport"/><meta content="web_blank" name="shell-type"/><title>Kairos — Enterprise Authentication</title><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500;600&amp;display=swap" rel="stylesheet"/><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/><link href="/auth-stitch.css?v=1" rel="stylesheet"/><script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script><script id="tailwind-config">
     tailwind.config = {
       darkMode: "class",
       theme: {
@@ -104,9 +104,9 @@
 </div>
 <!-- Central Split-Card Layout -->
 <main class="w-full flex items-center justify-center p-4 sm:p-6 lg:p-8 my-auto">
-<div class="auth-shell-card w-full lg:max-w-5xl rounded-3xl p-3 sm:p-4 shadow-[0_25px_70px_-15px_rgba(20,40,90,0.12)] border border-slate-100 flex flex-col md:flex-row gap-4 items-stretch relative" style="max-width: 1120px; min-height: 680px; background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(16px); box-shadow: rgba(15, 23, 42, 0.12) 0px 25px 60px -15px, rgba(255, 255, 255, 0.8) 0px 0px 0px 1px inset, rgba(0, 0, 0, 0.05) 0px 1px 2px 0px;">
+<div class="w-full lg:max-w-5xl rounded-3xl p-3 sm:p-4 shadow-[0_25px_70px_-15px_rgba(20,40,90,0.12)] border border-slate-100 flex flex-col md:flex-row gap-4 items-stretch relative" style="max-width: 1120px; min-height: 680px; background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(16px); box-shadow: rgba(15, 23, 42, 0.12) 0px 25px 60px -15px, rgba(255, 255, 255, 0.8) 0px 0px 0px 1px inset, rgba(0, 0, 0, 0.05) 0px 1px 2px 0px;">
 <!-- LEFT COLUMN: Vibrant Visual Brand Panel with WebGL Fluid Wave Shader Animation -->
-<div class="auth-brand-panel w-full md:w-[46%] lg:w-[48%] rounded-[24px] relative overflow-hidden flex flex-col justify-between p-7 lg:p-10 h-full md:h-full md:min-h-[608px] text-white select-none shadow-inner border border-white/10 flex-shrink-0" style="position: relative; overflow: hidden; background: rgb(9, 14, 25); min-height: 640px;">
+<div class="w-full md:w-[46%] lg:w-[48%] rounded-[24px] relative overflow-hidden flex flex-col justify-between p-7 lg:p-10 h-full md:h-full md:min-h-[608px] text-white select-none shadow-inner border border-white/10 flex-shrink-0" style="position: relative; overflow: hidden; background: rgb(9, 14, 25); min-height: 640px;">
 <!-- WebGL Fluid Wave Shader Background Canvas -->
 <canvas class="absolute inset-0 w-full h-full object-cover" height="798" id="shader-canvas-ANIMATION_56" width="649"></canvas>
 <!-- Ambient Overlay Gradient for Perfect Contrast -->
@@ -126,7 +126,7 @@
 </div>
 </div>
 <!-- RIGHT COLUMN: Modern Clean Interactive Auth Form Panels -->
-<div class="auth-form-panel w-full md:w-[54%] lg:w-[52%] flex flex-col justify-between p-6 sm:p-8 lg:p-10 relative h-full md:h-full md:min-h-[608px] flex-shrink-0" style="min-height: 640px;">
+<div class="w-full md:w-[54%] lg:w-[52%] flex flex-col justify-between p-6 sm:p-8 lg:p-10 relative h-full md:h-full md:min-h-[608px] flex-shrink-0" style="min-height: 640px;">
 <div>
 <!-- Tab Switcher Segmented Control -->
 <div class="flex items-center p-1 bg-slate-100 rounded-xl mb-4 border border-slate-200/60 mx-auto max-w-xs" id="auth-tab-group" role="tablist">
@@ -866,15 +866,15 @@
         float wave = sin(p.x + p.y + t) * 0.5 + 0.5;
         float wave2 = cos(p.x * 1.5 - p.y * 1.2 + t * 0.7) * 0.5 + 0.5;
 
-        // Kairos dashboard palette: Google's blue, green, yellow, and red.
-        vec3 colBlue = vec3(0.259, 0.522, 0.957);
-        vec3 colRed = vec3(0.918, 0.263, 0.208);
-        vec3 colYellow = vec3(0.984, 0.737, 0.020);
-        vec3 colGreen = vec3(0.204, 0.659, 0.325);
+        // Rich deep cyber fluid gradient palette
+        vec3 colDeep = vec3(0.04, 0.07, 0.16);
+        vec3 colElectricBlue = vec3(0.0, 0.35, 0.95);
+        vec3 colCyan = vec3(0.12, 0.88, 0.82);
+        vec3 colViolet = vec3(0.42, 0.15, 0.92);
 
-        vec3 color = mix(colBlue, colGreen, wave);
-        color = mix(color, colYellow, pow(wave2, 3.0) * 0.72);
-        color = mix(color, colRed, (1.0 - wave) * 0.42);
+        vec3 color = mix(colDeep, colElectricBlue, wave);
+        color = mix(color, colCyan, pow(wave2, 3.0) * 0.75);
+        color = mix(color, colViolet, (1.0 - wave) * 0.3);
 
         gl_FragColor = vec4(color, 1.0);
       }
