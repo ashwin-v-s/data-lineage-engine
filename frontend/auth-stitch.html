@@ -3,7 +3,7 @@
 
 <!DOCTYPE html>
 
-<html lang="en" data-theme="light"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0" name="viewport"/><meta content="web_blank" name="shell-type"/><title>Kairos — Enterprise Authentication</title><link href="/styles.neo.css?v=305" rel="stylesheet"/><link href="/assets.css?v=4" rel="stylesheet"/><link href="/layout.css?v=304" rel="stylesheet"/><link href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;600;700;800&amp;family=Instrument+Sans:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500;600&amp;display=swap" rel="stylesheet"/><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/><link href="/auth-stitch.css?v=3" rel="stylesheet"/><script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script><script id="tailwind-config">
+<html lang="en" data-theme="light"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0" name="viewport"/><meta content="web_blank" name="shell-type"/><title>Kairos — Enterprise Authentication</title><link href="/styles.neo.css?v=305" rel="stylesheet"/><link href="/assets.css?v=4" rel="stylesheet"/><link href="/layout.css?v=304" rel="stylesheet"/><link href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;600;700;800&amp;family=Instrument+Sans:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500;600&amp;display=swap" rel="stylesheet"/><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/><link href="/auth-stitch.css?v=4" rel="stylesheet"/><script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script><script id="tailwind-config">
     tailwind.config = {
       darkMode: "class",
       theme: {
@@ -866,15 +866,15 @@
         float wave = sin(p.x + p.y + t) * 0.5 + 0.5;
         float wave2 = cos(p.x * 1.5 - p.y * 1.2 + t * 0.7) * 0.5 + 0.5;
 
-        // Rich deep cyber fluid gradient palette
-        vec3 colDeep = vec3(0.04, 0.07, 0.16);
-        vec3 colElectricBlue = vec3(0.0, 0.35, 0.95);
-        vec3 colCyan = vec3(0.12, 0.88, 0.82);
-        vec3 colViolet = vec3(0.42, 0.15, 0.92);
+        // Kairos dashboard palette: Google's blue, green, yellow, and red.
+        vec3 colBlue = vec3(0.259, 0.522, 0.957);
+        vec3 colRed = vec3(0.918, 0.263, 0.208);
+        vec3 colYellow = vec3(0.984, 0.737, 0.020);
+        vec3 colGreen = vec3(0.204, 0.659, 0.325);
 
-        vec3 color = mix(colDeep, colElectricBlue, wave);
-        color = mix(color, colCyan, pow(wave2, 3.0) * 0.75);
-        color = mix(color, colViolet, (1.0 - wave) * 0.3);
+        vec3 color = mix(colBlue, colGreen, wave);
+        color = mix(color, colYellow, pow(wave2, 3.0) * 0.72);
+        color = mix(color, colRed, (1.0 - wave) * 0.42);
 
         gl_FragColor = vec4(color, 1.0);
       }
