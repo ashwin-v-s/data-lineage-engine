@@ -16,16 +16,14 @@ def supabase_auth_url() -> str | None:
 
 
 def auth_disabled() -> bool:
-    """Local-dev escape hatch that skips token verification entirely."""
-    return os.getenv("KAIROS_AUTH_DISABLED", "").strip().lower() in {"1", "true", "yes", "on"}
+    """Authentication is mandatory for all API routes, including local runs."""
+    return False
 
 
 async def require_user(
     credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
 ) -> dict[str, Any]:
     """Validate a Supabase token with Auth, including legacy HS256 projects."""
-    if auth_disabled():
-        return {"id": "dev-anonymous", "email": "dev@local"}
     url = supabase_auth_url()
     if not url:
         raise HTTPException(status_code=503, detail="Authentication is not configured")
@@ -56,9 +54,5 @@ async def require_user(
 async def optional_user(
     credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
 ) -> dict[str, Any] | None:
-    """Allow anonymous access only for local demo mode with auth unset."""
-    if auth_disabled():
-        return None
-    if not supabase_auth_url() and credentials is None:
-        return None
+    """Backward-compatible alias that now always requires a valid user."""
     return await require_user(credentials)

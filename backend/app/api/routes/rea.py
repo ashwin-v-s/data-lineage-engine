@@ -15,10 +15,10 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, Query
 
-from backend.app.auth import optional_user
+from backend.app.auth import require_user
 from backend.app.services.rea_integration import get_rea_service
 
-router = APIRouter(dependencies=[Depends(optional_user)])
+router = APIRouter(dependencies=[Depends(require_user)])
 logger = logging.getLogger(__name__)
 
 

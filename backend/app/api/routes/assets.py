@@ -14,13 +14,13 @@ import re
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
-from backend.app.auth import optional_user
+from backend.app.auth import require_user
 from psycopg2.extras import RealDictCursor
 
 from backend.app.db import get_conn
 from backend.app.schemas.asset import AssetResponse
 
-router = APIRouter(dependencies=[Depends(optional_user)])
+router = APIRouter(dependencies=[Depends(require_user)])
 
 _UUID_RE = re.compile(
     r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$',

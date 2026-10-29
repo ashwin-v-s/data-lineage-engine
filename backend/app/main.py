@@ -1,7 +1,10 @@
-from fastapi import FastAPI, Request
+from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 import os
 import uuid
+from pathlib import Path
 
 from backend.app.api.errors import api_error
 from backend.app.api.routes.health import router as health_router
@@ -13,6 +16,7 @@ from backend.app.api.routes.rea import router as rea_router
 from backend.app.api.routes.audit import router as audit_router
 from backend.app.api.routes.owner import router as owner_router
 from backend.app.api.routes.metadata import router as metadata_router
+from backend.app.auth import auth_disabled, require_user, supabase_auth_url
 
 
 app = FastAPI(
@@ -75,3 +79,27 @@ app.include_router(rea_router,        prefix="/api/v1")
 app.include_router(audit_router,      prefix="/api/v1")
 app.include_router(owner_router,      prefix="/api/v1")
 app.include_router(metadata_router,   prefix="/api/v1")
+
+
+@app.get("/api/v1/auth/config", tags=["authentication"])
+def auth_config():
+    """Expose only the public Supabase client settings needed by the sign-in page."""
+    return {
+        "url": supabase_auth_url(),
+        "publishable_key": os.getenv("SUPABASE_PUBLISHABLE_KEY")
+        or os.getenv("VITE_SUPABASE_PUBLISHABLE_KEY"),
+        "auth_disabled": auth_disabled(),
+    }
+
+
+@app.get("/ingestion.html", include_in_schema=False)
+def authenticated_ingestion_page(user: dict = Depends(require_user)):
+    """Serve the standalone ingestion workspace only to signed-in users."""
+    return FileResponse(FRONTEND_DIR / "ingestion.html", media_type="text/html")
+
+
+# Keep API routes above this catch-all mount so the Hatchable-exported browser
+# interface is served at / while API endpoints remain handled by FastAPI.
+FRONTEND_DIR = Path(__file__).resolve().parents[2] / "frontend"
+if FRONTEND_DIR.is_dir():
+    app.mount("/", StaticFiles(directory=FRONTEND_DIR, html=True), name="frontend")
