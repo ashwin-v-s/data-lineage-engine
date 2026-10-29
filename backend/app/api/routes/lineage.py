@@ -517,3 +517,104 @@ def expand_lineage(
     ]
 
     return LineageResponse(asset_id=root["id"], nodes=nodes, edges=lineage_edges)
+
+
+def _dataset_labels(cur, ids: list[str]) -> dict[str, dict]:
+    """Fetch display labels for a set of dataset ids."""
+    if not ids:
+        return {}
+    cur.execute(
+        """
+        SELECT id::text AS id, name, asset_type AS type,
+               schema_name, database_name, source_system
+        FROM   dataset
+        WHERE  id = ANY(%s::uuid[])
+        """,
+        (ids,),
+    )
+    labels: dict[str, dict] = {}
+    for r in cur.fetchall():
+        labels[r["id"]] = {
+            "id": r["id"],
+            "name": r["name"],
+            "type": r["type"],
+            "schema_name": r.get("schema_name"),
+            "database_name": r.get("database_name"),
+            "source_system": r.get("source_system"),
+            "qualified_name": ".".join(
+                part for part in (r.get("database_name"), r.get("schema_name"), r["name"]) if part
+            ),
+        }
+    return labels
+
+
+@router.get("/assets/{asset_id}/downstream-impact")
+def get_downstream_impact(
+    asset_id: str,
+    as_of: Optional[str] = Query(default=None),
+    recorded_as_of: Optional[str] = Query(default=None),
+    depth: int = Query(default=3, ge=1, le=10),
+    granularity: str = Query(default="DATASET", pattern="^(DATASET|COLUMN)$"),
+):
+    """Group everything reachable downstream of an asset by propagation depth.
+
+    Unlike the flat lineage graph, this answers "if I change this asset, what
+    else is at risk, and how far away is it?" — one bucket per hop, with the
+    affected assets labelled for display.
+    """
+    ts_as_of = as_of or _now_utc()
+    ts_rec   = recorded_as_of or _now_utc()
+
+    with get_conn() as conn:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            root = _resolve_asset(cur, asset_id)
+            if not root:
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"Asset '{asset_id}' not found.",
+                )
+
+            visited = {root["id"]}
+            frontier = {root["id"]}
+            levels: list[dict] = []
+            total = 0
+
+            for hop in range(1, depth + 1):
+                if not frontier:
+                    break
+                cur.execute(
+                    """
+                    SELECT DISTINCT le.target_id::text AS target
+                    FROM   lineage_edge le
+                    JOIN   edge_temporal_version etv ON etv.edge_id = le.id
+                    WHERE  le.source_id = ANY(%s::uuid[])
+                      AND  le.granularity = %s
+                      AND  etv.valid_from        <= %s::timestamptz
+                      AND  (etv.valid_to         IS NULL OR etv.valid_to        > %s::timestamptz)
+                      AND  etv.transaction_from  <= %s::timestamptz
+                      AND  (etv.transaction_to   IS NULL OR etv.transaction_to  > %s::timestamptz)
+                    """,
+                    (list(frontier), granularity, ts_as_of, ts_as_of, ts_rec, ts_rec),
+                )
+                next_frontier = {
+                    row["target"] for row in cur.fetchall() if row["target"] not in visited
+                }
+                if not next_frontier:
+                    break
+
+                labels = _dataset_labels(cur, list(next_frontier))
+                assets = [labels[nid] for nid in sorted(next_frontier) if nid in labels]
+                total += len(assets)
+                levels.append({"depth": hop, "asset_count": len(assets), "assets": assets})
+
+                visited |= next_frontier
+                frontier = next_frontier
+
+    return {
+        "asset_id": root["id"],
+        "asset_name": root["name"],
+        "granularity": granularity,
+        "depth": len(levels),
+        "total_affected": total,
+        "levels": levels,
+    }

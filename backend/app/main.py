@@ -16,6 +16,7 @@ from backend.app.api.routes.rea import router as rea_router
 from backend.app.api.routes.audit import router as audit_router
 from backend.app.api.routes.owner import router as owner_router
 from backend.app.api.routes.metadata import router as metadata_router
+from backend.app.api.routes.personalization import router as personalization_router
 from backend.app.auth import auth_disabled, require_user, supabase_auth_url
 
 
@@ -79,6 +80,7 @@ app.include_router(rea_router,        prefix="/api/v1")
 app.include_router(audit_router,      prefix="/api/v1")
 app.include_router(owner_router,      prefix="/api/v1")
 app.include_router(metadata_router,   prefix="/api/v1")
+app.include_router(personalization_router, prefix="/api/v1")
 
 
 # ── Liveness probe ────────────────────────────────────────────────────────────

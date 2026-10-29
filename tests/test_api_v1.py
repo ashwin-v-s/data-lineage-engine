@@ -68,6 +68,9 @@ _PROTECTED_PATHS = [
     "/api/v1/metadata/anything/editable",
     "/api/v1/rea/recommendations",
     "/api/v1/raw-events",
+    "/api/v1/me/recently-viewed",
+    "/api/v1/me/starred-assets",
+    "/api/v1/assets/anything/downstream-impact",
 ]
 
 
@@ -106,6 +109,11 @@ def test_openapi_exposes_the_expected_route_inventory():
         "/api/v1/metadata/{asset_id}/editable",
         "/api/v1/raw-events",
         "/api/v1/rea/recommendations",
+        "/api/v1/me/recently-viewed",
+        "/api/v1/me/recently-viewed/{asset_id}",
+        "/api/v1/me/starred-assets",
+        "/api/v1/assets/{asset_id}/star",
+        "/api/v1/assets/{asset_id}/downstream-impact",
     }
     missing = expected - set(paths)
     assert not missing, f"Routes missing from the OpenAPI schema: {sorted(missing)}"

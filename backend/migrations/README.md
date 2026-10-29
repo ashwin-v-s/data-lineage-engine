@@ -64,6 +64,13 @@ workspace-scoped import provenance/idempotency record described in the product
 architecture. M3 must review its contract fields and authorize deployment
 before it is applied.
 
+### 0005_personalization.sql
+Adds the per-user `asset_view` (recently viewed) and `asset_star` (starred
+assets) tables used by the personalization endpoints under `/api/v1/me/*` and
+`/api/v1/assets/{asset_id}/star`. Both tables carry workspace RLS, are granted
+only to `kairos_app`, and are keyed on `(workspace_id, user_id, asset_id)` so a
+user's shortcuts stay private to that user inside that workspace.
+
 Apply 0003 only after 0001 and 0002, using the privileged database connection
 used for schema migrations:
 
