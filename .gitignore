@@ -26,6 +26,10 @@ data/olist/*
 !data/olist/*.csv
 research/results/*
 !research/results/.gitkeep
+# Consolidated benchmark-matrix summaries are committed deliverables;
+# the individual result_*.json artifacts remain ignored.
+!research/results/summary.json
+!research/results/summary.md
 *.zip
 *.tar.gz
 *.csv.gz
