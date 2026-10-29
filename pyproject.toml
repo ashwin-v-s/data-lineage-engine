@@ -7,14 +7,24 @@ name = "data-lineage-engine"
 version = "0.0.1"
 description = "Kairos: bitemporal lineage engine with coverage-aware execution-conditioned reasoning (research prototype)"
 requires-python = ">=3.11"
-dependencies = []          # core (contracts, research) is standard library only. Backend deps are added by M5 and M3.
+dependencies = [
+    "fastapi>=0.115,<1",
+    "httpx>=0.27,<1",
+    "psycopg2-binary>=2.9,<3",
+    "python-dotenv>=1,<2",
+    "pydantic[email]>=2,<3",
+    "sqlalchemy>=2,<3",
+]
+
+[tool.vercel]
+entrypoint = "backend.api.index:app"
 
 [project.optional-dependencies]
 dev = ["pytest>=8"]
 # Exact versions are NOT YET FROZEN: freeze at the first working build (Pack Section 42).
 
 [tool.setuptools.packages.find]
-include = ["contracts*", "research*"]
+include = ["backend*", "contracts*", "research*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

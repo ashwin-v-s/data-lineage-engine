@@ -18,7 +18,9 @@
   let appStarted = false;
 
   const trustedProviders = new Set(['google', 'github', 'azure']);
-  const hasActiveSession = () => Boolean(activeSession?.access_token && (!activeSession.expires_at || activeSession.expires_at * 1000 > Date.now()));
+  const hasActiveSession = () => Boolean(activeSession?.access_token
+    && (!activeSession.expires_at || activeSession.expires_at * 1000 > Date.now())
+    && (!activeSession.kairos_remember_until || activeSession.kairos_remember_until > Date.now()));
 
   const readSaved = () => {
     for (const storage of [localStorage, sessionStorage]) {
@@ -34,6 +36,11 @@
     const other = target === localStorage ? sessionStorage : localStorage;
     const session = { ...value };
     if (!session.expires_at && session.expires_in) session.expires_at = Math.floor(Date.now() / 1000) + Number(session.expires_in);
+    if (remember) {
+      session.kairos_remember_until ||= Date.now() + 30 * 24 * 60 * 60 * 1000;
+    } else {
+      delete session.kairos_remember_until;
+    }
     target.setItem(sessionKey, JSON.stringify(session));
     other.removeItem(sessionKey);
     activeSession = session;
@@ -43,6 +50,11 @@
   const clearSession = () => {
     localStorage.removeItem(sessionKey);
     sessionStorage.removeItem(sessionKey);
+    // Browser-local profile values are user-specific; don't leave them visible
+    // when this browser is signed out or used by another account.
+    localStorage.removeItem('kairos_profileName');
+    localStorage.removeItem('kairos_profilePicture');
+    localStorage.removeItem('kairos_workspaceLabel');
     clearTimeout(refreshTimer);
     activeSession = null;
   };
@@ -73,9 +85,14 @@
   }
   async function refreshSession(session) {
     if (!session?.refresh_token || !config?.url || !config?.publishable_key) throw new Error('Your sign-in has expired. Please sign in again.');
+    if (session.kairos_remember_until && session.kairos_remember_until <= Date.now()) {
+      clearSession();
+      throw new Error('Your remembered session expired. Please sign in again.');
+    }
     const remember = Boolean(localStorage.getItem(sessionKey));
     const next = await authRequest('token?grant_type=refresh_token', { refresh_token: session.refresh_token });
     if (session.user && !next.user) next.user = session.user;
+    if (session.kairos_remember_until) next.kairos_remember_until = session.kairos_remember_until;
     return saveSession(next, remember);
   }
   function scheduleRefresh(session) {
@@ -93,26 +110,38 @@
     window.fetch = async (input, init = {}) => {
       const url = typeof input === 'string' ? input : input?.url || '';
       if (!url.startsWith('/api/v1/') && !url.startsWith('/ingestion.html')) return originalFetch(input, init);
+      if (window.kairosDemoPreview) {
+        const isIngestion = url.startsWith('/ingestion.html');
+        return new Response(isIngestion ? 'Demo preview cannot access ingestion.' : JSON.stringify({ ok: false, error: { message: 'Demo preview cannot access the catalog.' } }), { status: 403, headers: { 'Content-Type': isIngestion ? 'text/plain' : 'application/json' } });
+      }
       let session = activeSession || readSaved();
       if (session?.expires_at && session.expires_at * 1000 < Date.now() + 20_000) {
         try { session = await refreshSession(session); } catch (_) { clearSession(); session = null; }
       }
       const headers = new Headers(init.headers || (input instanceof Request ? input.headers : undefined));
       if (session?.access_token) headers.set('Authorization', `Bearer ${session.access_token}`);
-      return originalFetch(input, { ...init, headers });
+      const response = await originalFetch(input, { ...init, headers });
+      if (response.status === 401 && session?.access_token) {
+        clearSession();
+        location.replace('/');
+      }
+      return response;
     };
     window.__kairosBearerFetch = true;
   }
   async function restoreSession() {
     let session = readSaved();
     if (!session) return null;
-    if (session.expires_at && session.expires_at * 1000 < Date.now() + 30_000) session = await refreshSession(session);
-    if (!session.user) {
-      const response = await fetch(`${config.url}/auth/v1/user`, { headers: { apikey: config.publishable_key, Authorization: `Bearer ${session.access_token}` } });
-      if (!response.ok) { clearSession(); return null; }
-      session.user = await response.json();
-      saveSession(session, Boolean(localStorage.getItem(sessionKey)));
+    if (session.kairos_remember_until && session.kairos_remember_until <= Date.now()) {
+      clearSession();
+      return null;
     }
+    if (session.expires_at && session.expires_at * 1000 < Date.now() + 30_000) session = await refreshSession(session);
+    const response = await fetch(`${config.url}/auth/v1/user`, { headers: { apikey: config.publishable_key, Authorization: `Bearer ${session.access_token}` } });
+    if (response.status === 401 || response.status === 403) { clearSession(); return null; }
+    if (!response.ok) throw new Error('Supabase could not validate the saved session.');
+    session.user = await response.json();
+    saveSession(session, Boolean(localStorage.getItem(sessionKey)));
     return session;
   }
   async function loadAppScripts(index = 0) {
@@ -133,7 +162,7 @@
     button.id = 'kairosSignOut';
     button.className = 'auth-link';
     button.type = 'button';
-    button.textContent = 'Sign out';
+    button.textContent = window.kairosDemoPreview ? 'Exit demo preview' : 'Sign out';
     button.style.margin = '10px 18px';
     button.addEventListener('click', signOut);
     row.insertAdjacentElement('afterend', button);
@@ -145,16 +174,35 @@
     }
   }
   async function signOut() {
+    if (window.kairosDemoPreview) {
+      window.kairosDemoPreview = false;
+      location.replace('/');
+      return;
+    }
     try { await authRequest('logout', null, activeSession?.access_token); } catch (_) { /* Clear the local session even if remote logout is unreachable. */ }
     clearSession();
     location.replace('/');
   }
-  async function startApp(session) {
+  async function startApp(session, { demoPreview = false } = {}) {
+    window.kairosDemoPreview = Boolean(demoPreview);
     if (session?.access_token) {
       activeSession = session;
       scheduleRefresh(session);
     }
-    window.kairosUser = session?.user ? { id: session.user.id || '', email: session.user.email || '' } : null;
+    const authUser = session?.user;
+    window.kairosUser = authUser ? { id: authUser.id || '', email: authUser.email || '' } : null;
+    if (authUser) {
+      const metadata = authUser.user_metadata || {};
+      const accountName = String(metadata.full_name || metadata.name || authUser.email || 'Workspace user').trim();
+      const currentName = localStorage.getItem('kairos_profileName');
+      if (!currentName || currentName === 'Jatin Shende' || currentName === 'Workspace user') {
+        localStorage.setItem('kairos_profileName', accountName);
+      }
+      const currentWorkspaceLabel = localStorage.getItem('kairos_workspaceLabel');
+      if (!currentWorkspaceLabel || currentWorkspaceLabel === 'Research workspace') {
+        localStorage.setItem('kairos_workspaceLabel', 'Personal workspace');
+      }
+    }
     installApiAuthorization();
     authScreen.hidden = true;
     appShell.hidden = false;
@@ -190,6 +238,10 @@
     if (event.origin !== location.origin || event.source !== frame?.contentWindow) return;
     const message = event.data;
     if (!message || message.source !== 'kairos-auth-stitch') return;
+    if (message.type === 'demo-preview') {
+      await startApp(null, { demoPreview: true });
+      return;
+    }
     if (message.type === 'ready') {
       if (configLoaded && (!config?.url || !config?.publishable_key)) frameStatus('signin', false, 'Supabase sign-in is not configured. Set the project URL and publishable key on the server.');
       sendCurrentUserToFrame();
@@ -214,7 +266,9 @@
           frameStatus('signup', true, `Account created for ${message.email}. Supabase sent a verification link to your work email. Verify it before signing in.`, 'signin');
         }
       } else if (message.type === 'recover') {
-        const response = await fetch(`${config.url}/auth/v1/recover`, { method: 'POST', headers: { apikey: config.publishable_key, 'Content-Type': 'application/json' }, body: JSON.stringify({ email: message.email }) });
+        const recoverUrl = new URL(`${config.url}/auth/v1/recover`);
+        recoverUrl.searchParams.set('redirect_to', `${location.origin}/`);
+        const response = await fetch(recoverUrl, { method: 'POST', headers: { apikey: config.publishable_key, 'Content-Type': 'application/json' }, body: JSON.stringify({ email: message.email }) });
         const result = await response.json().catch(() => ({}));
         if (!response.ok) throw new Error(result.msg || result.message || `Password recovery failed (${response.status}).`);
         frameStatus('recover', true, 'If this email has a Kairos account, Supabase will send a password reset link.');
@@ -291,6 +345,11 @@
       if (!response.ok) throw new Error('Could not read authentication configuration.');
       config = await response.json();
       configLoaded = true;
+      if (!config?.url || !config?.publishable_key) {
+        authScreen.hidden = false;
+        setTimeout(() => showAuthError('Supabase sign-in is not configured. Add the project URL and publishable key to the server environment.'), 250);
+        return;
+      }
       const oauthResult = await consumeOAuthCallback();
       if (oauthResult?.session) {
         if (oauthResult.type === 'recovery') { showPasswordReset(oauthResult.session); return; }

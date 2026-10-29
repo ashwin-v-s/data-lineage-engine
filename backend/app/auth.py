@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import os
-from typing import Any
+from typing import Any, AsyncGenerator
 
 import httpx
 from fastapi import Depends, HTTPException
@@ -22,7 +22,7 @@ def auth_disabled() -> bool:
 
 async def require_user(
     credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
-) -> dict[str, Any]:
+) -> AsyncGenerator[dict[str, Any], None]:
     """Validate a Supabase token with Auth, including legacy HS256 projects."""
     url = supabase_auth_url()
     if not url:
@@ -48,11 +48,30 @@ async def require_user(
         raise HTTPException(status_code=503, detail="Authentication service returned an invalid response") from exc
     if not isinstance(user, dict) or not isinstance(user.get("id"), str):
         raise HTTPException(status_code=401, detail="Session did not identify a user")
-    return user
+    # Provision only from the user UUID returned by Supabase's verified /user
+    # endpoint.  Never trust a client-supplied workspace or user identifier.
+    try:
+        from backend.app.db import provision_personal_workspace, set_workspace_id, reset_workspace_id
+
+        workspace_id = provision_personal_workspace(user["id"])
+    except Exception as exc:
+        # Usually this means migration 0003 has not been applied, or the DB
+        # login has not been granted membership in kairos_app.  Fail closed.
+        raise HTTPException(
+            status_code=503,
+            detail="Workspace service is not ready. Apply the workspace migration and try again.",
+        ) from exc
+    token = set_workspace_id(workspace_id)
+    try:
+        yield user
+    finally:
+        reset_workspace_id(token)
 
 
 async def optional_user(
     credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
 ) -> dict[str, Any] | None:
     """Backward-compatible alias that now always requires a valid user."""
-    return await require_user(credentials)
+    async for user in require_user(credentials):
+        return user
+    return None

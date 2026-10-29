@@ -66,6 +66,45 @@ Creates foundational schema:
 - UUID primary keys with deterministic option
 - Indexes for traversal, time range queries, and lookups
 
+### 0002_audit_ownership_metadata.sql
+Adds dataset ownership/description fields and the team, ownership, audit,
+version, and rollback tables used by the governance API.
+
+### 0003_personal_workspaces.sql
+Adds a personal workspace for each Supabase user on that user's first
+authenticated API request. PostgreSQL row-level security scopes every business
+table query to that workspace. Existing rows are kept in a separate
+`Legacy catalog` workspace and are intentionally not assigned to whoever signs
+in first.
+
+Apply 0003 only after 0001 and 0002, using the privileged database connection
+used for schema migrations:
+
+```powershell
+psql "$env:DATABASE_URL" -v ON_ERROR_STOP=1 -f backend/migrations/0003_personal_workspaces.sql
+```
+
+The API's `DATABASE_URL` role must be a member of `kairos_app`; the migration
+grants membership to its executing role and to `postgres` when that role
+exists. If the API uses a different login role, a database administrator must
+also grant it membership and permission to execute
+`public.kairos_ensure_personal_workspace(uuid)`. Do not run the API with a
+restricted or anonymous database role that cannot call that provisioning
+function. The API fails closed with HTTP 503 until the migration and grants are
+in place.
+
+For example, when the API login is `kairos`, run as a database administrator:
+
+```sql
+GRANT kairos_app TO kairos;
+GRANT EXECUTE ON FUNCTION public.kairos_ensure_personal_workspace(uuid) TO kairos;
+```
+
+To inspect migration state, verify that all 17 business tables have a
+`workspace_id` column, `kairos_workspace_isolation` policy, and RLS enabled.
+Do not manually assign the legacy workspace to a user unless that user is
+intended to receive the pre-isolation catalog.
+
 ## Connection String Format
 
 ```

@@ -19,6 +19,8 @@ as a context manager – the connection is returned to the pool automatically.
 from __future__ import annotations
 
 import os
+import logging
+from contextvars import ContextVar
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Generator
@@ -50,6 +52,60 @@ DATABASE_URL: str | None = os.getenv("DATABASE_URL")
 
 # ── Connection pool (lazy singleton) ─────────────────────────────────────────
 _pool: pg_pool.ThreadedConnectionPool | None = None
+logger = logging.getLogger(__name__)
+
+# Populated only after Supabase has verified the bearer token.  The database
+# layer applies this identity to every transaction, so route SQL cannot omit
+# workspace scoping accidentally.
+_workspace_id: ContextVar[str | None] = ContextVar("kairos_workspace_id", default=None)
+
+
+def set_workspace_id(workspace_id: str):
+    return _workspace_id.set(workspace_id)
+
+
+def reset_workspace_id(token) -> None:
+    _workspace_id.reset(token)
+
+
+def _apply_workspace_scope(conn) -> None:
+    workspace_id = _workspace_id.get()
+    if not workspace_id:
+        raise RuntimeError("Authenticated workspace context is missing")
+    with conn.cursor() as cur:
+        # The migration creates this restricted role and grants membership to
+        # the database login used by the API.  RLS remains enabled even when
+        # the connection string belongs to a privileged Supabase role.
+        cur.execute("SET LOCAL ROLE kairos_app")
+        cur.execute(
+            "SELECT set_config('kairos.workspace_id', %s, true)",
+            (workspace_id,),
+        )
+
+
+def provision_personal_workspace(user_id: str) -> str:
+    """Create or return a user's workspace using the migration-owned function.
+
+    This narrowly scoped call runs before SET ROLE; no route query gets a
+    privileged connection.  The SQL function is SECURITY DEFINER and only
+    returns the workspace for the supplied verified Supabase UUID.
+    """
+    pool = _get_pool()
+    conn = pool.getconn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT kairos_ensure_personal_workspace(%s)", (user_id,))
+            row = cur.fetchone()
+            if not row or not row[0]:
+                raise RuntimeError("Workspace provisioning returned no workspace")
+            workspace_id = str(row[0])
+        conn.commit()
+        return workspace_id
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        pool.putconn(conn)
 
 
 def _get_pool() -> pg_pool.ThreadedConnectionPool:
@@ -86,6 +142,7 @@ def get_conn() -> Generator[psycopg2.extensions.connection, None, None]:
     p = _get_pool()
     conn = p.getconn()
     try:
+        _apply_workspace_scope(conn)
         yield conn
         conn.commit()
     except Exception:
@@ -118,9 +175,11 @@ class _PooledConnectionCompat:
 
     def commit(self) -> None:
         self._conn.commit()
+        _apply_workspace_scope(self._conn)
 
     def rollback(self) -> None:
         self._conn.rollback()
+        _apply_workspace_scope(self._conn)
 
     def close(self) -> None:
         if self._returned:
@@ -152,7 +211,14 @@ class _PooledConnectionCompat:
 def get_db_connection() -> _PooledConnectionCompat:
     """Return a pooled connection for the audit / owner / metadata routes."""
     pool = _get_pool()
-    return _PooledConnectionCompat(pool, pool.getconn())
+    conn = pool.getconn()
+    try:
+        _apply_workspace_scope(conn)
+    except Exception:
+        conn.rollback()
+        pool.putconn(conn)
+        raise
+    return _PooledConnectionCompat(pool, conn)
 
 
 def health_check() -> dict:
@@ -162,5 +228,6 @@ def health_check() -> dict:
             with conn.cursor() as cur:
                 cur.execute("SELECT 1")
         return {"db": "connected"}
-    except Exception as exc:
-        return {"db": f"error: {exc}"}
+    except Exception:
+        logger.exception("Database health check failed")
+        return {"db": "unavailable"}

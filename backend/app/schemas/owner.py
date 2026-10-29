@@ -93,7 +93,6 @@ class OwnerRequestCreate(BaseModel):
 
 class ApproveOwnerRequest(BaseModel):
     """Approve owner request"""
-    approved_by: str
     reason: Optional[str] = None
 
 

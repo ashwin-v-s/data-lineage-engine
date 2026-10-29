@@ -51,12 +51,14 @@ def list_team_members(
     try:
         query = "SELECT id, email, name, title, department, slack_handle, is_active FROM team_member"
         filters = []
+        params = []
         
         if active_only:
             filters.append("is_active = TRUE")
         
         if department:
-            filters.append(f"department = '{department}'")
+            filters.append("department = %s")
+            params.append(department)
         
         if filters:
             query += " WHERE " + " AND ".join(filters)
@@ -64,7 +66,7 @@ def list_team_members(
         query += " ORDER BY name"
         
         cur = conn.cursor(row_factory=dict)
-        cur.execute(query)
+        cur.execute(query, params)
         members = cur.fetchall()
         cur.close()
         conn.close()
@@ -135,6 +137,11 @@ def assign_owner(
     Returns:
         Confirmation of assignment
     """
+    if not request.owner_email and not request.steward_email:
+        raise HTTPException(status_code=400, detail="Provide an owner or steward email to assign")
+    if request.requires_approval:
+        raise HTTPException(status_code=400, detail="Use the owner request workflow for changes that require approval")
+
     conn = get_db_connection()
     try:
         # Get current owners
@@ -146,15 +153,13 @@ def assign_owner(
         current = cur.fetchone()
         
         if not current:
-            cur.close()
-            conn.close()
             raise HTTPException(status_code=404, detail="Dataset not found")
         
         # Update dataset
         updates = []
         if request.owner_email:
+            updates.append(("owner_name", request.owner_email))
             updates.append(("owner_id", request.owner_email))
-            updates.append(("assigned_at", datetime.utcnow()))
             
             # Record assignment in audit trail
             cur.execute("""
@@ -164,6 +169,7 @@ def assign_owner(
             """, (asset_id, current["owner_name"], request.owner_email, user.get("email") or user["id"], request.reason))
         
         if request.steward_email:
+            updates.append(("steward_name", request.steward_email))
             updates.append(("steward_id", request.steward_email))
             
             # Record assignment in audit trail
@@ -175,6 +181,7 @@ def assign_owner(
         
         # Update dataset record
         if updates:
+            updates.append(("assigned_at", datetime.utcnow()))
             set_clause = ", ".join([f"{k} = %s" for k, v in updates])
             values = [v for k, v in updates]
             values.append(asset_id)
@@ -194,6 +201,9 @@ def assign_owner(
             message="Assignment successful"
         )
     
+    except HTTPException:
+        conn.rollback()
+        raise
     except Exception as e:
         conn.rollback()
         logger.error(f"Error assigning owner: {e}")
@@ -409,15 +419,23 @@ def approve_owner_request(
 ):
     """Approve owner assignment request"""
     conn = get_db_connection()
+    cur = None
+    current_user = user.get("email") or user["id"]
     try:
         cur = conn.cursor(row_factory=dict)
         
         # Get request
-        cur.execute("SELECT * FROM owner_request WHERE id = %s", (request_id,))
+        cur.execute(
+            """SELECT *, (expires_at IS NULL OR expires_at > NOW()) AS is_active
+               FROM owner_request WHERE id = %s FOR UPDATE""",
+            (request_id,),
+        )
         req = cur.fetchone()
         
         if not req:
             raise HTTPException(status_code=404, detail="Request not found")
+        if req["status"] != "PENDING" or not req["is_active"]:
+            raise HTTPException(status_code=409, detail="Request is no longer pending or has expired")
         
         # Update request
         cur.execute("""
@@ -438,16 +456,21 @@ def approve_owner_request(
             INSERT INTO owner_assignment
             (dataset_id, assignment_type, new_value, assigned_by, reason)
             VALUES (%s, 'OWNER', %s, %s, %s)
-        """, (req["dataset_id"], req["requested_owner"], current_user, f"Approved by {approval.approved_by}"))
+        """, (req["dataset_id"], req["requested_owner"], current_user, approval.reason or req.get("reason")))
         
         conn.commit()
-        cur.close()
-        conn.close()
-        
         logger.info(f"Approved owner request {request_id}")
         
         return {"status": "approved", "message": "Owner assignment approved"}
     
+    except HTTPException:
+        conn.rollback()
+        raise
     except Exception as e:
+        conn.rollback()
         logger.error(f"Error approving request: {e}")
         raise HTTPException(status_code=500, detail="Failed to approve request")
+    finally:
+        if cur is not None:
+            cur.close()
+        conn.close()

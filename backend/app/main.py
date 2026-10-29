@@ -95,11 +95,12 @@ def auth_config():
 @app.get("/ingestion.html", include_in_schema=False)
 def authenticated_ingestion_page(user: dict = Depends(require_user)):
     """Serve the standalone ingestion workspace only to signed-in users."""
-    return FileResponse(FRONTEND_DIR / "ingestion.html", media_type="text/html")
+    return FileResponse(FRONTEND_SOURCE_DIR / "ingestion.html", media_type="text/html")
 
 
 # Keep API routes above this catch-all mount so the Hatchable-exported browser
 # interface is served at / while API endpoints remain handled by FastAPI.
-FRONTEND_DIR = Path(__file__).resolve().parents[2] / "frontend"
+FRONTEND_SOURCE_DIR = Path(__file__).resolve().parents[2] / "frontend"
+FRONTEND_DIR = FRONTEND_SOURCE_DIR / "dist"
 if FRONTEND_DIR.is_dir():
     app.mount("/", StaticFiles(directory=FRONTEND_DIR, html=True), name="frontend")

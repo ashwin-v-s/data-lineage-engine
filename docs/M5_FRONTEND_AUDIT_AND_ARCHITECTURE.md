@@ -5,6 +5,13 @@
 **Status**: DRAFT FOR REVIEW & APPROVAL  
 **Primary Source Reference**: `docs/FINAL_ARCHITECTURE_AND_RESEARCH_EXECUTION_PACK.md` (Sections 10, 11, 12, 17, 19, 34, 46) & `docs/TEAM_GUIDE.md` (Section 12)
 
+> **Current-state note (2026-10-29):** This September audit is a historical
+> design snapshot. A React/Vite entry point and application shell now exist in
+> `frontend/src/`; the existing CSS and Stitch sign-in page are retained. The
+> dashboard's generated views and interactions still use `frontend/app.js` as
+> a compatibility layer, so this is the start of the React migration, not a
+> completed conversion of every dashboard feature.
+
 ---
 
 ## Executive Summary

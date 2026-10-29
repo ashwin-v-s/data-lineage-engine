@@ -15,6 +15,9 @@ Bitemporal data lineage infrastructure and execution-conditioned reasoning engin
 ├── configs/                  # Project and environment configuration files
 ├── contracts/                # Shared domain types, interfaces, fixtures, and test mocks
 ├── docs/                     # Architectural specs, research pack, guides, and pattern analysis
+├── frontend/                 # React/Vite app, existing CSS, and dashboard compatibility runtime
+│   ├── src/                  # React app shell and dashboard view bridge
+│   └── *.css                 # Existing Kairos design system and page styles
 ├── ingestion/                # Lineage & metadata extractors
 │   ├── cli/                  # CLI ingestion utilities and configuration templates
 │   ├── dbt/                  # dbt manifest/catalog ingestion adapter
@@ -50,6 +53,20 @@ source .venv/bin/activate       # On Linux/macOS
 pip install -r backend/requirements.txt
 pip install pytest sqlglot
 ```
+
+### 1.1 Frontend Setup
+
+```bash
+cd frontend
+npm ci
+npm run build
+cd ..
+```
+
+The React/Vite build keeps the existing Kairos CSS, palette, and Stitch sign-in
+page. Dashboard views still use the existing `frontend/app.js` renderer while
+they are migrated into React components. `scripts/run_ui.py` rebuilds the
+frontend before starting FastAPI.
 
 ### 2. Verify Import Boundaries & Tests
 ```bash
