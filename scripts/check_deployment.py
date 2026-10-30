@@ -39,7 +39,6 @@ from typing import NamedTuple
 import httpx
 from dotenv import load_dotenv
 
-
 # Router path of the health endpoint (``backend/app/api/routes/health.py``),
 # relative to the API base passed via ``--base-url``.
 HEALTH_PATH = "/health"

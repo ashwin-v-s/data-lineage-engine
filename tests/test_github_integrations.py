@@ -15,8 +15,8 @@ pytest.importorskip("cryptography")
 
 from fastapi.testclient import TestClient
 
-from backend.app.main import app
 from backend.app.auth import require_user
+from backend.app.main import app
 from backend.app.services import github_app, github_connection_store, token_crypto
 
 client = TestClient(app)

@@ -2,6 +2,20 @@
 Comprehensive pytest test suite for Audit Trail & Version History API
 Tests all 15 audit API endpoints with fixtures, database integration, and validation.
 
+This module exercises the real HTTP surface of the Kairos audit API, so it is
+fail-closed (live-gated) in two independent ways:
+
+* ``tests.conftest.requires_live_backend`` keeps the module dormant unless an
+  operator opts in with ``KAIROS_LIVE_API_TESTS=1`` (together with
+  ``DATABASE_URL`` and ``SUPABASE_URL``).
+* A real, verified Supabase end-user access token must be supplied in
+  ``KAIROS_TEST_USER_TOKEN``; without it every protected route fails closed
+  with 401/503.
+
+When either condition is unmet the whole module is skipped with a clear,
+human-readable reason, so the default offline run never touches the network or
+the shared database.
+
 Test Coverage:
 1. GET /audit/{asset_id}/trail - with various date ranges, field/user filtering, pagination
 2. GET /audit/{asset_id}/versions - version history with snapshots
@@ -15,14 +29,14 @@ Test Coverage:
 10. Response consistency and data integrity
 """
 
-import pytest
-import json
 import csv
 import io
 from datetime import datetime, timedelta
-from typing import Dict, Any, List
-from uuid import UUID, uuid4
-from unittest.mock import Mock, patch, MagicMock
+from typing import Any, Dict, List
+from unittest.mock import MagicMock
+from uuid import uuid4
+
+import pytest
 
 # FastAPI & database imports
 pytest.importorskip("fastapi")
@@ -32,17 +46,29 @@ from fastapi.testclient import TestClient
 
 # Import the FastAPI app and models
 from backend.app.main import app
-from backend.app.schemas.audit import (
-    AuditTrailResponse,
-    AuditLogEntry,
-    VersionHistory,
-    AssetVersion,
-    VersionDiff,
-    RollbackRequest,
-    RollbackResponse,
-    AuditStatistics,
-    ComplianceReport,
-)
+from tests.conftest import requires_live_backend
+
+
+def _operator_token() -> str | None:
+    """The bearer token an operator supplies to run these live tests."""
+    import os
+
+    token = os.getenv("KAIROS_TEST_USER_TOKEN", "").strip()
+    return token or None
+
+
+# A single module-level gate: nothing runs unless live mode is opted in *and*
+# an operator has supplied an end-user token.
+pytestmark = [
+    requires_live_backend,
+    pytest.mark.skipif(
+        _operator_token() is None,
+        reason=(
+            "Set KAIROS_TEST_USER_TOKEN to a valid Supabase end-user access "
+            "token to run the live API integration tests."
+        ),
+    ),
+]
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # FIXTURES & TEST DATA
@@ -51,8 +77,8 @@ from backend.app.schemas.audit import (
 
 @pytest.fixture
 def client():
-    """FastAPI test client"""
-    return TestClient(app)
+    """FastAPI test client authenticated as the operator-supplied end user."""
+    return TestClient(app, headers={"Authorization": f"Bearer {_operator_token()}"})
 
 
 @pytest.fixture
@@ -1004,8 +1030,7 @@ class TestAuditIntegration:
         
         if report_response.status_code == 200 and stats_response.status_code == 200:
             report_data = report_response.json()
-            stats_data = stats_response.json()
-            
+
             # Report should reference statistics
             assert report_data.get("total_changes") >= 0
             assert report_data.get("compliance_score") >= 0

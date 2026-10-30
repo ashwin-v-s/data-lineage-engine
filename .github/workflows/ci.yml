@@ -19,6 +19,30 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
       - name: Install Python project and test dependencies
         run: python -m pip install -e ".[dev]"
+      - name: Lint (product-completion surface)
+        # Scoped on purpose.  The M1-M5 workstream trees still carry pre-existing
+        # ruff findings that only their owners may fix, so this gate covers every
+        # path this workstream added or modified.  Widen the path list as the
+        # workstreams clear their backlogs; the rule set lives in [tool.ruff] in
+        # pyproject.toml.
+        run: |
+          python -m ruff check \
+            backend/app/services \
+            scripts/check_deployment.py \
+            scripts/check_openapi_drift.py \
+            scripts/db/check_migrations.py \
+            scripts/db/verify_rls.py \
+            scripts/seed_demo_catalog.py \
+            scripts/export_openapi.py \
+            tests/test_github_app.py \
+            tests/test_github_integrations.py \
+            tests/test_token_crypto.py \
+            tests/test_live_api.py \
+            tests/test_audit_api_live.py
+      - name: OpenAPI contract drift
+        run: python scripts/check_openapi_drift.py
+      - name: Migration / RLS consistency (static)
+        run: python scripts/db/check_migrations.py
       - name: Install and build frontend
         run: |
           npm --prefix frontend ci

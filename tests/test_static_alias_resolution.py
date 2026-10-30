@@ -7,6 +7,11 @@ in the extracted lineage.
 
 import pytest
 
+# sqlglot is a declared runtime dependency, but a test environment that only
+# installs pytest (a stale CI recipe) must not abort the whole run at
+# collection time; skip this module instead.
+pytest.importorskip("sqlglot")
+
 from contracts.interfaces import SchemaSnapshot
 from contracts.types import ParserStatus
 from ingestion.sql import SQLGlotLineageProvider
