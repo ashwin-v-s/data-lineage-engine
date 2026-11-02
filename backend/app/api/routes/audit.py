@@ -1166,7 +1166,7 @@ def request_rollback(
 def export_audit_trail(
     request: Request,
     asset_id: str,
-    format: str = Query("json", regex="^(csv|json)$"),
+    format: str = Query("json", pattern="^(csv|json)$"),
     days: int = Query(30, ge=1, le=365)
 ):
     """

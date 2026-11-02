@@ -1,25 +1,29 @@
-from fastapi import Depends, FastAPI, Request
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
-from fastapi.staticfiles import StaticFiles
 import os
 import uuid
 from pathlib import Path
 
-from backend.app.api.errors import api_error
-from backend.app.api.routes.health import router as health_router
-from backend.app.api.routes.search import router as search_router
-from backend.app.api.routes.assets import router as assets_router
-from backend.app.api.routes.lineage import router as lineage_router
-from backend.app.api.routes.dependency import router as dependency_router
-from backend.app.api.routes.rea import router as rea_router
-from backend.app.api.routes.audit import router as audit_router
-from backend.app.api.routes.owner import router as owner_router
-from backend.app.api.routes.metadata import router as metadata_router
-from backend.app.api.routes.personalization import router as personalization_router
-from backend.app.api.routes.integrations import router as integrations_router
-from backend.app.auth import auth_disabled, require_user, supabase_auth_url
+from fastapi import Depends, FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 
+from backend.app.api.errors import api_error
+from backend.app.api.routes.assets import router as assets_router
+from backend.app.api.routes.audit import router as audit_router
+from backend.app.api.routes.capabilities import router as capabilities_router
+from backend.app.api.routes.dependency import router as dependency_router
+from backend.app.api.routes.governance import router as governance_router
+from backend.app.api.routes.health import router as health_router
+from backend.app.api.routes.ingest import router as ingest_router
+from backend.app.api.routes.integrations import router as integrations_router
+from backend.app.api.routes.lineage import router as lineage_router
+from backend.app.api.routes.metadata import router as metadata_router
+from backend.app.api.routes.owner import router as owner_router
+from backend.app.api.routes.personalization import router as personalization_router
+from backend.app.api.routes.rea import router as rea_router
+from backend.app.api.routes.search import router as search_router
+from backend.app.api.routes.sources import router as sources_router
+from backend.app.auth import auth_disabled, require_user, supabase_auth_url
 
 # Largest request body the API will accept, in bytes.  Import payloads are
 # untrusted input; capping the body keeps an oversized upload from consuming
@@ -115,6 +119,10 @@ app.include_router(owner_router,      prefix="/api/v1")
 app.include_router(metadata_router,   prefix="/api/v1")
 app.include_router(personalization_router, prefix="/api/v1")
 app.include_router(integrations_router, prefix="/api/v1")
+app.include_router(ingest_router, prefix="/api/v1")
+app.include_router(sources_router, prefix="/api/v1")
+app.include_router(governance_router, prefix="/api/v1")
+app.include_router(capabilities_router, prefix="/api/v1")
 
 
 # ── Liveness probe ────────────────────────────────────────────────────────────
