@@ -2,7 +2,41 @@ import React, { useEffect, useLayoutEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { flushSync } from 'react-dom';
 
+import DataModeLabel from './components/DataModeLabel.jsx';
+import { resolveDataMode } from './components/dataMode.js';
+import './components/dataMode.css';
+
 const initialDashboardMarkup = '<div class="loading-state">Loading workspace…</div>';
+
+/** Read the shell's current data provenance without assuming it is live. */
+function readDataModeState() {
+  let stored = null;
+  try {
+    stored = window.localStorage.getItem('kairos_dataMode');
+  } catch (_) {
+    stored = null;
+  }
+  return resolveDataMode({
+    dataMode: stored || undefined,
+    demoPreview: Boolean(window.kairosDemoPreview),
+  });
+}
+
+/** Track the data mode the shell reports, so the badge can never go stale. */
+function useDataMode() {
+  const [mode, setMode] = useState(readDataModeState);
+  useEffect(() => {
+    const sync = (event) => {
+      const detail = event && event.detail;
+      setMode(detail
+        ? resolveDataMode({ dataMode: detail.dataMode, demoPreview: Boolean(detail.demoPreview) })
+        : readDataModeState());
+    };
+    window.addEventListener('kairos:data-mode', sync);
+    return () => window.removeEventListener('kairos:data-mode', sync);
+  }, []);
+  return mode;
+}
 
 function AuthScreen() {
   return (
@@ -13,6 +47,7 @@ function AuthScreen() {
 }
 
 function Sidebar() {
+  const dataMode = useDataMode();
   return (
     <aside className="sidebar" id="sidebar">
       <div className="brand">
@@ -66,6 +101,7 @@ function Sidebar() {
         </div>
       </nav>
       <div className="sidebar-bottom">
+        <div className="sidebar-data-mode"><span>Data provenance</span><DataModeLabel mode={dataMode} /></div>
         <div className="health-card">
           <div className="health-top"><span className="status-dot" /><strong>Workspace mode</strong><span className="health-live" id="sidebarModeBadge">DEMO</span></div>
           <p id="sidebarModeDescription">Synthetic sample records; not production data.</p>

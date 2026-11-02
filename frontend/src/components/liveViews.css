@@ -1,0 +1,287 @@
+/*
+ * Shared presentation primitives for the React live views
+ * (Sources, Freshness, Incidents, asset capabilities).
+ *
+ * These views render inside `#mainContent` in place of the legacy `app.js`
+ * markup, so they only use design tokens that `styles.neo.css` already defines
+ * (both themes included) and never restyle the legacy shell.
+ *
+ * Class prefix: `kv-` (Kairos view). View-specific rules belong in that view's
+ * own stylesheet, never here.
+ */
+
+.kv-view {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 4px 2px 32px;
+  color: var(--ink);
+  font-family: var(--font-body);
+}
+
+.kv-view-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.kv-view-head h1 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.kv-sub {
+  margin: 0;
+  max-width: 78ch;
+  color: var(--muted);
+  font-size: 12.5px;
+  line-height: 1.55;
+}
+
+.kv-card {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  padding: 16px;
+}
+
+.kv-card h2 {
+  margin: 0 0 4px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.kv-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.kv-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.kv-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.kv-spacer {
+  flex: 1 1 auto;
+}
+
+/* ────────────────────────────────── forms ────────────────────────────────── */
+
+.kv-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+}
+
+.kv-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.kv-label {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.kv-input,
+.kv-select {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 7px 9px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--ink);
+  font: 13px var(--font-body);
+}
+
+.kv-input:focus,
+.kv-select:focus {
+  outline: 2px solid var(--link);
+  outline-offset: -1px;
+}
+
+.kv-hint {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+/* ───────────────────────────────── buttons ───────────────────────────────── */
+
+.kv-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 11px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--ink);
+  font: 600 12px var(--font-body);
+  cursor: pointer;
+}
+
+.kv-btn:hover:not(:disabled) {
+  border-color: var(--link);
+  color: var(--link);
+}
+
+.kv-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.kv-btn--primary {
+  border-color: var(--link);
+  background: var(--link);
+  color: #ffffff;
+}
+
+.kv-btn--primary:hover:not(:disabled) {
+  color: #ffffff;
+  filter: brightness(1.06);
+}
+
+.kv-btn--danger:hover:not(:disabled) {
+  border-color: var(--red);
+  color: var(--red);
+}
+
+/* ────────────────────────────────── tables ───────────────────────────────── */
+
+.kv-table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+}
+
+.kv-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+}
+
+.kv-table th,
+.kv-table td {
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
+}
+
+.kv-table thead th {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.kv-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.kv-mono {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+}
+
+.kv-muted {
+  color: var(--muted);
+}
+
+.kv-right {
+  text-align: right;
+}
+
+/* ─────────────────────────────── state chips ─────────────────────────────── */
+
+.kv-chip {
+  display: inline-block;
+  padding: 1px 8px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--muted);
+  font: 600 10px var(--font-mono);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.kv-chip--ok {
+  border-color: var(--edge-ok);
+  color: var(--edge-ok);
+}
+
+.kv-chip--warn {
+  border-color: var(--edge-maybe);
+  color: var(--edge-maybe);
+}
+
+.kv-chip--bad {
+  border-color: var(--edge-no);
+  color: var(--edge-no);
+}
+
+.kv-chip--info {
+  border-color: var(--link);
+  color: var(--link);
+}
+
+.kv-chip--muted {
+  border-color: var(--edge-unknown);
+  color: var(--edge-unknown);
+}
+
+/* ──────────────────────────── empty / error states ───────────────────────── */
+
+.kv-note {
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--edge-unknown);
+  border-radius: 8px;
+  background: var(--code-bg);
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.kv-note--error {
+  border-left-color: var(--red);
+  background: var(--warn-bg);
+  color: var(--warn-ink);
+}
+
+.kv-note--ok {
+  border-left-color: var(--green);
+  background: var(--tint-green);
+}
+
+.kv-empty {
+  padding: 22px 16px;
+  border: 1px dashed var(--line);
+  border-radius: 12px;
+  color: var(--muted);
+  font-size: 12.5px;
+  text-align: center;
+}
