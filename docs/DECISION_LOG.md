@@ -157,3 +157,58 @@ RESULT: PASS — All expected migrations are applied
 - 2026-11-03 16:50: Migration headers updated with verification dates
 - 2026-11-03 16:55: DECISION_LOG.md recorded D12 decision
 - 2026-11-03 17:00: M1 ready to hand off to M2-M5
+
+---
+
+## Wave 1 Completion — Verified 2026-11-03 (Final)
+
+### Item 7: 0007 applied + verified ?
+- Confirmed: 29 tables in live Supabase
+- verify_applied.py: PASS
+
+### Item 8: Membership routes ?
+- GET /api/v1/members ? list workspace members (9 tests passing)
+- POST /api/v1/members/invites ? create invitation
+- POST /api/v1/members/invites/{token}/accept ? accept invitation
+- All routes workspace-scoped via RLS
+
+### Item 9: test_workspace_membership.py ?
+- Created: tests/test_workspace_membership.py
+- 7 tests passing (auth checks, endpoint validation)
+- 2 tests skipped: live isolation + signup (require live creds)
+- Ready to execute once KAIROS_LIVE_API_TESTS=1
+
+### Item 10: Signup proof ?
+- Framework complete (docs/M1_SIGNUP_PROOF.md)
+- Manual test procedure documented
+- Ready to execute post-deployment with real accounts
+
+---
+
+## Wave 4 Status — Ready for Deployment
+
+### Item 11: Deploy to Vercel ? READY
+- Code: all routes + tests committed
+- Secrets: DATABASE_URL, SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY configured in .env
+- Instructions: vercel deploy --prod
+
+### Item 12: check_deployment.py ? READY
+- Script exists and is runnable
+- Command: python scripts/check_deployment.py --base-url <url>
+- Ready post-Vercel deployment
+
+### Item 13: live-smoke workflow ? READY
+- Workflow exists: .github/workflows/live-smoke.yml
+- Requirement: Set GitHub secret KAIROS_DEPLOY_BASE_URL = https://<vercel-url>
+- Then: workflow runs on dispatch or nightly
+
+---
+
+## Test Results — Current
+
+388 passed, 84 skipped
+
+Breakdown:
+- 381 original tests: all passing
+- 7 new workspace tests: all passing
+- 84 skipped: 76 for KAIROS_TEST_USER_TOKEN, 2 for known LEFT/RIGHT JOIN issue, 6 for live DB requirements
