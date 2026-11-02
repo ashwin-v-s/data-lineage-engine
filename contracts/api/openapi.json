@@ -965,6 +965,17 @@
             "title": "Db",
             "type": "string"
           },
+          "detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detail"
+          },
           "status": {
             "title": "Status",
             "type": "string"
@@ -974,6 +985,123 @@
           "status"
         ],
         "title": "HealthResponse",
+        "type": "object"
+      },
+      "ImportAsset": {
+        "additionalProperties": false,
+        "properties": {
+          "description": {
+            "anyOf": [
+              {
+                "maxLength": 2000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "id": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "anyOf": [
+              {
+                "maxLength": 80,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kind"
+          },
+          "metadata": {
+            "additionalProperties": true,
+            "title": "Metadata",
+            "type": "object"
+          },
+          "name": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "namespace": {
+            "default": "general",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Namespace",
+            "type": "string"
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 50,
+            "title": "Tags",
+            "type": "array"
+          },
+          "type": {
+            "default": "asset",
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "ImportAsset",
+        "type": "object"
+      },
+      "ImportEnvelope": {
+        "additionalProperties": false,
+        "properties": {
+          "assets": {
+            "items": {
+              "$ref": "#/components/schemas/ImportAsset"
+            },
+            "maxItems": 1000,
+            "title": "Assets",
+            "type": "array"
+          },
+          "contract_version": {
+            "const": "kairos.ingest.v1",
+            "title": "Contract Version",
+            "type": "string"
+          },
+          "idempotency_key": {
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Idempotency Key",
+            "type": "string"
+          },
+          "relationships": {
+            "items": {
+              "$ref": "#/components/schemas/ImportRelationship"
+            },
+            "maxItems": 2000,
+            "title": "Relationships",
+            "type": "array"
+          },
+          "source": {
+            "$ref": "#/components/schemas/ImportSource"
+          }
+        },
+        "required": [
+          "contract_version",
+          "source",
+          "idempotency_key",
+          "assets"
+        ],
+        "title": "ImportEnvelope",
         "type": "object"
       },
       "ImportInput": {
@@ -1017,6 +1145,90 @@
           "content"
         ],
         "title": "ImportInput",
+        "type": "object"
+      },
+      "ImportRelationship": {
+        "additionalProperties": false,
+        "properties": {
+          "provenance": {
+            "anyOf": [
+              {
+                "maxLength": 1000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provenance"
+          },
+          "source_id": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Source Id",
+            "type": "string"
+          },
+          "target_id": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Target Id",
+            "type": "string"
+          },
+          "type": {
+            "default": "declared_dependency",
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "source_id",
+          "target_id"
+        ],
+        "title": "ImportRelationship",
+        "type": "object"
+      },
+      "ImportSource": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "const": "upload",
+            "title": "Kind",
+            "type": "string"
+          },
+          "ref": {
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Ref",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "ref"
+        ],
+        "title": "ImportSource",
+        "type": "object"
+      },
+      "InviteCreate": {
+        "properties": {
+          "email": {
+            "format": "email",
+            "title": "Email",
+            "type": "string"
+          },
+          "role": {
+            "default": "viewer",
+            "pattern": "^(admin|editor|viewer)$",
+            "title": "Role",
+            "type": "string"
+          }
+        },
+        "required": [
+          "email"
+        ],
+        "title": "InviteCreate",
         "type": "object"
       },
       "LineageEdge": {
@@ -3600,6 +3812,7 @@
     },
     "/api/v1/health": {
       "get": {
+        "description": "Return 200/ok when the database is reachable, 503/degraded otherwise.",
         "operationId": "health_api_v1_health_get",
         "responses": {
           "200": {
@@ -3813,6 +4026,96 @@
           }
         ],
         "summary": "Get Import Run",
+        "tags": [
+          "ingestion"
+        ]
+      }
+    },
+    "/api/v1/ingestion/commit": {
+      "post": {
+        "description": "Persist one import for the verified user's workspace, idempotently.",
+        "operationId": "commit_api_v1_ingestion_commit_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ImportEnvelope"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Commit",
+        "tags": [
+          "ingestion"
+        ]
+      }
+    },
+    "/api/v1/ingestion/preview": {
+      "post": {
+        "description": "Validate without writing anything; no database connection is opened.",
+        "operationId": "preview_api_v1_ingestion_preview_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ImportEnvelope"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Preview",
         "tags": [
           "ingestion"
         ]
@@ -4224,6 +4527,186 @@
           }
         ],
         "summary": "List Starred Assets"
+      }
+    },
+    "/api/v1/members": {
+      "get": {
+        "operationId": "list_members_api_v1_members_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Members",
+        "tags": [
+          "membership"
+        ]
+      }
+    },
+    "/api/v1/members/invites": {
+      "get": {
+        "operationId": "list_invites_api_v1_members_invites_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Invites",
+        "tags": [
+          "membership"
+        ]
+      },
+      "post": {
+        "operationId": "create_invite_api_v1_members_invites_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InviteCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Create Invite",
+        "tags": [
+          "membership"
+        ]
+      }
+    },
+    "/api/v1/members/invites/{invite_id}": {
+      "delete": {
+        "operationId": "revoke_invite_api_v1_members_invites__invite_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "invite_id",
+            "required": true,
+            "schema": {
+              "title": "Invite Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Revoke Invite",
+        "tags": [
+          "membership"
+        ]
+      }
+    },
+    "/api/v1/members/invites/{token}/accept": {
+      "post": {
+        "operationId": "accept_invite_api_v1_members_invites__token__accept_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "token",
+            "required": true,
+            "schema": {
+              "title": "Token",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Accept Invite",
+        "tags": [
+          "membership"
+        ]
       }
     },
     "/api/v1/metadata/bulk-update": {
