@@ -77,6 +77,14 @@ def _apply_workspace_scope(conn) -> None:
         # the database login used by the API.  RLS remains enabled even when
         # the connection string belongs to a privileged Supabase role.
         cur.execute("SET LOCAL ROLE kairos_app")
+        cur.execute("SELECT current_user")
+        row = cur.fetchone()
+        role = row[0] if row else None
+        if role != "kairos_app":
+            raise RuntimeError(
+                "Workspace scope refused: expected 'kairos_app' but the "
+                f"connection is still '{role}' — RLS isolation is not applied."
+            )
         cur.execute(
             "SELECT set_config('kairos.workspace_id', %s, true)",
             (workspace_id,),

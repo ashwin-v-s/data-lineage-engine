@@ -15,6 +15,7 @@ from backend.app.api.routes.dependency import router as dependency_router
 from backend.app.api.routes.governance import router as governance_router
 from backend.app.api.routes.health import router as health_router
 from backend.app.api.routes.ingest import router as ingest_router
+from backend.app.api.routes.ingestion import router as ingestion_router
 from backend.app.api.routes.integrations import router as integrations_router
 from backend.app.api.routes.lineage import router as lineage_router
 from backend.app.api.routes.metadata import router as metadata_router
@@ -120,6 +121,7 @@ app.include_router(metadata_router,   prefix="/api/v1")
 app.include_router(personalization_router, prefix="/api/v1")
 app.include_router(integrations_router, prefix="/api/v1")
 app.include_router(ingest_router, prefix="/api/v1")
+app.include_router(ingestion_router, prefix="/api/v1")
 app.include_router(sources_router, prefix="/api/v1")
 app.include_router(governance_router, prefix="/api/v1")
 app.include_router(capabilities_router, prefix="/api/v1")

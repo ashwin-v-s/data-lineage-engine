@@ -37,6 +37,23 @@ router = APIRouter(dependencies=[Depends(require_user)])
 # Columns we allow sort_by on (whitelist to prevent SQL injection)
 _SORTABLE = {"name", "schema_name", "asset_type", "source_system"}
 
+_PLACEHOLDER_DATABASE = "metadata"
+
+
+def _qualified_name(asset: dict) -> str:
+    """Canonical asset identity: drop the legacy ``metadata`` database placeholder
+    in favour of the namespace path when one exists; keep real
+    ``database.schema.name`` triples for legacy catalog rows."""
+    database_name = (asset.get("database_name") or "").strip()
+    schema_name = (asset.get("schema_name") or "").strip()
+    namespace = (asset.get("namespace") or "").strip()
+    name = (asset.get("name") or "").strip()
+    if database_name and database_name != _PLACEHOLDER_DATABASE:
+        return ".".join(part for part in (database_name, schema_name, name) if part)
+    if namespace:
+        return ".".join(part for part in (namespace, name) if part)
+    return ".".join(part for part in (database_name, schema_name, name) if part)
+
 
 @router.get("/search", response_model=SearchResponse)
 def search(
@@ -251,11 +268,7 @@ def catalog_snapshot(user: dict = Depends(require_user)):
         "assets": [
             {
                 **asset,
-                "qualified_name": ".".join(
-                    str(part) for part in (
-                        asset.get("database_name"), asset.get("schema_name"), asset.get("name")
-                    ) if part
-                ),
+                "qualified_name": _qualified_name(asset),
                 "owner_name": None,
                 "metadata": {"source_system": asset.get("source_system")},
             }
