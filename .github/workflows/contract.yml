@@ -1,4 +1,4 @@
-﻿name: contract
+name: contract
 on:
   pull_request:
   push:
