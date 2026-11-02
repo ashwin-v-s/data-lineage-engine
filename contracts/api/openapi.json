@@ -318,6 +318,56 @@
         "title": "BulkUpdateResponse",
         "type": "object"
       },
+      "CommitInput": {
+        "additionalProperties": false,
+        "properties": {
+          "content": {
+            "title": "Content"
+          },
+          "filename": {
+            "default": "upload",
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Filename",
+            "type": "string"
+          },
+          "idempotency_key": {
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Idempotency Key",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "metadata_graph",
+              "dbt_manifest",
+              "file_inventory",
+              "csv_headers"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "source_revision": {
+            "anyOf": [
+              {
+                "maxLength": 512,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Revision"
+          }
+        },
+        "required": [
+          "kind",
+          "content",
+          "idempotency_key"
+        ],
+        "title": "CommitInput",
+        "type": "object"
+      },
       "CoverageOut": {
         "properties": {
           "branches_covered": {
@@ -924,6 +974,49 @@
           "status"
         ],
         "title": "HealthResponse",
+        "type": "object"
+      },
+      "ImportInput": {
+        "additionalProperties": false,
+        "properties": {
+          "content": {
+            "title": "Content"
+          },
+          "filename": {
+            "default": "upload",
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Filename",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "metadata_graph",
+              "dbt_manifest",
+              "file_inventory",
+              "csv_headers"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "source_revision": {
+            "anyOf": [
+              {
+                "maxLength": 512,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Revision"
+          }
+        },
+        "required": [
+          "kind",
+          "content"
+        ],
+        "title": "ImportInput",
         "type": "object"
       },
       "LineageEdge": {
@@ -1550,6 +1643,41 @@
         "title": "PersonalizedAssetList",
         "type": "object"
       },
+      "PreviewResult": {
+        "properties": {
+          "commit_blocker": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Commit Blocker"
+          },
+          "commit_ready": {
+            "title": "Commit Ready",
+            "type": "boolean"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "preview": {
+            "additionalProperties": true,
+            "title": "Preview",
+            "type": "object"
+          }
+        },
+        "required": [
+          "ok",
+          "preview",
+          "commit_ready"
+        ],
+        "title": "PreviewResult",
+        "type": "object"
+      },
       "RollbackRequest": {
         "description": "Request to rollback to previous version",
         "properties": {
@@ -1739,6 +1867,182 @@
         "title": "SearchResult",
         "type": "object"
       },
+      "SlaInput": {
+        "additionalProperties": false,
+        "properties": {
+          "asset_id": {
+            "maxLength": 512,
+            "minLength": 1,
+            "title": "Asset Id",
+            "type": "string"
+          },
+          "error_after_minutes": {
+            "minimum": 1.0,
+            "title": "Error After Minutes",
+            "type": "integer"
+          },
+          "signal": {
+            "enum": [
+              "openlineage_run",
+              "dbt_run_results",
+              "updated_at",
+              "manual"
+            ],
+            "title": "Signal",
+            "type": "string"
+          },
+          "stale_after_minutes": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stale After Minutes"
+          },
+          "warn_after_minutes": {
+            "minimum": 1.0,
+            "title": "Warn After Minutes",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "asset_id",
+          "warn_after_minutes",
+          "error_after_minutes",
+          "signal"
+        ],
+        "title": "SlaInput",
+        "type": "object"
+      },
+      "SourceCreate": {
+        "additionalProperties": false,
+        "properties": {
+          "dbname": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Dbname",
+            "type": "string"
+          },
+          "host": {
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Host",
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "password": {
+            "maxLength": 512,
+            "minLength": 1,
+            "title": "Password",
+            "type": "string"
+          },
+          "port": {
+            "default": 5432,
+            "maximum": 65535.0,
+            "minimum": 1.0,
+            "title": "Port",
+            "type": "integer"
+          },
+          "schema_name": {
+            "default": "public",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Schema Name",
+            "type": "string"
+          },
+          "source_kind": {
+            "const": "postgresql",
+            "default": "postgresql",
+            "title": "Source Kind",
+            "type": "string"
+          },
+          "user": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "User",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "host",
+          "dbname",
+          "user",
+          "password"
+        ],
+        "title": "SourceCreate",
+        "type": "object"
+      },
+      "SourceSummary": {
+        "properties": {
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "last_checked_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Checked At"
+          },
+          "last_error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Error"
+          },
+          "lifecycle_state": {
+            "title": "Lifecycle State",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "source_kind": {
+            "title": "Source Kind",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "source_kind",
+          "lifecycle_state"
+        ],
+        "title": "SourceSummary",
+        "type": "object"
+      },
       "TeamMember": {
         "description": "Team member who can be assigned as owner/steward",
         "properties": {
@@ -1801,6 +2105,40 @@
           "name"
         ],
         "title": "TeamMember",
+        "type": "object"
+      },
+      "TestResult": {
+        "properties": {
+          "lifecycle_state": {
+            "title": "Lifecycle State",
+            "type": "string"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "table_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Table Count"
+          }
+        },
+        "required": [
+          "ok",
+          "lifecycle_state",
+          "message"
+        ],
+        "title": "TestResult",
         "type": "object"
       },
       "ValidationError": {
@@ -1892,6 +2230,52 @@
           }
         ],
         "summary": "Get Asset"
+      }
+    },
+    "/api/v1/assets/{asset_id}/capabilities": {
+      "get": {
+        "description": "Publish the capability registry for one asset (UUID or dataset name).",
+        "operationId": "get_asset_capabilities_api_v1_assets__asset_id__capabilities_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "asset_id",
+            "required": true,
+            "schema": {
+              "title": "Asset Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Asset Capabilities",
+        "tags": [
+          "capabilities"
+        ]
       }
     },
     "/api/v1/assets/{asset_id}/downstream-impact": {
@@ -2833,6 +3217,387 @@
         "summary": "Evidence At Time"
       }
     },
+    "/api/v1/governance/datasets/{asset_id}/evaluate": {
+      "post": {
+        "description": "Run the freshness engine for one dataset and reconcile its incident.",
+        "operationId": "evaluate_dataset_api_v1_governance_datasets__asset_id__evaluate_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "asset_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Asset Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Evaluate Dataset",
+        "tags": [
+          "governance"
+        ]
+      }
+    },
+    "/api/v1/governance/freshness": {
+      "get": {
+        "description": "Return the latest freshness verdict per dataset plus counts by state.",
+        "operationId": "list_freshness_api_v1_governance_freshness_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Freshness",
+        "tags": [
+          "governance"
+        ]
+      }
+    },
+    "/api/v1/governance/incidents": {
+      "get": {
+        "description": "List the workspace's incidents, newest first, optionally filtered by status.",
+        "operationId": "list_incidents_api_v1_governance_incidents_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Incidents",
+        "tags": [
+          "governance"
+        ]
+      }
+    },
+    "/api/v1/governance/incidents/{incident_id}": {
+      "get": {
+        "description": "Return one incident plus its event timeline, or 404.",
+        "operationId": "get_incident_api_v1_governance_incidents__incident_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "incident_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Incident Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Incident",
+        "tags": [
+          "governance"
+        ]
+      }
+    },
+    "/api/v1/governance/incidents/{incident_id}/acknowledge": {
+      "post": {
+        "description": "Transition an incident to ACKNOWLEDGED (409 on an illegal transition).",
+        "operationId": "acknowledge_incident_api_v1_governance_incidents__incident_id__acknowledge_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "incident_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Incident Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Acknowledge Incident",
+        "tags": [
+          "governance"
+        ]
+      }
+    },
+    "/api/v1/governance/incidents/{incident_id}/investigate": {
+      "post": {
+        "description": "Transition an incident to INVESTIGATING (409 on an illegal transition).",
+        "operationId": "investigate_incident_api_v1_governance_incidents__incident_id__investigate_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "incident_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Incident Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Investigate Incident",
+        "tags": [
+          "governance"
+        ]
+      }
+    },
+    "/api/v1/governance/incidents/{incident_id}/resolve": {
+      "post": {
+        "description": "Transition an incident to RESOLVED (409 on an illegal transition).",
+        "operationId": "resolve_incident_api_v1_governance_incidents__incident_id__resolve_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "incident_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Incident Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Resolve Incident",
+        "tags": [
+          "governance"
+        ]
+      }
+    },
+    "/api/v1/governance/slas": {
+      "get": {
+        "description": "List the workspace's freshness SLAs with a human-readable dataset name.",
+        "operationId": "list_slas_api_v1_governance_slas_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Slas",
+        "tags": [
+          "governance"
+        ]
+      },
+      "post": {
+        "description": "Create or replace the freshness SLA for one dataset.",
+        "operationId": "upsert_sla_api_v1_governance_slas_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SlaInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Upsert Sla",
+        "tags": [
+          "governance"
+        ]
+      }
+    },
     "/api/v1/health": {
       "get": {
         "operationId": "health_api_v1_health_get",
@@ -2854,6 +3619,203 @@
           }
         ],
         "summary": "Health"
+      }
+    },
+    "/api/v1/ingest/commit": {
+      "post": {
+        "description": "Revalidate then atomically persist assets, declared edges, and provenance.",
+        "operationId": "commit_import_api_v1_ingest_commit_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CommitInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Commit Import",
+        "tags": [
+          "ingestion"
+        ]
+      }
+    },
+    "/api/v1/ingest/preview": {
+      "post": {
+        "description": "Validate and normalize an import without performing database writes.",
+        "operationId": "preview_import_api_v1_ingest_preview_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ImportInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Preview Import",
+        "tags": [
+          "ingestion"
+        ]
+      }
+    },
+    "/api/v1/ingest/runs": {
+      "get": {
+        "description": "List the import runs visible to the caller's workspace, newest first.",
+        "operationId": "list_import_runs_api_v1_ingest_runs_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "minimum": 0,
+              "title": "Offset",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Import Runs",
+        "tags": [
+          "ingestion"
+        ]
+      }
+    },
+    "/api/v1/ingest/runs/{import_id}": {
+      "get": {
+        "description": "Return a single import run from the caller's workspace, or 404.",
+        "operationId": "get_import_run_api_v1_ingest_runs__import_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "import_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Import Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Import Run",
+        "tags": [
+          "ingestion"
+        ]
       }
     },
     "/api/v1/integrations/github/callback": {
@@ -4410,6 +5372,321 @@
           }
         ],
         "summary": "Search"
+      }
+    },
+    "/api/v1/sources": {
+      "get": {
+        "description": "List the caller's workspace sources, newest first (never ciphertext).",
+        "operationId": "list_sources_api_v1_sources_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SourceSummary"
+                  },
+                  "title": "Response List Sources Api V1 Sources Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Sources",
+        "tags": [
+          "sources"
+        ]
+      },
+      "post": {
+        "description": "Register an encrypted, workspace-scoped PostgreSQL connection.",
+        "operationId": "create_source_api_v1_sources_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SourceCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourceSummary"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Create Source",
+        "tags": [
+          "sources"
+        ]
+      }
+    },
+    "/api/v1/sources/{source_id}": {
+      "delete": {
+        "description": "Soft-revoke a source (lifecycle_state -> REVOKED); 404 when unknown.",
+        "operationId": "delete_source_api_v1_sources__source_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "source_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Source Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Delete Source",
+        "tags": [
+          "sources"
+        ]
+      },
+      "get": {
+        "description": "Return one source in the caller's workspace, or 404.",
+        "operationId": "get_source_api_v1_sources__source_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "source_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Source Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourceSummary"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Source",
+        "tags": [
+          "sources"
+        ]
+      }
+    },
+    "/api/v1/sources/{source_id}/preview": {
+      "post": {
+        "description": "Read the source and summarise what a sync would persist, without writing.",
+        "operationId": "preview_source_api_v1_sources__source_id__preview_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "source_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Source Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PreviewResult"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Preview Source",
+        "tags": [
+          "sources"
+        ]
+      }
+    },
+    "/api/v1/sources/{source_id}/sync": {
+      "post": {
+        "description": "Read the source and atomically persist its assets and provenance.",
+        "operationId": "sync_source_api_v1_sources__source_id__sync_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "source_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Source Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Sync Source",
+        "tags": [
+          "sources"
+        ]
+      }
+    },
+    "/api/v1/sources/{source_id}/test": {
+      "post": {
+        "description": "Read the source schema and record the connector lifecycle state.",
+        "operationId": "test_source_api_v1_sources__source_id__test_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "source_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Source Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TestResult"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Test Source",
+        "tags": [
+          "sources"
+        ]
       }
     },
     "/healthz": {
