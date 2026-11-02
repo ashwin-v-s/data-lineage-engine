@@ -41,5 +41,9 @@ jobs:
           cache-dependency-path: pyproject.toml
       - name: Install Python project and test dependencies
         run: python -m pip install -e ".[dev]"
+      # Skipped, not failed, while the deployment secrets are unconfigured, so
+      # the nightly schedule cannot produce a permanent red run.  Remove this
+      # guard to restore a hard failure when --base-url is missing.
       - name: Live deployment smoke test
+        if: env.KAIROS_DEPLOY_BASE_URL != ''
         run: python scripts/check_deployment.py --base-url "$KAIROS_DEPLOY_BASE_URL"
