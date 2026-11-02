@@ -1,11 +1,11 @@
-(() => {
+﻿(() => {
   const authScreen = document.getElementById('authScreen');
   const appShell = document.querySelector('.app-shell');
   const frame = document.getElementById('authFrame');
   const sessionKey = 'kairos_supabase_session';
   const appScripts = [
-    'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js',
-    'https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js',
+    '/vendors/three.min.js',
+    '/vendors/chart.umd.min.js',
     '/observatory.js?v=304',
     '/stewardship.js?v=304',
     '/app.js?v=305',
@@ -312,7 +312,7 @@
         });
         const result = await response.json().catch(() => ({}));
         if (!response.ok) throw new Error(result.msg || result.message || `Password update failed (${response.status}).`);
-        message.textContent = 'Password updated. Opening your Kairos workspace…';
+        message.textContent = 'Password updated. Opening your Kairos workspaceâ€¦';
         message.classList.add('success');
         await startApp(session);
       } catch (error) {
@@ -373,3 +373,4 @@
   }
   boot();
 })();
+
