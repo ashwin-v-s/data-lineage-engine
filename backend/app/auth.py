@@ -24,11 +24,13 @@ async def require_user(
     credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
 ) -> AsyncGenerator[dict[str, Any], None]:
     """Validate a Supabase token with Auth, including legacy HS256 projects."""
+    # FAIL FAST ON MISSING CREDENTIALS before checking infrastructure
+    if credentials is None or credentials.scheme.lower() != "bearer":
+        raise HTTPException(status_code=401, detail="Sign in is required")
+    
     url = supabase_auth_url()
     if not url:
         raise HTTPException(status_code=503, detail="Authentication is not configured")
-    if credentials is None or credentials.scheme.lower() != "bearer":
-        raise HTTPException(status_code=401, detail="Sign in is required")
     headers = {"Authorization": f"Bearer {credentials.credentials}"}
     key = os.getenv("SUPABASE_PUBLISHABLE_KEY") or os.getenv("VITE_SUPABASE_PUBLISHABLE_KEY")
     if key:
