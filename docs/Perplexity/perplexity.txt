@@ -1,0 +1,2950 @@
+Yes. Based on everything we discussed—source connections, metadata sync, change detection, freshness, lineage evidence, incidents, and Realtime updates—Kairos needs these UI screens and components.
+
+## 1. Global layout
+
+Every page should share the same shell.
+
+| UI area | What it contains |
+| --- | --- |
+| Left sidebar | Home, Catalog, Lineage, Sources, Quality, Incidents, Glossary, Domains, Data Products, Settings |
+| Top bar | Global search, workspace selector, notifications bell, user avatar, help |
+| Main content | Page-specific dashboard/table/graph/detail area |
+| Right inspector | Contextual details: selected asset, node, incident, evidence, or run |
+| Bottom/status bar | Sync status, connection health, last refreshed time, environment label |
+
+The sidebar should keep the core navigation simple:
+
+```text
+Home
+Catalog
+Lineage
+Sources
+Quality
+Incidents
+Glossary
+Domains
+Data Products
+Settings
+```
+
+## 2. Home / main dashboard
+
+This is the first screen after login. It should answer: “What needs my attention?”
+
+| Section | UI components |
+| --- | --- |
+| Hero header | “Kairos Data Intelligence,” workspace name, date, quick actions |
+| Health summary cards | Total assets, healthy assets, at-risk assets, late assets, unknown freshness |
+| Incident summary | Open incidents, critical incidents, incidents assigned to me, incidents resolved today |
+| Source health | Connected sources, failed connections, credentials expiring, last sync time |
+| Freshness overview | Fresh, at risk, late, stale, unknown counts |
+| Lineage overview | Total assets, lineage edges, observed edges, possible edges, unknown edges |
+| Recent activity feed | New assets, metadata changes, PII changes, lineage updates, quality failures |
+| Recent runs | OpenLineage runs, dbt runs, PostgreSQL syncs, GitHub syncs |
+| My ownership | Assets I own, incidents assigned to me, assets awaiting review |
+| Quick actions | Add source, import artifact, search catalog, create glossary term, view incidents |
+
+Do not make the dashboard number-heavy. Each metric should be clickable and lead to a filtered list.
+
+## 3. Catalog page
+
+Catalog is the discovery entry point.
+
+| UI component | Purpose |
+| --- | --- |
+| Search bar | Search assets by name, description, schema, table, column, owner, domain, tag |
+| Filter sidebar | Asset type, source, database, schema, domain, owner, tags, PII, freshness, quality, certification |
+| Sort control | Name, updated time, freshness, incident count, popularity |
+| Asset result cards/table | Asset name, type icon, source, database/schema, owner, tags, freshness badge, quality badge |
+| Asset preview drawer | Quick details without leaving the catalog |
+| Bulk filters | Show only PII assets, stale assets, assets with incidents, uncertified assets |
+| Empty states | “No assets found,” “Connect a source to discover assets,” “No results match filters” |
+| Pagination / infinite scroll | Handle large catalogs |
+| Saved views | “My assets,” “Critical assets,” “Stale assets,” “PII assets” |
+
+Each asset row should show:
+
+```text
+Asset name
+Asset type: table / view / file / model / dashboard / ML model
+Source: PostgreSQL / GitHub / dbt / OpenLineage
+Database.schema.table
+Owner
+Domain
+Freshness state
+Quality state
+PII badge
+Last updated
+Incident count
+```
+
+## 4. Asset detail page
+
+This is the most important page after Catalog.
+
+| Tab / section | What it shows |
+| --- | --- |
+| Overview | Asset name, URN, description, type, source, owner, domain, tags, certification, created/updated time |
+| Schema / structure | Columns, data types, nullability, primary keys, constraints, descriptions, PII tags |
+| Freshness | Freshness SLA, last successful update, next expected update, freshness trend chart, freshness evidence |
+| Quality | Test results, pass/fail trend, failed tests, quality score, latest run |
+| Lineage | Upstream/downstream graph, column-level lineage, evidence state, impact analysis |
+| Evidence | Raw evidence records, source event, parser output, confidence, valid time, transaction time |
+| Incidents | Open/closed incidents affecting this asset |
+| Activity | Metadata edits, ownership changes, tag changes, lineage changes, comments |
+| Runs | OpenLineage runs, dbt runs, ingestion runs, source sync runs |
+| Relationships | Related glossary terms, data products, dashboards, ML models, contracts |
+| Actions | Edit description, assign owner, add tag, mark PII, create incident, refresh metadata, view lineage |
+
+### Freshness panel
+
+```text
+Freshness status: HEALTHY / AT_RISK / LATE / STALE / UNKNOWN
+Freshness SLA: 24 hours
+Last successful update: 2 hours ago
+Next expected update: in 22 hours
+Freshness signal: OpenLineage run / updated_at / dbt run
+Last checked: 5 minutes ago
+Freshness trend: last 7 days
+Evidence: run_882, source: OpenLineage
+```
+
+## 5. Lineage page
+
+The lineage page should support both 2D and 3D views.
+
+| UI component | Purpose |
+| --- | --- |
+| Lineage graph | Asset nodes and lineage edges |
+| Direction toggle | Upstream, downstream, both |
+| Depth control | 1, 2, 3, 5, or custom hops |
+| Column-level toggle | Switch from table lineage to column lineage |
+| Evidence-state legend | OBSERVED, POSSIBLE, REFUTED_FOR_RUN, UNKNOWN |
+| Edge inspector | Why this edge exists, evidence IDs, parser, confidence, valid time |
+| Node inspector | Asset summary, schema, owner, freshness, incidents |
+| Impact analysis | Downstream assets affected by a change or failure |
+| Root-cause view | Trace a failure backward to likely source |
+| Time-travel control | View lineage as known at a selected date/time |
+| Filters | Asset type, source, domain, PII, quality, freshness |
+| Search within graph | Find a node quickly |
+| Mini-map | Navigate large graphs |
+| Export | PNG/SVG/JSON export |
+| 2D/3D toggle | 2D for precision, 3D for spatial exploration |
+
+Every edge must be clickable and show:
+
+```text
+Relationship type: table-to-table / column-to-column
+State: OBSERVED / POSSIBLE / REFUTED_FOR_RUN / UNKNOWN
+Evidence source: OpenLineage / dbt manifest / SQL parser / user declaration
+Evidence ID
+Confidence
+Valid time
+Transaction time
+Coverage
+Explanation
+```
+
+## 6. Sources page
+
+This is where users connect PostgreSQL, GitHub, dbt, and OpenLineage.
+
+| UI component | Purpose |
+| --- | --- |
+| Source cards | Source name, type, status, last sync, asset count |
+| Add source button | Start connection wizard |
+| Connection wizard | Choose source type, enter credentials, test connection, select scope, save |
+| Connection status | Connected, syncing, failed, credentials expired, paused |
+| Sync history | Each sync run: started, finished, status, assets discovered, updated, deleted, errors |
+| Sync schedule | Manual, hourly, every 6 hours, daily, custom |
+| Sync now button | Trigger immediate metadata refresh |
+| Credential health | Masked credential, expiry warning, rotate credential |
+| Scope selector | Select databases, schemas, repositories, folders, branches |
+| Error panel | Authentication failure, permission failure, timeout, parser error |
+| Delete/disable source | Remove or pause ingestion |
+
+Never display raw passwords or full connection strings. Show masked values:
+
+```text
+postgres://demo_user:••••••@host:5432/sales
+```
+
+## 7. Freshness monitoring UI
+
+Freshness needs both a global view and per-asset view.
+
+| UI component | Purpose |
+| --- | --- |
+| Freshness dashboard | Overall fresh/at-risk/late/stale/unknown counts |
+| Freshness table | Asset, SLA, last update, age, status, owner, source |
+| Freshness filters | Status, domain, owner, source, SLA, asset type |
+| Freshness trend chart | Update history over time |
+| SLA configuration | Set expected update frequency and maximum allowed age |
+| Evaluation schedule | Every 15 minutes, hourly, daily, CRON |
+| Freshness evidence | OpenLineage run, dbt result, `updated_at`, manual refresh |
+| Incident trigger | Create incident when asset becomes late |
+| Notification settings | Notify owner, steward, Slack/email/webhook |
+| Manual refresh | User confirms an asset was refreshed |
+| Unknown-state explanation | Why Kairos cannot determine freshness |
+
+## 8. Quality page
+
+| UI component | Purpose |
+| --- | --- |
+| Quality dashboard | Pass rate, failing tests, critical failures, trend |
+| Quality test list | Test name, asset, type, status, last run, owner |
+| Test detail | Definition, threshold, latest result, history, evidence |
+| Test creation form | Choose asset, test type, threshold, schedule, severity |
+| Test types | Freshness, completeness, uniqueness, validity, schema, custom SQL |
+| Failure investigation | Failed rows, sample values, affected downstream assets |
+| Quality trend chart | Pass/fail history |
+| Test schedule | Hourly, daily, weekly, custom |
+| Test-to-contract link | Connect test to a data contract |
+
+## 9. Incidents page
+
+| UI component | Purpose |
+| --- | --- |
+| Incident list | ID, title, severity, status, asset, owner, opened time, age |
+| Incident filters | Open, acknowledged, investigating, resolved, assigned to me, severity |
+| Incident detail | Description, affected assets, root cause, evidence, timeline, comments |
+| Incident timeline | Detected → acknowledged → investigating → resolved |
+| Impact panel | Downstream assets affected |
+| Evidence panel | OpenLineage event, failed test, freshness breach, source sync error |
+| Assignment | Assign owner/steward |
+| Resolution form | Resolution reason, action taken, resolved by, resolved time |
+| Notifications | Owner, domain steward, Slack/email |
+| Related incidents | Similar historical incidents |
+
+## 10. Evidence explorer
+
+This is Kairos’s differentiator. It should make provenance visible.
+
+| UI component | Purpose |
+| --- | --- |
+| Evidence list | Evidence ID, source, type, ingested time, valid time, confidence |
+| Evidence filters | Source, type, asset, run, confidence, time range |
+| Raw evidence viewer | Original JSON/event/artifact in read-only form |
+| Normalized evidence viewer | Parsed entities, relationships, columns, runs, facets |
+| Evidence-to-asset link | Which canonical asset this evidence supports |
+| Evidence-to-lineage link | Which lineage edge this evidence supports |
+| Confidence indicator | High / medium / low |
+| Coverage indicator | Complete / partial / unknown |
+| Conflict view | When two evidence records disagree |
+| Temporal view | What was known at a given time |
+| Provenance chain | Raw event → parser → normalized entity → canonical asset |
+
+## 11. Glossary page
+
+| UI component | Purpose |
+| --- | --- |
+| Glossary term list | Term, definition, owner, domain, related assets |
+| Term detail | Definition, synonyms, owner, steward, status, related assets |
+| Term-to-asset linking | Attach business terms to tables/columns |
+| PII classification | Tag columns as PII/sensitive |
+| Governance status | Draft, approved, deprecated |
+| Search | Find terms quickly |
+| Related lineage | Show assets connected to a business term |
+
+## 12. Domains page
+
+| UI component | Purpose |
+| --- | --- |
+| Domain cards | Finance, Sales, Marketing, Operations, etc. |
+| Domain detail | Assets, owners, stewards, data products, incidents, freshness |
+| Domain health | Critical incidents, stale assets, failing tests |
+| Ownership panel | Domain owner, stewards, contributors |
+| Asset list | Assets belonging to the domain |
+
+## 13. Data products page
+
+| UI component | Purpose |
+| --- | --- |
+| Product cards | Product name, owner, domain, health, assets, consumers |
+| Product detail | Description, purpose, owner, SLA, included assets, contracts, quality |
+| Product health | Freshness, quality, incident, lineage coverage |
+| Contract panel | Contract terms, freshness SLA, quality expectations, schema expectations |
+| Consumer panel | Dashboards, ML models, teams consuming the product |
+| Lineage view | Product-level lineage |
+
+## 14. Settings page
+
+| UI section | What it controls |
+| --- | --- |
+| Profile | Name, avatar, email, role |
+| Workspace | Workspace name, members, roles |
+| Notifications | Email, in-app, Slack, webhook preferences |
+| Freshness defaults | Default evaluation schedule, default SLA |
+| Sync defaults | Default sync frequency, retry policy |
+| API keys | Create/revoke API tokens |
+| Webhooks | OpenLineage endpoint, GitHub webhook, dbt artifact endpoint |
+| Security | Role-based access, audit log, credential policy |
+| Integrations | Slack, email, GitHub, PostgreSQL, dbt, OpenLineage |
+| Audit log | Who changed what, when, and from where |
+
+## 15. Notifications UI
+
+| UI component | Purpose |
+| --- | --- |
+| Notification bell | Unread count |
+| Notification dropdown | Recent alerts |
+| Notification center | Full notification history |
+| Notification types | Freshness breach, quality failure, new incident, sync failure, credential expiry, lineage change, PII change |
+| Mark as read | Individual and bulk |
+| Filter | Type, severity, asset, date |
+| Action link | Open affected asset/incident/source |
+
+## 16. Realtime UI behavior
+
+When Supabase Realtime sends an internal change event:
+
+| Event | UI reaction |
+| --- | --- |
+| New asset imported | Catalog count updates; asset appears after authorized refetch |
+| Freshness changes | Freshness badge updates |
+| Incident created | Incident count and notification update |
+| Lineage edge changes | Lineage graph refetches affected portion |
+| Quality test fails | Quality badge and incident update |
+| PII tag changes | Asset badge and governance panel update |
+| Source sync completes | Source status and asset count update |
+| Another user edits description | Asset detail refetches updated metadata |
+
+Important: Realtime should trigger a **refetch**, not carry the full authorized dataset in the event payload.
+
+## 17. MVP page priority
+
+Build these in this order:
+
+| Priority | Page / feature |
+| --- | --- |
+| P0 | Global layout, sidebar, top bar, global search |
+| P0 | Home dashboard |
+| P0 | Catalog page with search, filters, asset cards |
+| P0 | Asset detail page with overview, schema, lineage link, freshness, quality |
+| P0 | Lineage graph with node/edge inspector and evidence states |
+| P0 | Sources page with connection status and sync history |
+| P0 | Freshness dashboard and per-asset freshness panel |
+| P0 | Incidents list and incident detail |
+| P1 | Quality page and test detail |
+| P1 | Evidence explorer |
+| P1 | Glossary and PII tagging |
+| P1 | Domains |
+| P1 | Data products and contracts |
+| P2 | 3D lineage studio modes |
+| P2 | Advanced impact/root-cause views |
+| P2 | Time travel |
+| P2 | Audit log and admin settings |
+
+## 18. Minimum demo screens
+
+For a strong university demo, you need at least these seven screens:
+
+```text
+1. Home dashboard
+2. Catalog
+3. Asset detail
+4. Lineage graph
+5. Sources
+6. Freshness monitoring
+7. Incidents
+```
+
+Then add these if time permits:
+
+```text
+8. Quality
+9. Evidence explorer
+10. Glossary
+11. Settings
+```
+
+## 19. One-line UI positioning
+
+> **Kairos UI should let a user discover assets, inspect their schema and ownership, trace lineage with evidence, monitor freshness and quality, investigate incidents, and understand exactly why the platform reached each conclusion.**
+
+The key UI difference from DataHub, OpenMetadata, and Atlan is that Kairos should not only show lineage—it should show **why each lineage relationship is trusted, uncertain, refuted, or unknown**, using visible evidence, coverage, confidence, and time context.
+
+
+
+
+
+
+
+
+
+# Competitor analysis: how freshness monitoring actually works
+
+Yes—competitors run freshness checks **on a schedule**, but they do not necessarily scan the entire source constantly. They define three things:
+
+```text
+1. What signal proves the data changed
+2. How often to check that signal
+3. How long is too long since the last update
+```
+
+That is the exact model Kairos should use.
+
+## 1. The universal freshness model
+
+```text
+Asset has an expected update pattern
+  → Platform checks a freshness signal on a schedule
+  → Platform compares last observed change with the allowed window
+  → If too old: mark late/stale, raise incident, notify owner
+  → If updated: mark healthy and record evidence
+```
+
+| Component | Meaning | Example |
+| --- | --- | --- |
+| Freshness signal | Proof that data changed | `updated_at`, OpenLineage run, audit log, row-count change |
+| Evaluation schedule | How often Kairos checks | Every 15 minutes, hourly, daily, CRON |
+| Lookback / change window | How far back to look for a change | Last 6 hours, since previous check |
+| Freshness SLA | Maximum acceptable age | Data must be no older than 24 hours |
+| Freshness result | Current state | Healthy, at risk, late, stale, unknown |
+
+## 2. DataHub
+
+DataHub calls this a **Freshness Assertion**: a configurable data-quality rule that determines whether a warehouse table has been updated within a given period. [docs.datahub](https://docs.datahub.com/docs/managed-datahub/observe/freshness-assertions)
+
+It has two key settings:
+
+| Setting | Meaning |
+| --- | --- |
+| Evaluation schedule | How often DataHub checks the table |
+| Change window / lookback | How far back it looks for evidence of change |
+
+DataHub says the evaluation schedule should normally match the table’s expected change frequency: hourly tables are checked hourly; daily tables are checked daily. It also supports more frequent checks to detect staleness sooner. [docs.datahub](https://docs.datahub.com/docs/managed-datahub/observe/freshness-assertions)
+
+### DataHub freshness signals
+
+DataHub supports multiple evidence sources, depending on the data platform:
+
+| Signal | How it detects freshness |
+| --- | --- |
+| Audit log | Reads platform operational/audit logs for table changes |
+| Information schema | Reads system metadata tables |
+| Last-modified column | Queries a column such as `updated_at` |
+| High-watermark column | Checks for a new maximum value in an increasing column |
+| DataHub operation | Uses an operation event reported to DataHub |
+
+DataHub can issue a query against the table to look for rows modified within the configured window, or use a high-watermark column to detect a new maximum value. [docs.datahub](https://docs.datahub.com/docs/managed-datahub/observe/freshness-assertions)
+
+### Example
+
+```yaml
+lookback_interval: "6 hours"
+last_modified_field: updated_at
+schedule:
+  type: interval
+  interval: "6 hours"
+```
+
+This checks every 6 hours whether `purchase_events` has rows with `updated_at` within the last 6 hours. [docs.datahub](https://docs.datahub.com/docs/assertions/open-assertions-spec/)
+
+### Kairos lesson
+
+Kairos should support:
+
+- `updated_at` / last-modified column.
+- High-watermark column.
+- OpenLineage operation event.
+- Information-schema/catalog metadata.
+- Configurable evaluation schedule.
+- Configurable lookback window.
+
+## 3. Monte Carlo
+
+Monte Carlo offers two freshness monitor types:
+
+1. **Time since last update**
+2. **Time since last row-count change** [docs.getmontecarlo](https://docs.getmontecarlo.com/docs/freshness)
+
+It supports:
+
+| Configuration | Behavior |
+| --- | --- |
+| Automatic thresholds | Learns normal update patterns and alerts on unusual delay |
+| Explicit threshold | User defines how often data should update |
+| Periodic check | Runs at a fixed interval |
+| Scheduled check | Runs at specific times |
+| CRON check | Runs using a custom CRON expression |
+
+Monte Carlo automatically chooses a check frequency that ensures it can detect a breach; for example, if data must update at least every 6 hours, it checks often enough not to miss a violation. [docs.getmontecarlo](https://docs.getmontecarlo.com/docs/freshness)
+
+### Example
+
+A table is expected to update daily at 7:40 AM, with an internal deadline of 8:00 AM. Monte Carlo can run at 7:55 AM and create an incident/notification if the expected job has not completed. [docs.getmontecarlo](https://docs.getmontecarlo.com/docs/freshness)
+
+### Freshness rules
+
+Monte Carlo’s Freshness Rules periodically collect target-table metadata to determine whether the table has received an expected update. It recommends matching the check schedule and lookback range to the actual run schedule—for example, run every 6 hours with a 6-hour lookback, or run daily at 9 AM with a 2-hour lookback for a scheduled morning job. [docs.getmontecarlo](https://docs.getmontecarlo.com/docs/freshness-rules)
+
+### Kairos lesson
+
+Kairos should support:
+
+- Time since last update.
+- Time since last row-count change.
+- Automatic/learned thresholds later.
+- Explicit SLA threshold now.
+- Fixed interval, daily-time, and CRON schedules.
+- Incident creation and owner notification on breach.
+
+## 4. OpenMetadata
+
+OpenMetadata has a built-in test called **“Table Data to Be Fresh.”** It validates whether a table’s data is fresh using a freshness column and a maximum allowed time since update. [docs.open-metadata](https://docs.open-metadata.org/v1.11.x/how-to-guides/data-quality-observability/quality/test)
+
+Its rule is simple:
+
+```text
+If time_since_update > timeSinceUpdate → FAIL
+If time_since_update <= timeSinceUpdate → SUCCESS
+```
+
+For example, if `timeSinceUpdate` is 86,400 seconds, the table must have been updated within the last 24 hours. [docs.open-metadata](https://docs.open-metadata.org/v1.13.x/how-to-guides/data-quality-observability/quality/tests-yaml)
+
+### Scheduling
+
+OpenMetadata runs tests through a pipeline. The user adds a pipeline, sets the desired frequency/time zone, submits it, and the tests run on that schedule. Results then appear in the Data Quality tab. [docs.open-metadata](https://docs.open-metadata.org/v1.11.x/how-to-guides/data-quality-observability/quality/test)
+
+OpenMetadata data contracts can also link quality test cases to a contract; saving a contract creates a test suite and pipeline that runs it. Contract validation runs daily at midnight by default, though the schedule can be changed. [docs.open-metadata](https://docs.open-metadata.org/v2.0.x/how-to-guides/data-contracts/spec)
+
+### Kairos lesson
+
+Kairos should treat freshness as a **quality assertion**:
+
+```text
+Assertion: revenue_daily must be fresh within 24 hours
+Freshness column: updated_at
+Evaluation schedule: hourly
+Failure action: create/update incident
+```
+
+## 5. Atlan
+
+Atlan’s model is active metadata: connector-driven metadata extraction plus governance context propagation. When source metadata or governance classifications change, Atlan can propagate context—such as PII classifications—through lineage. 
+
+For freshness specifically, Atlan relies on connector ingestion and metadata refresh rather than exposing the same low-level freshness-assertion configuration as DataHub or Monte Carlo. The exact behavior depends on the connector, source permissions, and product edition. `INFERENCE`
+
+### Kairos lesson
+
+Do not claim Atlan-style continuous freshness for every source. Instead, make freshness capability source-specific:
+
+```text
+PostgreSQL catalog → metadata sync freshness
+OpenLineage source → runtime freshness
+dbt artifact → artifact/run freshness
+GitHub source → commit/file freshness
+```
+
+## 6. How Kairos should implement it
+
+### Freshness configuration
+
+```json
+{
+  "asset_urn": "kairos:table:finance:analytics.revenue_daily",
+  "freshness_sla": "24h",
+  "evaluation_schedule": "0 * * * *",
+  "lookback_window": "24h",
+  "freshness_signal": {
+    "type": "openlineage_run | updated_at_column | high_watermark | source_metadata | manual",
+    "column": "updated_at",
+    "source": "postgres"
+  },
+  "incident_policy": {
+    "create_on_late": true,
+    "notify_owner": true,
+    "severity": "high"
+  }
+}
+```
+
+### Evaluation logic
+
+```text
+At every scheduled run:
+
+1. Get asset freshness configuration
+2. Get latest freshness evidence
+3. Calculate:
+     age = now - last_successful_update_at
+4. Compare age with freshness_sla
+5. Set state:
+     age <= 80% SLA → HEALTHY
+     age > 80% SLA and <= SLA → AT_RISK
+     age > SLA → LATE
+     no reliable evidence → UNKNOWN
+6. Create/update incident if LATE
+7. Notify owner
+8. Store freshness result and evidence
+9. Update UI through refetch or Supabase Realtime
+```
+
+### Freshness states
+
+| State | Rule |
+| --- | --- |
+| `HEALTHY` | Last successful update is within SLA |
+| `AT_RISK` | Approaching SLA breach, e.g. over 80% of SLA elapsed |
+| `LATE` | SLA exceeded |
+| `STALE` | No update for a much longer period, e.g. multiple SLA windows |
+| `UNKNOWN` | No reliable freshness evidence exists |
+| `PAUSED` | Monitoring intentionally disabled |
+
+## 7. What signal should Kairos use first?
+
+| Source | Best freshness signal | MVP priority |
+| --- | --- | --- |
+| OpenLineage | Successful run event / output dataset update | P0 |
+| dbt `run_results.json` | Successful model run time | P0 |
+| PostgreSQL source | `updated_at` column or catalog metadata | P1 |
+| GitHub | Latest commit timestamp for relevant file | P1 |
+| File upload | Upload/processing timestamp | P1 |
+| Image/document | Ingestion timestamp only | P2 |
+| MLflow | Training-run completion time | P2 |
+| RAG answer | Trace timestamp, not data freshness | P2 |
+
+## 8. Important correctness rule
+
+Do **not** mark an asset late merely because Kairos has not received an event.
+
+| Situation | Correct freshness state |
+| --- | --- |
+| OpenLineage confirms update 2 hours ago | `HEALTHY` |
+| `updated_at` shows update 2 hours ago | `HEALTHY` |
+| No freshness evidence exists | `UNKNOWN` |
+| Last known update was 30 hours ago; SLA is 24 hours | `LATE` |
+| Event missing but coverage is incomplete | `UNKNOWN`, not automatically late/refuted |
+| User manually confirms refresh | `HEALTHY`, with manual evidence provenance |
+
+This preserves Kairos’s evidence-first principle: absence of evidence is not proof of failure.
+
+## 9. MVP build plan
+
+| Priority | Feature |
+| --- | --- |
+| P0 | Store `freshness_sla`, `last_successful_update_at`, `freshness_status`, `last_checked_at` |
+| P0 | Run a scheduled freshness evaluator every 15 minutes or hourly |
+| P0 | Update freshness from OpenLineage successful run events |
+| P0 | Create/update incident when asset becomes `LATE` |
+| P1 | Update freshness from dbt run results |
+| P1 | Support `updated_at` column freshness checks |
+| P1 | Show freshness trend chart in Quality tab |
+| P1 | Notify asset owner on breach |
+| P2 | Support high-watermark freshness checks |
+| P2 | Learn normal update patterns and detect anomalies |
+| P2 | Support CRON schedules |
+| P3 | Use freshness to affect impact score and data-product health |
+
+## 10. Poster / demo wording
+
+> **Kairos evaluates freshness on a configurable schedule. Each asset defines an expected update frequency and freshness SLA. Kairos checks evidence from OpenLineage runs, dbt results, source metadata, high-watermark columns, or manual refresh confirmations. If the latest observed update exceeds the SLA, Kairos marks the asset late, creates or updates an incident, notifies the owner, and records the freshness result as evidence.**
+
+This matches the competitor pattern: DataHub uses freshness assertions with evaluation schedules and change windows; Monte Carlo uses freshness monitors with explicit or learned thresholds; OpenMetadata uses scheduled freshness test cases. [docs.datahub](https://docs.datahub.com/docs/managed-datahub/observe/freshness-assertions)
+
+
+
+
+Yes—**Kairos should run freshness checks on a schedule**, but it should not necessarily “constantly” poll every source. The correct model is:
+
+```text
+Freshness check = scheduled evaluation of whether an asset updated within its expected SLA
+Source sync     = scheduled discovery/ingestion of metadata from the source
+Realtime update = immediate UI notification after an internal Kairos change
+```
+
+These are three different jobs.
+
+## How freshness works
+
+For every important asset, Kairos stores a freshness expectation:
+
+```json
+{
+  "asset_urn": "kairos:table:finance:analytics.revenue_daily",
+  "freshness_sla": "24h",
+  "expected_update_frequency": "daily",
+  "last_successful_update_at": "2026-10-31T02:00:00Z",
+  "next_expected_update_by": "2026-11-01T02:00:00Z",
+  "freshness_status": "healthy"
+}
+```
+
+Then a scheduled worker runs periodically:
+
+```text
+Every 15 minutes / hourly:
+  → Find assets with freshness SLAs
+  → Read latest successful update/run/event
+  → Compare elapsed time with SLA
+  → Set status:
+      HEALTHY
+      AT_RISK
+      LATE
+      STALE
+      UNKNOWN
+  → Create/update incident if SLA breached
+  → Notify owner
+  → Update UI
+```
+
+## Freshness states
+
+| State | Meaning | Example |
+| --- | --- | --- |
+| `HEALTHY` | Updated within SLA | Last update 2 hours ago; SLA is 24 hours |
+| `AT_RISK` | Approaching SLA breach | Last update 20 hours ago; SLA is 24 hours |
+| `LATE` | SLA breached | Last update 30 hours ago; SLA is 24 hours |
+| `STALE` | No update for a long period | No update for 7 days |
+| `UNKNOWN` | No reliable update timestamp or run evidence | Source does not expose update time |
+| `PAUSED` | Freshness monitoring intentionally disabled | Non-production asset |
+
+Important: if Kairos has no update timestamp or run evidence, it must show `UNKNOWN`, not falsely mark the asset healthy or late.
+
+## How often should it run?
+
+| Asset importance | Freshness check frequency | Source sync frequency |
+| --- | --- | --- |
+| Critical / certified / production | Every 5–15 minutes | Every 1–6 hours |
+| Standard production | Every 30–60 minutes | Every 6–24 hours |
+| Internal / non-critical | Every 6–24 hours | Daily |
+| Experimental / demo | Manual or daily | Manual |
+| Real-time pipeline source | Event-driven via OpenLineage | Event-driven |
+
+For your MVP, start with:
+
+```text
+Freshness evaluation: every 15 minutes or hourly
+PostgreSQL metadata sync: daily or every 6 hours
+GitHub sync: manual or hourly
+dbt artifact: on upload / CI webhook
+OpenLineage: event-driven webhook
+```
+
+## What competitors do
+
+| Platform | Freshness approach |
+| --- | --- |
+| DataHub | Supports scheduled metadata ingestion and event-driven metadata updates; freshness can be evaluated from ingestion/run metadata.  [docs.datahub](https://docs.datahub.com/docs/architecture/metadata-ingestion) |
+| OpenMetadata | Users schedule metadata ingestion at a preferred frequency; ingestion runs have status/history and retry settings.  [docs.datahub](https://docs.datahub.com/docs/metadata-ingestion) |
+| Monte Carlo | Monitors freshness, volume, schema, and quality continuously or on schedules, using learned patterns and alerts.  |
+| Supabase | Realtime can notify UI clients of internal PostgreSQL changes, but it is not a replacement for scheduled source freshness checks.  |
+
+## Kairos architecture
+
+```mermaid
+flowchart LR
+    subgraph Sources["Sources"]
+        PG["User PostgreSQL"]
+        GH["GitHub"]
+        DBT["dbt artifact / CI"]
+        OL["OpenLineage emitter"]
+    end
+
+    subgraph Kairos["Kairos"]
+        SCHED["Freshness Scheduler"]
+        SYNC["Source Sync Scheduler"]
+        QUEUE["Durable Job Queue"]
+        EVAL["Freshness Evaluator"]
+        INC["Incident Manager"]
+        DB[("Supabase PostgreSQL")]
+        RT["Supabase Realtime"]
+    end
+
+    PG --> SYNC
+    GH --> SYNC
+    DBT --> QUEUE
+    OL --> QUEUE
+
+    SYNC --> QUEUE --> DB
+    QUEUE --> EVAL
+    SCHED --> EVAL
+    EVAL --> DB
+    EVAL --> INC
+    INC --> DB
+    DB --> RT
+    RT --> UI["Open Kairos dashboards"]
+```
+
+## What triggers freshness change?
+
+| Event | Freshness result |
+| --- | --- |
+| OpenLineage run reports successful output | Asset last-updated time advances |
+| dbt run result succeeds | Model freshness advances |
+| PostgreSQL sync sees updated table | Table freshness advances, if source timestamp is available |
+| GitHub commit changes a SQL/dbt file | File freshness advances |
+| User manually marks asset refreshed | Freshness advances, with `MANUAL` provenance |
+| No new run/event arrives | Elapsed time grows; status may become `AT_RISK`, `LATE`, or `STALE` |
+| No timestamp exists | Status remains `UNKNOWN` |
+
+## Important rule
+
+Freshness must be evidence-based:
+
+```text
+Do not say “fresh” just because the catalog row was recently updated.
+Do not say “late” just because Kairos has not received an event.
+```
+
+Instead:
+
+| Situation | Correct freshness state |
+| --- | --- |
+| OpenLineage confirms successful output 2 hours ago | `HEALTHY` |
+| Source catalog shows `updated_at` 2 hours ago | `HEALTHY` |
+| No update timestamp available | `UNKNOWN` |
+| Last known update was 30 hours ago and SLA is 24 hours | `LATE` |
+| Event missing but coverage incomplete | `UNKNOWN`, not automatically late/refuted |
+| User manually confirms refresh | `HEALTHY`, with manual evidence provenance |
+
+## MVP recommendation
+
+Build freshness in this order:
+
+1. Add `freshness_sla`, `last_successful_update_at`, `freshness_status`, and `freshness_checked_at` to assets.
+2. Run a scheduled freshness evaluator every 15 minutes or hourly.
+3. Update freshness from OpenLineage run events first.
+4. Update freshness from dbt run results second.
+5. Update freshness from PostgreSQL source metadata third.
+6. Create an incident when an asset becomes `LATE`.
+7. Show a freshness trend chart in the Quality tab.
+8. Use Supabase Realtime only to refresh the UI after the database changes.
+
+## Poster / demo wording
+
+> **Kairos runs scheduled freshness evaluations against each asset’s defined SLA. Runtime events from OpenLineage, dbt results, source metadata synchronization, and manual refresh confirmations update the last-known successful update time. If an asset exceeds its freshness SLA, Kairos changes its freshness state, creates or updates an incident, notifies the owner, and reflects the change in the Quality dashboard.**
+
+Do not claim “real-time monitoring” unless OpenLineage or another event producer is actually connected and tested. For the MVP, say **“scheduled freshness monitoring with event-driven updates where available.”**
+
+
+
+
+## Short answer
+
+The system does **not** automatically know about every external change by magic. There are only three ways a metadata platform learns that something changed:
+
+1. **Pull / polling** — Kairos periodically reconnects to the source and checks for changes.
+2. **Push / event** — the source actively sends Kairos an event when something changes.
+3. **Internal database change capture** — when a change happens inside Kairos’s own Supabase PostgreSQL, Supabase Realtime can notify open browser sessions.
+
+Competitors use different combinations of these. Kairos should use all three, but with clear boundaries.
+
+## 1. The three update mechanisms
+
+| Mechanism | How it works | Example | Latency | Reliability |
+| --- | --- | --- | --- | --- |
+| Pull / scheduled crawl | Kairos connects to source on a schedule and compares metadata | PostgreSQL catalog scan every 6 hours | Minutes/hours | Reliable if scheduled and retried |
+| Push / webhook | Source calls Kairos when an event occurs | GitHub push, OpenLineage event, dbt run | Seconds | Reliable only with signature, retry, idempotency |
+| Internal CDC / Realtime | Kairos database change is streamed to open UI clients | User A imports asset; User B’s catalog updates | Seconds | UI delivery; not a guaranteed workflow queue |
+
+## 2. How competitors do it
+
+### DataHub
+
+DataHub supports both **pull-based** and **push-based** ingestion.
+
+```text
+Pull-based:
+Connector crawls Snowflake / BigQuery / dbt / Airflow / Looker
+  → extracts metadata
+  → sends Metadata Change Proposal to Kafka or HTTP
+  → DataHub applies it to metadata graph
+
+Push-based:
+Airflow / Spark / Great Expectations emits metadata event
+  → SDK sends Metadata Change Proposal
+  → DataHub updates graph in near real time
+```
+
+DataHub’s ingestion framework explicitly supports push, pull, asynchronous, and synchronous models. Pull-based integrations crawl sources on a schedule; push-based integrations emit metadata changes from the point of origin through Kafka or HTTP. [docs.datahub](https://docs.datahub.com/docs/architecture/metadata-ingestion)
+
+DataHub’s internal architecture is streaming-first: metadata changes are communicated through Kafka and reflected in the platform within seconds. [docs.datahub](https://docs.datahub.com/docs/introduction)
+
+**Kairos lesson:** use scheduled pulls for database/catalog sources and push events for pipelines/dbt/OpenLineage.
+
+### OpenMetadata
+
+OpenMetadata uses a scheduled metadata agent/connector.
+
+```text
+Admin creates connector
+  → Configures source connection
+  → Selects schedule: hourly / daily / weekly / custom
+  → Sets retries
+  → Deploys ingestion pipeline
+  → Agent runs and ingests metadata
+  → UI shows queued / running / failed / successful status
+```
+
+OpenMetadata documents that users add a connector and schedule metadata fetches at a preferred frequency. It also supports retry counts, debug logs, deleted-table handling, query-parsing timeout, and agent run history. [docs.open-metadata](https://docs.open-metadata.org/v2.1.x-SNAPSHOT/how-to-guides/admin-guide/how-to-ingest-metadata)
+
+**Kairos lesson:** every connector needs a visible ingestion-run history, schedule, retry count, and failure state.
+
+### Atlan
+
+Atlan uses connector-driven metadata extraction and active metadata propagation. When governance context such as PII classification changes, it can propagate through lineage to downstream assets. 
+
+**Kairos lesson:** when a source metadata change occurs, Kairos should not only update the asset—it should recompute affected lineage, PII propagation, impact, and contract status.
+
+### Supabase Realtime
+
+Supabase Realtime listens to PostgreSQL changes through logical replication/WAL and broadcasts them to subscribed browser clients over WebSockets. [atlan](https://atlan.com/active-data-governance/)
+
+```text
+User A imports asset
+  → Kairos API inserts into Supabase PostgreSQL
+  → PostgreSQL WAL records INSERT
+  → Supabase Realtime reads replication stream
+  → Authorized subscribed clients receive event
+  → User B’s open Catalog page updates
+```
+
+Supabase Realtime supports `INSERT`, `UPDATE`, `DELETE`, or all events, with server-side filters. [supabase](https://supabase.com/docs/reference/self-hosting-realtime/introduction)
+
+**Important limitation:** Supabase explicitly says Postgres Changes does **not yet guarantee delivery of every change**. WAL buildup, replication lag, crashes, or disconnection can cause missed events. [atlan](https://atlan.com/active-data-governance/)
+
+**Kairos lesson:** use Realtime for live UI refresh, not as the authoritative event queue.
+
+## 3. How Kairos should detect changes
+
+### A. Changes inside Kairos
+
+Example: User A imports an asset, edits a description, tags PII, resolves an incident, or creates a lineage edge.
+
+```text
+User action
+  → Kairos API validates authorization
+  → Writes to Supabase PostgreSQL
+  → Creates an internal change event
+  → Updates affected projections
+  → Realtime notifies authorized open clients
+  → Other users refetch or update UI
+```
+
+Use Supabase Realtime for:
+
+- New/updated asset in Catalog.
+- New lineage edge.
+- PII classification change.
+- Incident status change.
+- Quality result change.
+- Connection health change.
+
+But always re-fetch authorized data from the API; do not trust the Realtime payload alone for authorization or complete state.
+
+### B. Changes in an external PostgreSQL source
+
+Kairos cannot use Supabase Realtime to watch the user’s external PostgreSQL database unless that database is configured for logical replication and Kairos has permission to consume it. That is too complex for the MVP.
+
+Use **scheduled pull**:
+
+```text
+Every 6 hours / daily:
+Kairos connector connects to user PostgreSQL
+  → reads catalog metadata
+  → compares with last snapshot
+  → creates new/updated/deleted asset events
+  → normalizes and persists changes
+  → updates catalog and lineage projections
+```
+
+Track:
+
+```text
+last_full_sync_at
+last_incremental_sync_at
+sync_cursor
+source_snapshot_hash
+records_created
+records_updated
+records_deleted
+records_failed
+```
+
+### C. Changes in GitHub
+
+Use GitHub webhooks or scheduled polling.
+
+```text
+Preferred:
+User installs Kairos GitHub App
+  → Selects repository
+  → GitHub sends push event to Kairos webhook
+  → Kairos verifies signature
+  → Kairos fetches changed files/tree
+  → Parses SQL/dbt/OpenLineage artifacts
+  → Updates assets and lineage evidence
+
+Fallback:
+Kairos polls repository every 15 minutes / hourly
+  → Compares latest commit SHA
+  → Fetches only changed files
+```
+
+GitHub Apps can receive webhooks, and GitHub recommends verifying webhook payloads with a webhook secret and requesting only minimum permissions. 
+
+### D. Changes from dbt
+
+dbt does not continuously push changes by itself. Kairos should ingest artifacts when they are produced.
+
+```text
+dbt run / dbt build completes
+  → CI/CD or user uploads manifest.json / run_results.json
+  → OR CI sends artifact to Kairos webhook
+  → Kairos parses models, tests, dependencies, results
+  → Updates declared lineage and quality evidence
+```
+
+`manifest.json` gives declared dependencies; `run_results.json` gives execution/test outcomes. They are different evidence types.
+
+### E. Changes from OpenLineage
+
+This is the best push-based source.
+
+```text
+Pipeline runs
+  → OpenLineage emitter sends event to Kairos webhook
+  → Kairos validates signature/schema
+  → Stores immutable raw event
+  → Normalizes job/run/dataset/facets
+  → Updates run evidence and lineage
+  → Notifies affected asset owners
+```
+
+OpenLineage events are designed for exactly this: they carry job, run, inputs, outputs, event time, producer, and extensible facets. 
+
+## 4. Recommended Kairos update architecture
+
+```mermaid
+flowchart TB
+    subgraph ExternalSources["External Sources"]
+        PGS["User PostgreSQL"]
+        GH["GitHub"]
+        DBT["dbt CI/CD"]
+        OL["OpenLineage emitter"]
+    end
+
+    subgraph KairosIngestion["Kairos Ingestion"]
+        WEBHOOK["Webhook receiver"]
+        SCHEDULER["Scheduled pull jobs"]
+        QUEUE["Durable job queue"]
+        WORKER["Normalizer / parser / reconciler"]
+    end
+
+    subgraph KairosDB["Supabase PostgreSQL"]
+        RAW[("Raw evidence ledger")]
+        CORE[("Canonical assets / lineage / evidence")]
+        PROJ[("Catalog / graph projections")]
+    end
+
+    subgraph Clients["Open Kairos Browser Sessions"]
+        B1["User A"]
+        B2["User B"]
+    end
+
+    PGS --> SCHEDULER
+    GH --> WEBHOOK
+    DBT --> WEBHOOK
+    OL --> WEBHOOK
+
+    WEBHOOK --> QUEUE
+    SCHEDULER --> QUEUE
+    QUEUE --> WORKER
+    WORKER --> RAW
+    WORKER --> CORE
+    CORE --> PROJ
+
+    PROJ --> RT["Supabase Realtime"]
+    RT --> B1
+    RT --> B2
+    B1 --> API["Kairos API"]
+    B2 --> API
+    API --> CORE
+```
+
+## 5. What should trigger an automatic update?
+
+| Change | Kairos reaction |
+| --- | --- |
+| New asset discovered | Create canonical asset; update catalog count; notify workspace |
+| Asset renamed | Preserve URN if stable source ID exists; record rename event |
+| Column added/removed | Update schema; evaluate affected column lineage |
+| Column type changed | Create schema-drift evidence; assess downstream impact |
+| New dbt model dependency | Create declared lineage edge with `POSSIBLE` state |
+| dbt test fails | Create/update quality result and incident |
+| OpenLineage run succeeds | Create run evidence; upgrade matching `POSSIBLE` edges to `OBSERVED` only where justified |
+| OpenLineage event missing | Do **not** create refutation; keep `UNKNOWN`/`POSSIBLE` |
+| PII tag added | Propagate classification through lineage; notify steward |
+| Connection credential expires | Mark connection `CREDENTIALS_EXPIRED`; stop sync; notify owner |
+| Source deleted/disconnected | Mark connection state; decide retention policy |
+| User edits description | Create metadata-version history; update search index |
+| User resolves incident | Record actor, time, reason, and evidence |
+
+## 6. What Kairos must never do
+
+| Wrong behavior | Correct behavior |
+| --- | --- |
+| Assume no OpenLineage event means no dependency | Mark `UNKNOWN` or keep `POSSIBLE` |
+| Automatically create lineage from two similar table names | Require parser, manifest, event, or explicit user declaration |
+| Treat credential success as discovery success | Track each lifecycle stage separately |
+| Use Supabase Realtime as the only ingestion mechanism | Use durable queue + immutable raw-event ledger |
+| Broadcast all metadata changes to all users | Apply RLS/workspace authorization before delivery |
+| Overwrite historical evidence | Append new evidence and preserve temporal history |
+| Silently refresh UI from an unauthorized Realtime payload | Refetch through authorized API |
+
+## 7. MVP recommendation
+
+For Kairos’s first reliable demo:
+
+| Change type | Mechanism |
+| --- | --- |
+| User imports JSON/dbt/OpenLineage | Immediate API write + UI refetch |
+| Another user has page open | Manual refresh first; Supabase Realtime later |
+| User PostgreSQL source | Scheduled pull every 6–24 hours |
+| GitHub source | Manual “Sync now” first; webhook later |
+| dbt artifact | Upload or CI webhook |
+| OpenLineage | Webhook or deterministic event upload |
+| PII/lineage/quality change inside Kairos | Supabase Realtime notification + authorized refetch |
+
+Do **not** build continuous CDC from external user databases in the MVP. It requires source-side replication permissions, WAL management, and operational complexity that are unnecessary for a credible student demo.
+
+## 8. Final architecture statement
+
+> Kairos detects changes through three complementary mechanisms: scheduled pull-based discovery for external databases and repositories, push-based webhooks for dbt and OpenLineage events, and Supabase Realtime for propagating authorized internal PostgreSQL changes to open user sessions. Every external change is stored as immutable raw evidence, normalized into canonical assets and relationships, and evaluated through Kairos’s four-state evidence model. Supabase Realtime improves UI freshness but is not the authoritative ingestion queue; PostgreSQL remains the single source of truth.
+
+This matches the industry pattern: DataHub uses pull and push ingestion with streaming propagation; OpenMetadata uses scheduled ingestion agents; Supabase Realtime provides database-change streaming for UI updates. [docs.datahub](https://docs.datahub.com/docs/architecture/metadata-ingestion)
+
+
+# Supabase + competitor analysis: what Kairos should do
+
+## Direct answer
+
+**Do not drop PostgreSQL.** Supabase **is PostgreSQL**—every Supabase project provides a full PostgreSQL database, not a Postgres abstraction. Supabase adds Auth, Storage, Realtime, Edge Functions, and vector support around that database. [supabase](https://supabase.com/docs/guides/database/overview)
+
+So Kairos should use:
+
+```text
+PostgreSQL = authoritative metadata/evidence database
+Supabase   = managed hosting + Auth + RLS + Storage + Realtime + Edge Functions
+Neo4j      = optional rebuildable projection only; do not add now
+```
+
+Your original architecture remains valid. You are not replacing PostgreSQL with Supabase; you are hosting PostgreSQL on Supabase. [supabase](https://supabase.com/docs/guides/database/overview)
+
+## 1. Supabase vs local PostgreSQL
+
+| Aspect | Local PostgreSQL | Supabase PostgreSQL |
+| --- | --- | --- |
+| Database engine | PostgreSQL | PostgreSQL |
+| Data location | Your machine/server | Supabase cloud project |
+| Shared across users | Only if exposed/configured | Yes, through the deployed Kairos app |
+| User authentication | You build it | Supabase Auth built in |
+| Row-level authorization | PostgreSQL RLS | PostgreSQL RLS, integrated with Supabase Auth |
+| File storage | You manage | Supabase Storage |
+| Real-time UI updates | You build WebSockets/polling | Supabase Realtime |
+| Serverless functions | You host | Supabase Edge Functions |
+| Backups | You manage | Managed backups; PITR on paid plans.  [supabase](https://supabase.com/docs/guides/database/overview) |
+| Best for Kairos | Local research/testing | Deployed multi-user demo/product |
+
+Supabase is the right choice for Kairos’s deployed demo because multiple users can access the same central catalog, while local PostgreSQL is appropriate only for isolated development or research experiments.
+
+## 2. What Supabase gives Kairos
+
+| Supabase service | Kairos use |
+| --- | --- |
+| PostgreSQL | Authoritative store for assets, lineage, evidence, quality, incidents, contracts |
+| Auth | Kairos user sign-in, JWT identity, server-side authorization |
+| Row Level Security | Workspace/user-scoped access to catalog, lineage, incidents, and RAG |
+| Storage | Raw uploaded JSON, dbt manifests, OpenLineage events, documents, images |
+| Realtime | Live catalog/lineage/incident updates in open browser sessions |
+| Edge Functions | Lightweight API/webhook/receipt endpoints |
+| pgvector | Metadata embeddings for future semantic search/RAG |
+| Database backups | Operational safety for the demo database |
+
+Supabase explicitly states that every project receives a full PostgreSQL database, and that Auth, Storage, Realtime, and Edge Functions are built on top of it. [supabase](https://supabase.com/docs/guides/database/overview)
+
+## 3. Competitor architecture comparison
+
+| Platform | Storage architecture | What Kairos should learn |
+| --- | --- | --- |
+| DataHub | Event-driven architecture using Kafka, with metadata projected into MySQL, Neo4j, and Elasticsearch for search, graph traversal, and document/key-value access.  [atlan](https://atlan.com/linkedin-datahub-tutorial/) | Use one authoritative store plus derived projections; do not make the UI query multiple sources of truth. |
+| OpenMetadata | MySQL/PostgreSQL plus Elasticsearch; deliberately avoids a separate graph database for simpler operations.  [atlan](https://atlan.com/what-is-apache-atlas/) | Strong validation for Kairos’s PostgreSQL-first approach. |
+| Atlan | Hardened Apache Atlas-style graph backend with managed infrastructure and broad connectors.  [atlan](https://atlan.com/what-is-apache-atlas/) | Useful UX/governance reference, but too heavy to replicate in a student MVP. |
+| Apache Atlas | JanusGraph + Solr + HBase + Kafka; PostgreSQL can replace some HBase/HDFS backend needs in newer versions.  [atlan](https://atlan.com/what-is-apache-atlas/) | Shows why graph stores are optional, not mandatory. |
+| Amundsen | Neo4j + Elasticsearch.  [atlan](https://atlan.com/what-is-apache-atlas/) | Good search/graph reference, but not enough reason to add Neo4j now. |
+| Marquez / OpenLineage | Lineage event service built around jobs, runs, datasets, and facets.  | Best model for Kairos evidence ingestion. |
+| Firebase | NoSQL/document-oriented app platform; different data model from PostgreSQL.  [openlineage](https://openlineage.io/docs/spec/facets/) | Not suitable as Kairos’s authoritative relational metadata store. |
+| Appwrite | App platform with database/storage/functions; added native PostgreSQL/MySQL options.  [openlineage](https://openlineage.io/docs/spec/facets/) | Possible alternative hosting model, but no reason to migrate away from Supabase now. |
+
+## 4. What competitors do that Kairos should copy
+
+### A. Central metadata store
+
+All mature platforms separate:
+
+```text
+Raw source evidence
+  → normalized metadata
+  → canonical assets
+  → derived lineage/search projections
+```
+
+DataHub uses multiple synchronized stores because it needs full-text search, graph traversal, SQL-like queries, and key-value/document lookup at scale.  Kairos does not need that complexity yet. [atlan](https://atlan.com/linkedin-datahub-tutorial/)
+
+**Kairos decision:** keep PostgreSQL authoritative; add materialized views/read models only when queries become slow.
+
+### B. Capability-aware UI
+
+OpenMetadata changes asset tabs by resource type: tables get schema/sample data/queries/profiler/quality; pipelines get executions; ML models get features. 
+
+**Kairos decision:** the backend must return a capability registry:
+
+```json
+{
+  "schema": { "supported": true, "available": true },
+  "preview": { "supported": true, "available": false, "reason": "No preview data retrieved" },
+  "lineage": { "supported": true, "available": false, "reason": "No lineage evidence ingested" },
+  "quality": { "supported": false, "available": false, "reason": "Unsupported resource type" }
+}
+```
+
+Never show a tab as functional when its backing capability does not exist.
+
+### C. Connector lifecycle
+
+Atlan and OpenMetadata separate connection configuration, authentication, connection testing, discovery, ingestion, scheduling, and failure handling. 
+
+**Kairos decision:** track these states separately:
+
+```text
+CONFIGURED
+AUTHENTICATED
+REACHABLE
+AUTHORIZED
+DISCOVERY_IN_PROGRESS
+DISCOVERY_COMPLETED
+NORMALIZED
+PERSISTED
+REFRESH_IN_PROGRESS
+STALE
+SYNC_FAILED
+CREDENTIALS_EXPIRED
+REVOKED
+```
+
+A successful credential test does **not** mean discovery succeeded.
+
+### D. Evidence-first lineage
+
+OpenLineage stores jobs, runs, datasets, events, and facets. Its lineage facets can describe exact datasets, jobs, and fields from which a dataset derives. 
+
+**Kairos decision:** every lineage edge must have evidence:
+
+```text
+Raw event / SQL parse / dbt manifest / manual action
+  → evidence record
+  → relationship
+  → four-state conclusion
+  → UI explanation
+```
+
+### E. Permission-aware metadata access
+
+Atlan separates users, groups, personas, purposes, connection access, visibility, and audit logs.  Supabase uses JWT identity plus PostgreSQL RLS to enforce access from browser to database. 
+
+**Kairos decision:** use two separate authorization layers:
+
+```text
+Source credential → what Kairos backend may read from user’s source
+Kairos RLS/role   → which Kairos user may see imported metadata
+```
+
+## 5. What Kairos should not copy
+
+| Competitor pattern | Why not now |
+| --- | --- |
+| Kafka + Elasticsearch + Neo4j + MySQL multi-store architecture | Too operationally complex for a student MVP; DataHub needs it for scale, Kairos does not yet.  [atlan](https://atlan.com/linkedin-datahub-tutorial/) |
+| Neo4j as primary graph database | Conflicts with Kairos’s PostgreSQL-authoritative contract |
+| Firebase/Firestore-style document model | Wrong fit for relational metadata, lineage, temporal evidence, and SQL queries |
+| Universal connector marketplace | Premature; focus on four reliable inputs |
+| Enterprise SSO/SCIM immediately | Add after basic workspace/RLS model works |
+| Arbitrary SQL lineage claims | Conflicts with Kairos’s restricted SQL research scope |
+| RAG as the research reasoning engine | RAG is a product feature, not the research contribution |
+| Automatic tenant isolation from UI hiding | Must be enforced through API authorization and RLS |
+
+## 6. Recommended Kairos architecture
+
+```mermaid
+flowchart TB
+    subgraph Users["Kairos Users"]
+        U1["User A"]
+        U2["User B"]
+    end
+
+    subgraph Kairos["Kairos Application"]
+        FE["Vanilla JS / HTML / CSS Frontend"]
+        API["Node Serverless API"]
+        WORKER["Ingestion / Parser / Embedding Worker"]
+    end
+
+    subgraph Supabase["Supabase Platform"]
+        AUTH["Supabase Auth"]
+        RLS["PostgreSQL Row Level Security"]
+        PG[("PostgreSQL\nAuthoritative metadata store")]
+        RT["Realtime"]
+        STORE["Storage"]
+        VEC["pgvector"]
+    end
+
+    subgraph Sources["User Sources"]
+        PGEXT["User PostgreSQL"]
+        GH["GitHub Repository"]
+        DBT["dbt manifest.json"]
+        OL["OpenLineage events"]
+        FILE["Local JSON / files"]
+    end
+
+    U1 --> FE
+    U2 --> FE
+    FE --> API
+    API --> AUTH
+    API --> RLS
+    API --> PG
+    API --> WORKER
+    WORKER --> PG
+    WORKER --> VEC
+    PG --> RT --> FE
+    FILE --> STORE --> WORKER
+
+    PGEXT --> API
+    GH --> API
+    DBT --> API
+    OL --> API
+```
+
+## 7. What should live in Supabase
+
+| Data | Storage location |
+| --- | --- |
+| Kairos users and workspace membership | Supabase Auth + PostgreSQL tables |
+| Connections and credential references | PostgreSQL; secrets in server-side secret storage |
+| Assets, columns, schemas | PostgreSQL |
+| Table lineage | PostgreSQL |
+| Column lineage | PostgreSQL |
+| Raw OpenLineage/dbt/JSON events | PostgreSQL immutable ledger; optional file in Storage |
+| Evidence records | PostgreSQL |
+| Four-state reasoning results | PostgreSQL |
+| Quality assertions/results | PostgreSQL |
+| Incidents | PostgreSQL |
+| Data products/contracts | PostgreSQL |
+| Embeddings | PostgreSQL `pgvector` |
+| RAG traces | PostgreSQL |
+| Uploaded raw files | Supabase Storage |
+| Realtime UI events | Supabase Realtime |
+
+## 8. Security model Kairos must implement
+
+```text
+User signs in
+  → Supabase Auth issues JWT
+  → API validates JWT
+  → API checks workspace membership/role
+  → API queries PostgreSQL using user-scoped context
+  → RLS filters rows
+  → User sees only authorized metadata
+```
+
+Supabase Edge Functions can validate Supabase JWTs and enforce RLS by running queries with the caller’s auth context.  Supabase also warns that any table reachable by browser/mobile clients needs RLS, and that service-role/secret keys bypass RLS and must remain server-side. [openlineage](https://openlineage.io/docs/1.48.0/)
+
+### Kairos access separation
+
+| Layer | Controls |
+| --- | --- |
+| Kairos user | Who is signed in |
+| Workspace membership | Which workspace’s metadata they may access |
+| Role | Viewer, steward, editor, connection owner, admin |
+| Source credential | What Kairos backend may read from the user’s external source |
+| Source scope | Which repositories/schemas/databases are cataloged |
+| Evidence sensitivity | Who may view raw events, PII-related metadata, or previews |
+| RAG authorization | Which metadata can be retrieved and used in AI answers |
+
+## 9. What to build next
+
+### P0 — Keep the system honest
+
+1. Confirm the deployed Hatchable app uses the intended Supabase PostgreSQL project.
+2. Verify catalog, ingestion, lineage, evidence, quality, and incident persistence.
+3. Remove silent demo fallbacks in Connected Catalog mode.
+4. Label every record as `LIVE`, `IMPORTED`, or `DEMO FIXTURE`.
+5. Test duplicate ingestion and canonical identity stability.
+6. Test relationship endpoint validation.
+7. Review incidents/data-products public access and RLS policies.
+8. Ensure RAG/search cannot bypass authorization.
+
+### P1 — Make Supabase useful properly
+
+1. Add workspace/user membership tables.
+2. Add proper RLS policies tied to `auth.uid()` and workspace ID.
+3. Add connection lifecycle states.
+4. Add ingestion-run history and connector diagnostics.
+5. Use Supabase Storage for raw uploaded artifacts.
+6. Use a durable job queue for parsing, embedding, and reprocessing.
+7. Use Supabase Realtime only for authorized UI updates.
+
+### P2 — Generalize the product
+
+1. Capability registry for every asset/resource type.
+2. Shared Asset Detail shell.
+3. dbt, OpenLineage, SQL, file, GitHub, and PostgreSQL connector adapters.
+4. Data contracts bound to quality assertions.
+5. Hybrid search: keyword + `pgvector` + graph expansion.
+6. Collaboration: activity feed, comments, tasks, notifications.
+
+### P3 — Advanced differentiation
+
+1. MCP/context API for AI agents.
+2. Grounded RAG evaluation.
+3. MLflow model/feature lineage.
+4. Usage/popularity analytics.
+5. Policy automation and PII propagation.
+6. Neo4j projection only if PostgreSQL lineage queries measurably fail.
+
+## 10. Final recommendation
+
+Use this exact architecture statement in your poster, report, and demo:
+
+> **Kairos uses PostgreSQL as its authoritative metadata, lineage, evidence, and governance store, deployed on Supabase. Supabase provides authentication, row-level security, file storage, realtime updates, Edge Functions, and vector-search infrastructure around PostgreSQL. The platform does not replace PostgreSQL with Supabase; it uses Supabase to operate and secure its PostgreSQL database.**
+
+Do **not** migrate to Firebase, MongoDB, Appwrite, or Neo4j now. Keep Supabase PostgreSQL as the single source of truth, add proper RLS/workspace isolation, and use derived projections only when performance requires them. This matches the simpler PostgreSQL-plus-search architecture used by OpenMetadata and avoids DataHub’s multi-store operational complexity while preserving Kairos’s evidence-first differentiation. [supabase](https://supabase.com/docs/guides/database/overview)
+
+
+
+
+Correct—but with one important correction: **Supabase does not magically make PostgreSQL “different.” Supabase is simply PostgreSQL running in the cloud, shared by your application.**
+
+## The real difference
+
+| Setup | Where data lives | Who sees changes |
+| --- | --- | --- |
+| Local PostgreSQL on your laptop | Only your machine | Only you, unless others connect to your machine |
+| Supabase PostgreSQL | Cloud database used by the deployed Kairos app | Every Kairos user/API request using that same Supabase project |
+| Local PostgreSQL exposed to internet | Your machine, but shared if configured | Anyone authorized to connect |
+| Supabase + Realtime | Cloud PostgreSQL + WebSocket updates | Users can see changes without manual refresh |
+
+So yes: if User A imports an asset through the deployed Kairos app, and the app writes it to the same Supabase PostgreSQL database, then User B can see it after querying the catalog—because they are both reading the **same central database**.
+
+```text
+User A → Kairos app → Supabase PostgreSQL
+User B → Kairos app → same Supabase PostgreSQL
+```
+
+## But Supabase does not automatically update every screen
+
+A database change does not automatically appear in another user’s already-open browser unless you implement one of these:
+
+| Mechanism | Behavior |
+| --- | --- |
+| Manual refresh / refetch | User sees updated data next time the page or view loads |
+| Polling | Frontend periodically refetches catalog/lineage |
+| Supabase Realtime | Database change event is pushed to subscribed clients |
+| WebSocket / SSE | Backend pushes a custom update event |
+| Cache invalidation | Frontend refetches after a mutation or invalidation signal |
+
+Supabase Realtime can listen to PostgreSQL `INSERT`, `UPDATE`, and `DELETE` events and deliver them to subscribed clients over WebSockets. But it should be used for UI updates, not as the guaranteed queue for ingestion or lineage processing. [supabase](https://supabase.com/blog/realtime-or-pipelines-how-to-choose-the-right-tool)
+
+## Correct Kairos behavior
+
+```text
+User A imports asset
+  → Kairos API validates and writes to Supabase PostgreSQL
+  → Catalog record is persisted centrally
+
+User B opens Catalog
+  → Kairos API queries same Supabase PostgreSQL
+  → RLS checks User B’s workspace/permissions
+  → User B sees the asset only if authorized
+```
+
+If User B already has the Catalog page open, you can optionally do:
+
+```text
+Supabase Realtime detects INSERT on kairos_assets
+  → Notifies subscribed clients
+  → Frontend refetches catalog or updates the affected row
+```
+
+## Important security rule
+
+“Every user sees the change” must **not** mean every user sees every asset.
+
+Use Supabase RLS:
+
+```sql
+create policy assets_select_for_workspace_members
+on kairos_assets
+for select
+to authenticated
+using (
+  exists (
+    select 1
+    from kairos_workspace_members m
+    where m.workspace_id = kairos_assets.workspace_id
+      and m.user_id = auth.uid()
+  )
+);
+```
+
+So:
+
+```text
+User A imports asset into Workspace A
+  → User A sees it
+  → Workspace A members see it if permitted
+  → Workspace B users do not see it
+  → Anonymous users do not see it
+```
+
+Supabase recommends RLS for every table reachable by browser/mobile clients, and warns that the service-role/secret key bypasses RLS and must remain server-side only. [supabase](https://supabase.com/docs/guides/getting-started/the-supabase-way-to-build)
+
+## What this means for Kairos
+
+Use this wording:
+
+> **Kairos uses Supabase-hosted PostgreSQL as its central authoritative database. Metadata ingested by one authorized user is persisted centrally and becomes visible to other authorized users according to workspace membership and Row Level Security. Supabase Realtime may optionally notify open clients of changes, but authorization is always enforced server-side.**
+
+Do not say:
+
+> “Supabase automatically shares all data with all users.”
+
+That would be a security mistake.
+
+## Practical demo behavior
+
+For your demo:
+
+1. User A imports a dbt manifest or OpenLineage event.
+2. Kairos writes assets, lineage, and evidence to Supabase PostgreSQL.
+3. User A sees the new asset immediately.
+4. User B refreshes Catalog—or, if Realtime is enabled, sees it update automatically.
+5. User B can open the same asset only if they belong to the same workspace and have permission.
+6. A user from another workspace cannot see it.
+
+That is the correct enterprise behavior: **central persistence, shared but permission-scoped visibility, and optional realtime UI updates.**
+
+
+
+# Full Kairos competitor analysis: what you may have missed
+
+## Executive finding
+
+You have already covered catalog, lineage, evidence, quality, RAG, and authentication. The areas most likely missing from Kairos’s current plan are **user/workspace onboarding, connector lifecycle diagnostics, incremental sync, collaboration, notifications, data contracts, API/MCP context for agents, usage analytics, admin/audit tooling, and graceful degradation when a source is partially authorized**. These are not optional enterprise extras; they determine whether Kairos feels like a real metadata workspace rather than a lineage demo.
+
+## 1. Platform landscape
+
+| Platform | Category | Core strength | Main lesson for Kairos |
+| --- | --- | --- | --- |
+| DataHub | Open-source metadata platform / context layer | Flexible metadata graph, event-driven ingestion, API-first extensibility, column-level lineage.  [atlan](https://atlan.com/open-source-data-catalog-tools/) | Keep PostgreSQL authoritative; make evidence and metadata event-driven; do not couple UI to one asset type. |
+| OpenMetadata | Open-source unified metadata platform | Discovery, lineage, quality, profiling, governance, collaboration in one platform; broad connector set.  [atlan](https://atlan.com/open-source-data-catalog-tools/) | Copy its capability-aware asset tabs and integrated quality/profile workflow. |
+| Atlan | Commercial active-metadata / governance platform | Strong adoption UX, active metadata, certifications, glossary, collaboration, AI context.  [atlan](https://atlan.com/data-catalog-tools/) | Copy onboarding, connection health, stewardship, and context-in-workflow patterns—not its SaaS complexity. |
+| Collibra | Enterprise governance platform | Policy, stewardship, workflows, compliance, semantic layer.  [iceberglakehouse](https://iceberglakehouse.com/posts/metadata-platforms-in-2026/) | Use later for governed workflows; do not make it the research MVP. |
+| Alation | Commercial data-intelligence catalog | Search-driven adoption, behavioral intelligence, stewardship, trust signals.  [iceberglakehouse](https://iceberglakehouse.com/posts/metadata-platforms-in-2026/) | Use usage/popularity and trust signals to improve discovery. |
+| Marquez / OpenLineage | Lineage service and open standard | Jobs, runs, datasets, events, facets, runtime lineage.  | This is Kairos’s closest technical standard; preserve raw events and evidence semantics. |
+| dbt | Transformation framework / artifact ecosystem | `manifest.json`, `catalog.json`, `run_results.json`, tests, exposures, model dependencies.  | dbt is the best first structured transformation-lineage input. |
+| Apache Atlas | Open-source governance/metadata framework | Type system, classifications, entity relationships.  | Useful reference for classification/relationship modeling; too heavy to adopt wholesale. |
+| Amundsen | Open-source discovery catalog | Search-oriented catalog; weaker native lineage.  [decube](https://www.decube.io/post/open-source-data-catalog-comparison) | Reinforces that discovery needs search, ownership, and usage signals—not only a graph. |
+| Unity Catalog / Polaris | Technical lakehouse catalogs | Table-format governance, policies, lineage near the data plane.  [iceberglakehouse](https://iceberglakehouse.com/posts/metadata-platforms-in-2026/) | Kairos should observe them, not compete as a table-format catalog. |
+
+## 2. Full user journey: what competitors actually do
+
+### 2.1 Sign-up and workspace creation
+
+```text
+User signs up
+  → Identity is created
+  → User is assigned to a workspace/organization
+  → User receives a role/persona
+  → User sees only permitted domains, connections, and assets
+  → User connects a source
+  → Platform discovers metadata
+  → Platform builds a personalized catalog view
+```
+
+| Platform | User/workspace model | Kairos implication |
+| --- | --- | --- |
+| DataHub | Users, groups, roles, policies, service accounts; JWT-based platform authentication.  | Add workspace membership and role, not just a browser-local profile. |
+| OpenMetadata | Users, teams, domains, roles, bots, policies.  [docs.open-metadata](https://docs.open-metadata.org/v1.13.x/quick-start/getting-started) | Use domains/workspaces as the primary catalog scope. |
+| Atlan | SSO/SCIM users, groups, personas, purposes, connection access.  | Start with simple roles; design for personas later. |
+| Collibra / Alation | Organization, communities, roles, stewards, business users.  [iceberglakehouse](https://iceberglakehouse.com/posts/metadata-platforms-in-2026/) | Use stewardship and accountability as first-class concepts. |
+
+**Kairos gap:** current profile fields are browser-local and not backed by a user-directory API.   
+**Required fix:** server-side user, workspace, membership, role, and audit-actor model.
+
+### 2.2 Source connection
+
+```text
+User opens Connections
+  → Chooses source type
+  → Supplies credentials or OAuth consent
+  → Tests connection
+  → Selects scope
+  → Runs discovery
+  → Reviews discovered assets
+  → Saves connection and ingestion schedule
+```
+
+| Platform | Connection pattern | What Kairos should adopt |
+| --- | --- | --- |
+| DataHub | Ingestion source + connection form + encrypted secrets + ingestion recipe.  | Separate connection, credential, discovery, and ingestion run. |
+| OpenMetadata | Service connection → test connection → ingestion workflow.  | Use explicit `testConnection` before discovery. |
+| Atlan | Connector-specific auth, grants, network prerequisites, scoping limits; secret-manager support.  | Store credentials server-side; support metadata-only access by default. |
+| GitHub | App installation, repository selection, scoped permissions, revocation.  | Use repository-scoped access; never request write permissions for cataloging. |
+
+**Kairos gap:** a connection form, credential success, and discovery success must not be treated as the same state.   
+**Required fix:** expose `CONFIGURED`, `AUTHENTICATED`, `REACHABLE`, `AUTHORIZED`, `DISCOVERED`, `NORMALIZED`, `PERSISTED`, `STALE`, `FAILED`, `REVOKED`.
+
+### 2.3 Metadata capture
+
+```text
+Source system
+  → connector / parser / event emitter
+  → raw artifact or event
+  → normalization
+  → canonical asset resolution
+  → relationship extraction
+  → persistence
+  → catalog/search/lineage projection
+```
+
+| Evidence source | What it captures | What it cannot prove |
+| --- | --- | --- |
+| PostgreSQL catalog | Databases, schemas, tables, columns, constraints, comments | Query behavior or lineage |
+| SQL file / SQLGlot | Parsed table/column dependencies | Runtime execution |
+| dbt manifest | Declared model/source/exposure dependencies, tests | Runtime execution |
+| OpenLineage | Job, run, inputs, outputs, facets, run state | Complete lineage unless lineage facets are supplied |
+| GitHub | Repo, branch, commit, file tree, files | Execution or database lineage by itself |
+| Local file upload | User-supplied metadata/files | Live source connectivity |
+| MLflow | Model versions, runs, metrics, artifacts | Full inference-time feature contribution |
+| BI tool | Dashboards, charts, dataset references | Data-level correctness |
+| Profiler | Nulls, distincts, distributions, freshness | Complete quality or lineage |
+| RAG trace | Query, retrieved context, model, answer, tokens | Answer correctness without evaluation |
+
+OpenLineage is explicit that facets attach context to runs, jobs, and datasets; a lineage facet can describe exact datasets, jobs, and fields from which a dataset derives.  Kairos must preserve those boundaries rather than turning every input/output pair into a fabricated edge.
+
+## 3. Features you may have missed
+
+### 3.1 Connector diagnostics
+
+Every connector needs an operational health view:
+
+| Field | Why it matters |
+| --- | --- |
+| Connection status | Distinguishes configured, authenticated, reachable, failed |
+| Credential status | Detects expired/revoked credentials |
+| Last successful discovery | Shows metadata freshness |
+| Last successful sync | Shows ingestion reliability |
+| Assets discovered | Measures coverage |
+| Assets created / updated / unchanged | Supports incremental sync |
+| Relationships discovered | Shows lineage coverage |
+| Errors and warnings | Makes partial failures visible |
+| Next scheduled sync | Sets expectations |
+| Sync duration | Detects performance problems |
+| Permission gaps | Explains missing schemas/lineage |
+| Source version / commit / artifact version | Makes evidence reproducible |
+
+DataHub’s ingestion model separates connection configuration, secrets, recipes, scheduling, and execution; OpenMetadata separates service connection, connection test, and ingestion workflow.  Kairos should do the same.
+
+### 3.2 Incremental synchronization
+
+A full scan every time will not scale and will make demos slow.
+
+| Sync mode | When to use | Kairos implementation |
+| --- | --- | --- |
+| Full snapshot | First connection or manual rebuild | Discover all permitted assets |
+| Incremental | Regular refresh | Use cursor: updated-at, commit SHA, event ID, or watermark |
+| Event-driven | OpenLineage/webhook sources | Ingest event and reconcile affected assets |
+| Scheduled | Database/BI connectors | Cron or durable job queue |
+| Manual refresh | User-triggered verification | Run one connection/source scope |
+
+Store:
+
+```text
+last_full_sync_at
+last_incremental_sync_at
+sync_cursor
+sync_status
+records_created
+records_updated
+records_unchanged
+records_failed
+```
+
+### 3.3 Collaboration
+
+This is a major missing category. Metadata platforms succeed when users can ask questions, resolve ambiguity, and trust assets.
+
+| Feature | Why it matters | Kairos priority |
+| --- | --- | --- |
+| Asset comments | Capture tribal knowledge | P2 |
+| @mentions | Route questions to owners | P2 |
+| Tasks | Assign documentation, classification, or incident work | P2 |
+| Announcements | Communicate schema changes or deprecations | P3 |
+| Activity feed | Show metadata and ownership changes | P1 |
+| Ratings / endorsements | Build trust signals | P3 |
+| Discussions on lineage edges | Resolve disputed dependencies | P3 |
+| Slack / Teams notifications | Bring metadata context to users | P3 |
+
+OpenMetadata explicitly includes announcements, tasks, team conversations, activity feeds, and team dashboards.  Atlan treats collaboration as a first-class part of adoption. [docs.open-metadata](https://docs.open-metadata.org/v1.13.x/quick-start/getting-started)
+
+### 3.4 Notifications and alert routing
+
+Kairos should not only create incidents; it should route them.
+
+```text
+Quality failure / SLA breach / schema drift
+  → classify severity
+  → find owner through lineage
+  → create/deduplicate incident
+  → notify owner
+  → escalate if unresolved
+  → resolve with evidence
+```
+
+| Notification target | Use case |
+| --- | --- |
+| Asset owner | Freshness/quality failure |
+| Downstream owners | Upstream breaking change |
+| Steward | PII classification or policy issue |
+| Connection owner | Credential expiry / sync failure |
+| Data-product owner | Contract violation |
+| AI-agent owner | Retrieval/grounding failure |
+
+OpenMetadata includes alerting, notifications, incident management, third-party notifications, pipeline monitoring, root-cause analysis, and anomaly detection. [docs.open-metadata](https://docs.open-metadata.org/v1.13.x/quick-start/getting-started)
+
+### 3.5 Data contracts
+
+You already have Data Products and SLA concepts, but contracts need to become operational.
+
+| Contract element | Example |
+| --- | --- |
+| Contract ID / version | `contract_revenue_daily_v3` |
+| Producer | Finance pipeline owner |
+| Consumer | Executive dashboard |
+| Freshness guarantee | Updated every 24 hours |
+| Schema guarantee | Required columns and types |
+| Quality guarantee | Null rate, uniqueness, referential integrity |
+| Retention | 365 days |
+| Enforcement mode | Monitor / warn / block |
+| Evidence | Assertion run results |
+| Status | Active, draft, deprecated, violated |
+
+DataHub treats assertions as the building blocks of data contracts.  OpenMetadata supports data contracts for producer-consumer collaboration.  Kairos should bind every contract clause to a quality assertion and evidence record. [atlan](https://atlan.com/open-source-data-catalog-tools/)
+
+### 3.6 Usage and popularity
+
+Kairos currently focuses on lineage and trust. Competitors also use usage to rank and trust assets.
+
+| Signal | Use |
+| --- | --- |
+| Query frequency | Identify important tables |
+| Unique consumers | Measure reach |
+| Dashboard views | Identify business-critical assets |
+| Last queried | Find stale or unused assets |
+| Owner activity | Identify neglected assets |
+| Search clicks | Improve relevance |
+| API/agent usage | Identify AI-consumed assets |
+
+Alation’s adoption model is built around search, behavioral signals, and trust; Atlan emphasizes active metadata and context pushed into user workflows. [atlan](https://atlan.com/data-catalog-tools/)
+
+### 3.7 Admin, audit, and lifecycle tooling
+
+Kairos needs an admin surface eventually, even if minimal.
+
+| Admin capability | Why |
+| --- | --- |
+| User/workspace management | Control access |
+| Connection inventory | See all sources and health |
+| Ingestion-run history | Debug failures |
+| Failed-record quarantine | Handle malformed input safely |
+| Fixture registry | Separate demo data from live data |
+| Classification approval queue | Govern PII/sensitivity |
+| Contract approval queue | Govern SLA changes |
+| Audit log | Explain who changed what and when |
+| Data-retention controls | Manage evidence lifecycle |
+| API-token management | Support integrations safely |
+
+DataHub provides service accounts with revocable tokens for programmatic access.  Atlan includes audit logs and connection-level access controls. 
+
+### 3.8 AI/MCP context layer
+
+Modern platforms are becoming context layers for AI agents, not only human catalogs.
+
+| Capability | Why it matters |
+| --- | --- |
+| MCP server | Lets AI agents query governed metadata |
+| Asset-context API | Returns asset summary, lineage, quality, ownership |
+| Permission-aware retrieval | Prevents unauthorized metadata exposure |
+| Citation-bound answers | Prevents unsupported AI claims |
+| Agent trace storage | Makes AI behavior auditable |
+| Tool-call validation | Prevents unsafe agent actions |
+
+DataHub and OpenMetadata both ship or support MCP servers; Atlan positions itself as an AI context layer.  Kairos should expose a read-only MCP/context API only after RLS, permissions, and evidence provenance are reliable. [atlan](https://atlan.com/open-source-data-catalog-tools/)
+
+### 3.9 Export, interoperability, and open standards
+
+| Standard / capability | Why Kairos needs it |
+| --- | --- |
+| OpenLineage | Runtime lineage interoperability |
+| ODCS | Data contracts |
+| ODPS | Data products |
+| Iceberg REST catalog | Future lakehouse interoperability |
+| OpenMetadata-style JSON export | Portability |
+| CSV export | Business/steward workflows |
+| GraphQL/REST API | Integrations |
+| Webhooks | Event ingestion |
+| MCP | AI-agent context |
+
+OpenMetadata documents support for standards including MCP, RDF, DCAT, DPROD, ODCS, and OpenLineage.  Kairos should prioritize OpenLineage and ODCS; defer the rest. [open-metadata](https://open-metadata.org/learning-center/metadata-platform)
+
+## 4. Feature-gap matrix for Kairos
+
+| Area | Kairos current direction | Competitor standard | Gap severity | Build priority |
+| --- | --- | --- | --- | --- |
+| User identity | Browser-local profile | Server-side identity, roles, teams | High | P0/P1 |
+| Workspace isolation | Personal project; broad RLS policies reported | Tenant/workspace membership + RLS | High | P0 |
+| Connection lifecycle | Ingestion/import paths exist | Configured → authenticated → discovered → persisted | High | P1 |
+| Connector diagnostics | Limited | Health, sync history, errors, coverage | High | P1 |
+| Incremental sync | Not established | Cursor/event-based refresh | High | P1/P2 |
+| Catalog discovery | Generic JSON/graph import | Database/BI/pipeline connectors | High | P1/P2 |
+| SQL lineage | Static analysis / SQLGlot direction | SQL parsing plus query logs | Medium | P1 |
+| Runtime lineage | OpenLineage ingestion path exists | Event-driven run evidence | High | P1 |
+| Column lineage | Schema and endpoint exist | Column-level evidence and propagation | High | P1 |
+| Evidence provenance | Four-state model | Source, run, timestamp, coverage | Low / differentiator | P0 test |
+| Time travel | Column/evidence temporal queries | Full historical lineage | Medium | P1/P2 |
+| Quality | Simulated job; quality tables exist | Assertions, results, incidents | High | P1 |
+| Incidents | Tables/routes exist | Detection → triage → owner → resolution | High | P1 |
+| Data contracts | Data products/SLA concept | Versioned contracts bound to assertions | Medium | P2 |
+| Search | Keyword SQL `LIKE` | Hybrid keyword + semantic + graph | Medium | P2 |
+| RAG | Embedding/trace schema exists | Grounded retrieval, citations, evaluation | High | P2 |
+| Collaboration | Limited | Comments, tasks, activity, notifications | Medium | P2/P3 |
+| Usage analytics | Not established | Query/dashboard/agent usage | Medium | P3 |
+| Admin/audit | Not established | Users, connections, runs, audit trail | Medium | P2 |
+| MCP / agent API | Not established | Permission-aware context API | Medium | P3 |
+| Export | JSON lineage export exists | JSON/CSV/standard exports | Low | P2 |
+| 3D Observatory | Existing BETA module | Visualization layer, not core | Low | Preserve |
+
+## 5. What Kairos should build next
+
+### P0 — Correctness and demo integrity
+
+1. Verify actual Supabase/PostgreSQL persistence for catalog, ingestion, lineage, and evidence.
+2. Remove every silent fixture fallback from Connected Catalog mode.
+3. Add explicit `DEMO FIXTURE`, `IMPORTED`, and `LIVE` source labels.
+4. Test duplicate ingestion and canonical identity stability.
+5. Validate relationship endpoints; quarantine invalid edges.
+6. Test `REFUTED_FOR_RUN` requires run ID, coverage, and complete-negative-evaluation evidence.
+7. Test ground-truth leakage prevention.
+8. Review incidents/data-products public access and RLS policies.
+9. Ensure RAG/search cannot return metadata the user cannot access.
+
+### P1 — Credible five-demo platform
+
+1. Generic metadata preview.
+2. Explicit metadata-graph import.
+3. dbt manifest import.
+4. OpenLineage event import.
+5. Temporal evidence inspection.
+
+Add:
+
+6. Connection lifecycle states.
+7. Ingestion-run history.
+8. Connector health and error diagnostics.
+9. Capability-driven Asset Detail tabs.
+10. Honest empty, partial, failed, and unsupported states.
+
+### P2 — Product completeness
+
+1. Shared profile shell for table, file, document, image, pipeline, model, and data product.
+2. Data contracts bound to assertions.
+3. Incident routing and owner notification.
+4. Activity feed and comments.
+5. Admin connection inventory and ingestion history.
+6. Failed-record quarantine.
+7. CSV/JSON export consistency.
+8. Hybrid search: keyword + vector + graph expansion.
+
+### P3 — Differentiation
+
+1. MCP context API for AI agents.
+2. Grounded RAG evaluation.
+3. MLflow model/feature lineage.
+4. Usage/popularity intelligence.
+5. Policy automation and PII propagation workflows.
+6. PostgreSQL, GitHub, Airflow, and BI connectors.
+7. Purpose-based access controls.
+
+## 6. What Kairos should not copy
+
+| Competitor capability | Why not now |
+| --- | --- |
+| Kafka + Elasticsearch + multiple-service architecture | Too operationally heavy for a student MVP; DataHub’s flexibility comes with infrastructure complexity.  [atlan](https://atlan.com/open-source-data-catalog-tools/) |
+| Full enterprise IAM/SCIM | Not needed until multi-tenant deployment is real |
+| Connector marketplace | Premature; focus on four reliable inputs |
+| Generic arbitrary-SQL lineage | Conflicts with the restricted research SQL scope |
+| LLM/RAG as the research reasoning engine | RAG is a product feature, not the research contribution |
+| Graph neural networks | Explicitly out of MVP scope |
+| Causal-inference claims | Kairos studies execution-conditioned dependency, not causality |
+| Universal connector claims | Every connector has different metadata, permissions, and lineage capability |
+| Fake “connected” status after credential test | Credential success is not discovery success |
+
+## 7. Recommended Kairos positioning
+
+Kairos should not try to become “another DataHub” or “another Atlan.” Its defensible position is:
+
+> **Kairos is an evidence-first metadata and lineage workspace that shows not only what depends on what, but what was observed, what was inferred, what was refuted for a specific run, what remains unknown, and which evidence proves each conclusion.**
+
+That positioning requires the missing product features to be honest rather than decorative:
+
+- Connection lifecycle tells the truth about what Kairos can access.
+- Capability registry tells the truth about what an asset supports.
+- Evidence inspector tells the truth about why a lineage conclusion exists.
+- Quality tells the truth about which assertion produced a result.
+- Incidents tell the truth about who owns and resolved a failure.
+- Search tells the truth about whether it is keyword, semantic, or grounded RAG.
+- Demo Mode tells the truth that its data is synthetic.
+
+## 8. Final recommendation
+
+Build Kairos in this order:
+
+```text
+1. Honest persistence and demo/live separation
+2. Stable canonical identity and idempotent ingestion
+3. Evidence-backed lineage and four-state reasoning
+4. Capability-aware asset profiles
+5. dbt + OpenLineage + SQL evidence inputs
+6. Connection lifecycle and diagnostics
+7. Quality assertions, incidents, and owner routing
+8. Data contracts
+9. Hybrid search and grounded RAG
+10. Collaboration, usage, admin, and MCP context
+```
+
+Do not add more connectors, AI features, or dashboard visuals until the first five demo workflows can be reproduced end to end from real imported or live data, with visible provenance and no silent mock fallback.
+
+
+## How evidence works across different sources
+
+Evidence is not “SQL lineage.” Evidence is any **verifiable observation, declaration, parse result, classification, or execution record** that explains why Kairos believes something about an asset, relationship, quality state, or AI answer. The same evidence model must work for SQL, files, GitHub repositories, databases, dbt, OpenLineage, ML models, and RAG.
+
+OpenLineage provides the best reference model: it separates a **job**, a **run**, a **dataset**, and extensible **facets**. A facet is atomic metadata attached to a run, job, or dataset; it carries context such as what ran, how it ran, what was used, and what was produced. [openlineage](https://openlineage.io/docs/spec/facets/)
+
+## Core principle
+
+Kairos should never store only a lineage arrow. Every edge, classification, quality result, preview, or AI answer should have an evidence record:
+
+```text
+Raw source artifact
+  → normalized evidence
+  → canonical asset / relationship
+  → reasoning state
+  → UI explanation
+```
+
+A relationship is not automatically true because two assets exist. It becomes:
+
+- `OBSERVED` only when runtime evidence supports it.
+- `POSSIBLE` when static analysis or a declaration supports it.
+- `REFUTED_FOR_RUN` only when complete negative evaluation exists for that run.
+- `UNKNOWN` when evidence is absent, incomplete, or ambiguous. 
+
+## Evidence model by source type
+
+| Source | What evidence it provides | What it can prove | What it cannot prove | Kairos evidence state |
+| --- | --- | --- | --- | --- |
+| SQL file / SQLGlot | Parsed tables, columns, joins, CTEs, transformations | Static dependency is plausible | That a particular run executed or propagated the dependency | `POSSIBLE` |
+| dbt `manifest.json` | Declared model/source/exposure dependencies, tests, descriptions | A dbt model declares a dependency | That a production run executed or that data propagated | `POSSIBLE` / declared |
+| dbt `run_results.json` | Test execution outcomes | A test passed/failed for a run | Complete column-level runtime propagation | `OBSERVED` for the test result |
+| OpenLineage run event | Job, run, inputs, outputs, timing, status, facets | A job read/wrote datasets during a run | A direct edge from every input to every output unless lineage facet says so | `OBSERVED` for run boundary |
+| OpenLineage lineage facet | Explicit dataset/job/field lineage | Exact declared or observed lineage edges | Completeness of instrumentation | `OBSERVED` for supplied edge |
+| PostgreSQL catalog | Tables, columns, types, constraints, comments | Structural metadata exists | Data content, runtime usage, lineage | Structural metadata only |
+| PostgreSQL query log | Queries executed against source | A query referenced certain tables/columns | Full column-level propagation unless query/log parser supports it | `OBSERVED` query reference / `POSSIBLE` lineage |
+| GitHub repository | Repo, branch, commit, file tree, file content | A file exists at a commit | That SQL was executed or that dbt models ran | File-existence evidence |
+| Local file upload | User-supplied JSON/CSV/document metadata | User supplied this artifact | Source authenticity or live connectivity | User-supplied evidence |
+| Image metadata | MIME type, dimensions, hash, path | File metadata exists | Image content meaning, lineage, quality | Metadata evidence |
+| MLflow | Model version, training run, parameters, metrics, artifacts | A model version exists and was trained from recorded inputs | That every feature contributed at inference | `OBSERVED` training lineage |
+| RAG trace | Query, retrieved chunks, prompt, model, answer, tokens | What the AI system retrieved and generated | That the answer is correct or grounded without evaluation | `OBSERVED` trace |
+| Manual steward action | Human classification/approval | A human made a decision | That the decision is technically correct | Manual evidence |
+| Profiler | Row count, null rate, distinct count, distribution | Statistical profile at a time | Complete data quality or lineage | `OBSERVED` profile |
+
+## Evidence record contract
+
+Every source should normalize into one common evidence shape.
+
+```json
+{
+  "evidence_id": "uuid",
+  "raw_event_id": "uuid | null",
+  "source_type": "sqlglot | dbt_manifest | openlineage | postgres_catalog | github | file_upload | mlflow | rag_trace | manual | profiler",
+  "source_system": "warehouse | github | dbt | airflow | user-upload",
+  "connection_id": "uuid | null",
+  "run_id": "uuid | null",
+  "artifact_version": "string | null",
+  "subject": {
+    "asset_urn": "kairos:table:finance:analytics.orders",
+    "column": "customer_id"
+  },
+  "related_subject": {
+    "asset_urn": "kairos:table:finance:analytics.customer_360",
+    "column": "customer_id"
+  },
+  "evidence_kind": "structural | declared | runtime | profile | classification | content | manual",
+  "evidence_state": "OBSERVED | POSSIBLE | REFUTED_FOR_RUN | UNKNOWN",
+  "observation": {
+    "statement": "Column customer_id in analytics.customer_360 derives from analytics.orders.customer_id",
+    "confidence": null,
+    "coverage": {},
+    "complete_negative_evaluation": false
+  },
+  "temporal": {
+    "event_time": "2026-10-31T10:00:00Z",
+    "valid_from": "2026-10-31T10:00:00Z",
+    "valid_to": null,
+    "recorded_from": "2026-10-31T10:02:00Z",
+    "recorded_to": null
+  },
+  "provenance": {
+    "producer": "dbt",
+    "artifact_uri": "s3://.../manifest.json",
+    "parser_version": "sqlglot-25.x",
+    "extraction_span": { "start": 120, "end": 180 },
+    "redacted_fields": ["password", "token"]
+  }
+}
+```
+
+## How each source becomes evidence
+
+### 1. SQL file
+
+```text
+User uploads query.sql
+  → SQLGlot parses SQL
+  → Extract tables, columns, joins, aliases
+  → Create relationship candidates
+  → Store parsed SQL + extraction span
+  → Mark lineage POSSIBLE
+```
+
+Example:
+
+```sql
+SELECT
+  o.customer_id,
+  c.email
+FROM orders o
+JOIN customers c ON c.id = o.customer_id;
+```
+
+Evidence:
+
+| Field | Value |
+| --- | --- |
+| Source | SQL file |
+| Parser | SQLGlot |
+| Subject | `analytics.customer_360.email` |
+| Related subject | `customers.email` |
+| Relationship | Column lineage |
+| State | `POSSIBLE` |
+| Reason | Static SQL analysis found a mapping |
+| Cannot prove | That this query ran or that the value propagated in a production run |
+
+### 2. dbt manifest
+
+```text
+User uploads manifest.json
+  → Parse nodes, sources, exposures, tests
+  → Create dbt model/source/exposure assets
+  → Create declared depends_on relationships
+  → Store manifest version and node unique_id
+  → Mark lineage declared / POSSIBLE
+```
+
+Example:
+
+```json
+{
+  "unique_id": "model.finance.fct_revenue",
+  "depends_on": {
+    "nodes": ["model.finance.stg_orders"]
+  }
+}
+```
+
+Evidence:
+
+| Field | Value |
+| --- | --- |
+| Source | dbt manifest |
+| Subject | `model.finance.fct_revenue` |
+| Related subject | `model.finance.stg_orders` |
+| Relationship | Declared model dependency |
+| State | `POSSIBLE` |
+| Reason | Declared in dbt manifest |
+| Cannot prove | That the model ran or that rows propagated |
+
+If a dbt test result is ingested, that result is separately `OBSERVED` evidence for the test outcome—not proof of full column-level propagation.
+
+### 3. OpenLineage event
+
+```text
+Pipeline emits OpenLineage event
+  → Kairos stores immutable raw event
+  → Parses job, run, inputs, outputs, facets
+  → Creates job/run/dataset records
+  → Creates run-boundary relationships
+  → Uses lineage facet for exact edges if present
+  → Marks event-backed relationships OBSERVED
+```
+
+OpenLineage explicitly warns against creating a Cartesian product from every event input and output. A job reading `customers` and `orders` and writing `customer_summary` and `order_summary` does not imply four lineage edges; the Lineage Job Facet records the actual edges. [openlineage](https://openlineage.io/docs/1.48.0/)
+
+Evidence:
+
+| Field | Value |
+| --- | --- |
+| Source | OpenLineage |
+| Run ID | Run UUID |
+| Subject | Output dataset |
+| Related subject | Exact input dataset from lineage facet |
+| Relationship | Runtime job lineage |
+| State | `OBSERVED` |
+| Reason | Observed during run |
+| Cannot prove | Column propagation unless field-level facet exists |
+
+### 4. PostgreSQL catalog discovery
+
+```text
+User connects read-only PostgreSQL role
+  → Kairos queries information_schema / pg_catalog
+  → Reads schemas, tables, columns, constraints
+  → Creates structural assets
+  → Stores discovery-run provenance
+  → Marks metadata OBSERVED
+```
+
+Evidence:
+
+| Field | Value |
+| --- | --- |
+| Source | PostgreSQL catalog |
+| Subject | `analytics.orders` |
+| Evidence kind | Structural metadata |
+| State | `OBSERVED` |
+| Proves | Table/column metadata existed at discovery time |
+| Cannot prove | Lineage, data quality, usage, or runtime behavior |
+
+A PostgreSQL connection gives Kairos **metadata access**, not automatic query-log access or data-preview access. Those require separate permissions.
+
+### 5. GitHub repository
+
+```text
+User connects GitHub
+  → Grants repository-scoped read access
+  → Kairos reads repo tree at a commit
+  → Discovers .sql, .yml, manifest.json, OpenLineage files
+  → Stores commit SHA, path, file hash
+  → Runs SQL/dbt/OpenLineage parsers only on relevant files
+  → Creates file assets and parser-derived evidence
+```
+
+Evidence:
+
+| Field | Value |
+| --- | --- |
+| Source | GitHub |
+| Subject | `repo://org/repo/path/models/stg_orders.sql` |
+| Commit | `abc123` |
+| Evidence kind | File existence / parsed SQL |
+| State | File existence `OBSERVED`; parsed lineage `POSSIBLE` |
+| Cannot prove | That the SQL ran in a warehouse |
+
+A GitHub connection proves repository access and file discovery. It does not automatically prove database lineage.
+
+### 6. Local file upload
+
+```text
+User uploads JSON / CSV / document / image
+  → Browser sends authorized file
+  → Backend validates type/size/schema
+  → Stores raw artifact or metadata reference
+  → Extracts safe metadata
+  → Creates file/document/image asset
+  → Marks evidence as user-supplied
+```
+
+Evidence:
+
+| Source | Evidence produced | State |
+| --- | --- | --- |
+| JSON metadata | Structural metadata and explicit relationships | `OBSERVED` for user-supplied fact |
+| CSV | File metadata; profile only if parsing is implemented | File metadata `OBSERVED`; profile `UNKNOWN` unless run |
+| Document | Path, MIME type, size, extracted text if implemented | Metadata `OBSERVED`; semantics `UNKNOWN` |
+| Image | MIME type, dimensions, hash, thumbnail if available | Metadata `OBSERVED`; content meaning `UNKNOWN` |
+
+A file import must never be described as a live connector.
+
+### 7. MLflow / ML metadata
+
+```text
+MLflow emits or exposes training run
+  → Kairos ingests model version, run ID, parameters, metrics, artifacts
+  → Links training dataset(s), feature views, code version
+  → Creates model/training/feature lineage
+  → Marks training lineage OBSERVED
+```
+
+Evidence:
+
+| Field | Value |
+| --- | --- |
+| Source | MLflow |
+| Subject | `model.churn_classifier@v7` |
+| Related subject | `feature.customer_lifetime_value` |
+| Relationship | Feature-to-model training lineage |
+| State | `OBSERVED` |
+| Proves | Model version recorded this feature/training dataset |
+| Cannot prove | That the feature contributed to every inference |
+
+### 8. RAG trace
+
+```text
+User asks Kairos a question
+  → Kairos retrieves metadata chunks
+  → Kairos records retrieved context, prompt, model, answer
+  → Kairos evaluates grounding/citations
+  → Stores RAG trace
+  → Marks retrieval/generation OBSERVED
+  → Marks correctness UNKNOWN until evaluated
+```
+
+Evidence:
+
+| Field | Value |
+| --- | --- |
+| Source | Kairos RAG |
+| Subject | RAG answer / trace |
+| Related subject | Retrieved asset/column/policy chunks |
+| Evidence kind | AI retrieval and generation trace |
+| State | Retrieval `OBSERVED`; factual correctness `UNKNOWN` until evaluated |
+| Cannot prove | Answer correctness without evaluation |
+
+## How the four states work per source
+
+| Situation | Correct state |
+| --- | --- |
+| OpenLineage lineage facet says output field derives from input field | `OBSERVED` |
+| SQLGlot finds a likely dependency | `POSSIBLE` |
+| dbt manifest declares a dependency | `POSSIBLE` / declared |
+| User manually creates a relationship | `OBSERVED` as a manual declaration, but not runtime-observed |
+| Run event confirms a job read/wrote datasets | `OBSERVED` for run boundary |
+| Run had complete observation coverage and proved no contribution | `REFUTED_FOR_RUN` |
+| Runtime event is missing | `UNKNOWN` or `POSSIBLE`, never `REFUTED_FOR_RUN` |
+| Parser cannot understand SQL | `UNKNOWN` |
+| Source connection failed | Evidence unavailable; do not invent state |
+| PII classification is manually applied | `OBSERVED` manual classification |
+| PII classification is inferred from lineage | `POSSIBLE` or inherited classification, with provenance |
+
+## How PII evidence works
+
+PII is not only a tag. It is an evidence-backed classification with a propagation path.
+
+```text
+customers.email = PII_SOURCE
+        │
+        ▼
+stg_customers.email = PII_INHERITED
+        │
+        ▼
+dim_customer.email_masked = PII_MASKED
+        │
+        ▼
+marketing_extract.email = PII_POTENTIAL
+```
+
+| Evidence type | Example | State |
+| --- | --- | --- |
+| Manual classification | Steward tags `customers.email` as PII | `OBSERVED` manual classification |
+| Lineage propagation | Column lineage shows direct copy | `OBSERVED` inherited classification |
+| Static SQL inference | SQLGlot finds possible mapping | `POSSIBLE` inherited classification |
+| Masking transformation | Hash/mask function detected | `PII_MASKED` |
+| Missing lineage | Downstream file has no column mapping | `UNKNOWN` |
+| Aggregation with no identifiers | Count only, no direct PII field | Potential `PII_CLEARED`, requires review |
+
+Atlan and DataHub both describe lineage-based PII propagation: a PII classification at source can propagate to derived columns through joins, transformations, and aggregations. 
+
+## Evidence UI in Kairos
+
+Use the existing Kairos evidence panel, not a new design system.
+
+### Evidence inspector
+
+```text
+Evidence ID: ev_8f31...
+Evidence State: OBSERVED
+Evidence Kind: Runtime lineage
+Source: OpenLineage
+Producer: airflow
+Run ID: run_4821
+Event Time: 2026-10-31 10:00 UTC
+Recorded Time: 2026-10-31 10:02 UTC
+
+Subject:
+  analytics.customer_360.customer_id
+
+Related Subject:
+  analytics.orders.customer_id
+
+Explanation:
+  OpenLineage lineage facet recorded this field-level dependency
+  during run run_4821.
+
+Coverage:
+  Run scope: full
+  Field coverage: complete
+
+Raw Event:
+  View sanitized payload
+```
+
+### PII evidence inspector
+
+```text
+Classification: PII — Email
+Classification State: OBSERVED
+Classification Source: Manual steward classification
+Classified By: steward@company.com
+Classified At: 2026-10-31 09:15 UTC
+
+Propagation:
+  customers.email → stg_customers.email
+  Propagation State: OBSERVED
+  Transformation: Direct copy
+  Evidence: OpenLineage run_4821
+
+Downstream Assets:
+  dim_customer.email_masked — PII_MASKED
+  marketing_extract.email — PII_POTENTIAL
+```
+
+## What competitors do
+
+| Competitor | Evidence approach | Kairos lesson |
+| --- | --- | --- |
+| OpenLineage | Stores job/run/dataset events and extensible facets; lineage facets distinguish exact edges from input/output boundaries.  [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/151262466/30bac001-4f51-4d26-ade3-576f52c11806/paste.txt?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Checksum-Mode=ENABLED&X-Amz-Credential=ASIA2F3EMEYEW52APJFP%2F20261101%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20261101T074321Z&X-Amz-Expires=1471&X-Amz-Security-Token=IQoJb3JpZ2luX2VjEJj%2F%2F%2F%2F%2F%2F%2F%2F%2F%2FwEaCXVzLWVhc3QtMSJGMEQCIDqWglQR%2Fhc%2BKNL8fizyhBEHy4JMu9fwj%2B8Dboo4seQGAiA7eQlqrFzBx0O6iUe3nWngShiWKo7w0kubXeVQgQ%2FSsyqABQhgEAEaDDY5OTc1MzMwOTcwNSIMAKwSD959zI1SArIGKt0EQOzX04Q4H9nqvtQkhBulE%2FrJiARdadCJb%2FqvD4QSWCirz%2FSI071Z9ftytoux%2FFuzTeXnKT9FQAwwOdnSJR8Xxkf4j23AkM49%2BQ92f4YJuGC3sKHWEROZc8zExza3159NqDLQKJN94Z8j7POr5ZBVZJUitKxhMIF0ZMiOxcaiLUtMtETddNpfk4FyJpmDzS%2B8dMWn2XeGdvWV9stnERjGt6bvgL6NDbsCqzDaPdKmth88TjIPbitt40G2S7m2d1Xg8vIbvNXzQM1V2lc37XmbZH4TOBdjjnY3NY9CvqE0rEwwyzp69MPoR3m9C9w4aMD1tLPlCKgBl3rvY94H8sgn7y2ke3Ne0PUYQoZ1foUDck0HNfqhh1L6XCrxtb%2FYXTzwI3ucRQC3LPUCRv1zXLSSOeQq5SeucAxQhR05VqnU1Tjt0jSvTUloWbrzYeDS45SUynwpI%2Fam3omxaxbCNDd7R1KTOUAq5Asw%2BNE41JY91Hyv5Qyv3uN6%2FsOPKUZ9E9E%2F6RH%2FQ%2BCCht16TufMMkXIeSAXai64zaq3fyc5SNlf7Gtq3c9PI1ywvT%2BoOr85ojMAGPX5UJ%2FoLXZQX2VM4yQaX5fgPWzI9Y%2FLUsb3m4ks9V4BPhE6eEB7SoF471TAJgyYWcxcuNGgwH0Umd8usbN95H7rcGqN3PrYY6jLZm15Vwx5HOfjNY9Azr46k7YB3qi2FTZS1veUo8pHU%2Fv2CJo0ZJRE%2B8IXG8bW%2B4qRDXxo15NfA5j4IisoEDcNaqRIW6LhPU1ht9xa0AOo0k6TEDTv3BI68HjSCBYDJM%2B4lRAwhcub1wY6mQGZwlCyWCZS%2BKpqe5iNr5UTsAqid26UCX4vzxhUWXxM1kYkUHGRGrTUQFN2CpztBfIsv3A5IH94XtCOJml8IK4ha80T2M9MwXEhvYsFVsgfeovC303tTAvrDjjum9x9ZZWrFuY1nmQmGKsRkDhBtZRH5tzyg6Sm6U%2BEwObsrX2oNIp757cwi0oszE%2B%2B%2BuOgfEgeeRzWB7yiBGw%3D&X-Amz-SignedHeaders=host&x-id=GetObject&X-Amz-Signature=bb8efbede641e981e5fba1923bce140193a06e80fe0eb4aa55f6900d15ee6bff) | Store raw events; never infer Cartesian input-output edges. |
+| DataHub | Uses assertions for quality and lineage/provenance metadata; PII classification propagates through column lineage.  | Make assertions, classifications, and lineage evidence first-class records. |
+| OpenMetadata | Links test cases to entities, stores results, tracks quality history, and manages incidents.  [openlineage](https://openlineage.io/docs/spec/facets/job-facets/lineage/) | Link every quality result to asset, run, owner, timestamp, and incident. |
+| Atlan | Propagates governance classifications along lineage and uses access controls to enforce visibility.  | Separate PII classification propagation from PII data access. |
+| Monte Carlo | Uses monitors and lineage to trace incidents and root causes.  | Connect quality failures to lineage impact and owner routing. |
+
+## Kairos implementation rule
+
+For every source, implement this same five-step pipeline:
+
+```text
+1. Capture raw artifact/event
+2. Preserve provenance and immutable raw record
+3. Normalize into source-neutral evidence
+4. Resolve canonical asset/relationship identity
+5. Derive four-state conclusion without using ground truth
+```
+
+Then the UI must always answer:
+
+```text
+What do we know?
+How do we know it?
+When did we learn it?
+For which run or time period?
+What remains unknown?
+```
+
+That is how evidence remains consistent whether the input is SQL, a GitHub file, a PostgreSQL catalog, an image, a dbt manifest, an OpenLineage event, an ML model, or a RAG answer.
+
+
+
+
+# Competitor authentication, access, and metadata-capture workflow analysis
+
+## Executive answer
+
+Competitors do **not** ask users to give a metadata platform unrestricted access to their private systems. They use a scoped, source-specific credential or OAuth authorization; the platform authenticates to the source, discovers only permitted metadata, normalizes it into its own catalog, and then controls which human users can see that metadata through platform roles, personas, workspaces, or row-level policies. For Kairos, the correct model is: **Kairos user identity is separate from source credentials; source credentials authorize Kairos to read a narrowly scoped source; Kairos RLS/authorization controls which Kairos user can view the resulting metadata.** [docs.atlan](https://docs.atlan.com/product/connections/references/connector-auth-and-setup)
+
+## 1. The universal competitor workflow
+
+```text
+1. User signs up / signs in to the metadata platform
+2. User creates a source connection
+3. User chooses an authentication method
+4. User grants only the required source scope
+5. Platform validates the credential/connection
+6. Platform runs discovery / ingestion
+7. Platform reads only permitted metadata
+8. Platform stores raw evidence and normalized catalog records
+9. Platform applies its own user/tenant permissions to catalog visibility
+10. User browses assets, lineage, quality, and incidents inside the platform
+```
+
+The critical separation is:
+
+| Concept | Question answered | Example |
+| --- | --- | --- |
+| Authentication | Who is calling? | Kairos user JWT, GitHub token, database user |
+| Source authorization | What can Kairos read from the user’s source? | Read-only PostgreSQL metadata, GitHub repository contents |
+| Platform authorization | Which Kairos assets can this user see? | Finance-domain assets only |
+| Tenant isolation | Which organization’s records are visible? | Tenant A cannot see Tenant B |
+| Source scope | Which repositories/schemas/databases were selected? | Only `repo-x`, only `sales` schema |
+| Evidence visibility | Who may inspect raw events or sensitive metadata? | Steward/admin only |
+
+## 2. DataHub workflow
+
+### User sign-up and platform access
+
+DataHub authenticates user and service requests through its metadata service using JWT bearer tokens. It supports native DataHub tokens and JWTs issued by external OAuth2/OIDC providers such as Okta, Auth0, and Azure AD. [docs.datahub](https://docs.datahub.com/docs/authentication)
+
+```text
+User signs in
+  → DataHub issues/accepts a JWT
+  → Frontend sends Authorization: Bearer <token>
+  → DataHub metadata service authenticates request
+  → Platform policies determine accessible assets/actions
+```
+
+DataHub also supports **service accounts** for non-human identities such as ingestion pipelines and CI/CD. An administrator creates a service account, generates a time-limited access token, and can revoke it later. The token is shown once and must be stored securely. [docs.datahub](https://docs.datahub.com/docs/features/feature-guides/service-accounts)
+
+### How a user connects a source
+
+In DataHub’s UI ingestion flow, the user creates an ingestion source, completes a connection form, and can reference encrypted secrets rather than entering raw credentials directly. Secret fields are resolved by a trusted worker at job time; secrets are decrypted server-side and sent to the worker over TLS. [docs.datahub](https://docs.datahub.com/docs/ui-ingestion)
+
+```text
+User opens Ingestion
+  → Chooses source type
+  → Enters host/database/project details
+  → Selects or creates a managed secret
+  → Tests connection
+  → Saves ingestion recipe
+  → Runs or schedules ingestion
+```
+
+### What DataHub accesses
+
+DataHub reads metadata under the permissions of the configured source credential. For example, a source integration may read database catalogs, schemas, tables, columns, query logs, dashboards, or pipeline metadata—but only what that credential is authorized to access. The exact capability depends on the connector and source permissions. [docs.datahub](https://docs.datahub.com/docs/ui-ingestion)
+
+### Kairos adaptation
+
+| DataHub pattern | Kairos implementation |
+| --- | --- |
+| JWT-based platform authentication | Supabase Auth JWT for every Kairos user request |
+| Service accounts | Kairos connector/worker identity for scheduled ingestion |
+| Secret references | Store source credentials server-side; never expose them to the browser |
+| Trusted worker resolves secrets | Hatchable/Node backend worker accesses credentials only during ingestion |
+| Source-specific connector forms | PostgreSQL, GitHub, dbt, OpenLineage forms with different fields |
+| Separate catalog search and graph traversal | Keep `/search`, asset lookup, and lineage traversal distinct |
+
+## 3. OpenMetadata workflow
+
+### User sign-up and access
+
+OpenMetadata uses services, users, teams, roles, domains, policies, and bots/service identities. A user first configures a **service connection**, tests it, saves it, and then creates an ingestion workflow. [openmetadatastandards](https://openmetadatastandards.org/schemas/entity/services/)
+
+```text
+User signs in
+  → Creates or selects a service
+  → Configures source connection
+  → Tests connection
+  → Saves service
+  → Creates ingestion workflow
+  → Runs/schedules ingestion
+  → Views resulting assets
+```
+
+OpenMetadata documents that credentials can be handled through the ingestion workflow, and that existing services use stored credentials rather than credentials supplied in each new YAML run. Credential updates occur through the UI or API. [docs.open-metadata](https://docs.open-metadata.org/v2.0.x/deployment/ingestion/external/credentials)
+
+### How a user connects a source
+
+For a database such as Snowflake, the user supplies account, warehouse, database, schema, and authentication details. OpenMetadata supports basic auth, key-pair auth, and SSO depending on the source. It then asks the user to test the connection and save it. [docs.open-metadata](https://docs.open-metadata.org/v1.13.x/connectors/database/snowflake)
+
+For BigQuery, OpenMetadata supports service-account key values, key-file paths, workload identity federation, and Application Default Credentials. After the service connection is created, ingestion can begin. [docs.open-metadata](https://docs.open-metadata.org/v2.0.x/connectors/database/bigquery)
+
+### What OpenMetadata accesses
+
+The connector account needs only metadata-read privileges. For Snowflake, OpenMetadata documents that a metadata-ingestion user needs `USAGE` on warehouse/database/schema and `SELECT` on tables; it does not require write access to the source. [docs.open-metadata](https://docs.open-metadata.org/v1.13.x/connectors/database/snowflake)
+
+For Pub/Sub, OpenMetadata requires permissions to list and read topics/subscriptions, and recommends a viewer role rather than broad admin access. [docs.open-metadata](https://docs.open-metadata.org/v2.1.x-SNAPSHOT/connectors/messaging/pubsub)
+
+### Kairos adaptation
+
+| OpenMetadata pattern | Kairos implementation |
+| --- | --- |
+| Service connection object | `kairos_connections` table |
+| Connection test | `/api/v1/connections/:id/test` |
+| Ingestion workflow | `kairos_ingestion_runs` |
+| Stored credentials | Server-side encrypted secret reference |
+| Source-specific permission requirements | Connector capability registry |
+| Scheduled ingestion | Durable job queue / scheduled worker |
+| Capability-specific asset tabs | Backend capability registry |
+
+## 4. Atlan workflow
+
+### User sign-up and access
+
+Atlan separates identity and access management into SSO/SCIM, users, groups, roles, personas, purposes, connection access, visibility, and audit logs. [docs.atlan](https://docs.atlan.com/product/capabilities/governance/access-control)
+
+```text
+User signs in through SSO
+  → User receives a persona/role
+  → Persona grants access to connections/domains/assets
+  → Connection admin controls connection-level access
+  → User sees only permitted metadata
+```
+
+A connection admin or workspace admin assigns additional connection admins. API tokens must be associated with personas to access connection assets. [docs.atlan](https://docs.atlan.com/faq/user-management-and-access-control)
+
+### How a user connects a source
+
+Atlan’s connector setup reference separates authentication methods, grants, network prerequisites, and scoping limits. It recommends service principals or managed identities backed by a secret store over long-lived keys or plaintext credentials. Credentials may be stored in Atlan or fetched from AWS Secrets Manager or GCP Secret Manager. [docs.atlan](https://docs.atlan.com/product/connections/references/connector-auth-and-setup)
+
+For Redshift, Atlan supports basic username/password, IAM user, or IAM role authentication. It instructs users to create a read-only database user and grant schema-level `USAGE` permissions before configuring the crawler. [docs.atlan](https://docs.atlan.com/apps/connectors/data-warehouses/amazon-redshift/how-tos/set-up-access-and-authentication)
+
+### What Atlan accesses
+
+Atlan states that it reads **metadata, not production data**, under the service principal’s scope; data preview can be disabled centrally. [docs.atlan](https://docs.atlan.com/product/connections/references/connector-auth-and-setup)
+
+This is an important product boundary for Kairos:
+
+```text
+Metadata access = schemas, tables, columns, lineage, ownership, documentation
+Data access = row-level content, previews, profiling
+```
+
+Kairos should make these separate permissions.
+
+### Kairos adaptation
+
+| Atlan pattern | Kairos implementation |
+| --- | --- |
+| Personas | Kairos roles: viewer, steward, editor, admin |
+| Purposes | Purpose-based access rules for sensitive metadata |
+| Connection admins | Connection owner / connector admin |
+| Secret-manager integration | Server-side secret reference; no plaintext credentials in DB/API responses |
+| Metadata-only access posture | Default connector scope is metadata read, not data read |
+| Preview opt-out | Separate `metadata:read` and `data:preview` permissions |
+
+## 5. GitHub access workflow
+
+### Recommended Kairos model
+
+For Kairos, use a **GitHub App installation** for the production path and a **fine-grained personal access token** only as a lower-friction MVP fallback.
+
+### GitHub App flow
+
+```text
+User signs in to Kairos
+  → Clicks “Connect GitHub”
+  → GitHub asks which account/organization to install the app on
+  → User selects specific repositories
+  → User approves requested permissions
+  → GitHub issues an installation ID
+  → Kairos exchanges/uses installation credentials
+  → Kairos reads only selected repository metadata/files
+  → User can revoke installation in GitHub
+```
+
+GitHub Apps have no permissions by default. The app requests only the minimum repository, organization, enterprise, or account permissions it needs; users grant those permissions when installing the app. [docs.github](https://docs.github.com/en/apps/creating-github-apps/registering-a-github-app/choosing-permissions-for-a-github-app)
+
+GitHub recommends minimum permissions, limiting repository access, subscribing only to required webhooks, and verifying webhook signatures with a webhook secret. [docs.github](https://docs.github.com/en/apps/creating-github-apps/about-creating-github-apps/best-practices-for-creating-a-github-app)
+
+### Fine-grained PAT fallback
+
+A fine-grained PAT is limited to one user or organization and can be restricted to selected repositories and specific permissions. GitHub recommends choosing minimal repository access and minimal permissions. [docs.github](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens)
+
+```text
+User creates fine-grained PAT
+  → Selects “Only select repositories”
+  → Selects Kairos demo repository
+  → Grants Contents: Read-only
+  → Pastes token into Kairos connection form
+  → Kairos stores it server-side
+  → Kairos reads repository tree/files
+```
+
+A classic PAT can access every repository the token owner can access, which is why it should not be Kairos’s preferred model. [docs.github](https://docs.github.com/api/article?pathname=/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens)
+
+### What Kairos should request
+
+| Permission | Level | Purpose |
+| --- | --- | --- |
+| Metadata | Read | Repository metadata, default branch |
+| Contents | Read | Read selected SQL/dbt/OpenLineage files |
+| Webhooks | Read/write only if incremental sync is implemented | Receive push events |
+| Administration | None | Not needed |
+| Actions | None | Not needed |
+| Secrets | None | Never request |
+
+Kairos must not request write access merely to catalog a repository.
+
+### Revocation behavior
+
+If the user revokes the GitHub App installation or deletes the PAT:
+
+```text
+Next connection health check fails
+  → Kairos marks connection REVOKED / CREDENTIALS_EXPIRED
+  → Existing imported metadata remains as historical evidence
+  → No new discovery/sync is attempted
+  → User may delete imported data or retain it according to retention policy
+```
+
+## 6. PostgreSQL source-access workflow
+
+### Recommended Kairos model
+
+Kairos should connect to a user’s PostgreSQL database using a **dedicated read-only Kairos user**, not the user’s admin account.
+
+```sql
+CREATE ROLE kairos_reader LOGIN PASSWORD '...';
+GRANT CONNECT ON DATABASE app_db TO kairos_reader;
+
+GRANT USAGE ON SCHEMA analytics TO kairos_reader;
+GRANT SELECT ON ALL TABLES IN SCHEMA analytics TO kairos_reader;
+
+-- Metadata-only access can be narrower:
+GRANT USAGE ON SCHEMA information_schema TO kairos_reader;
+GRANT SELECT ON information_schema.tables TO kairos_reader;
+GRANT SELECT ON information_schema.columns TO kairos_reader;
+```
+
+This follows the same least-privilege pattern used by OpenMetadata and Atlan: grant `USAGE` on relevant schemas and read access only to the metadata needed. [docs.open-metadata](https://docs.open-metadata.org/v1.13.x/connectors/database/snowflake)
+
+### What Kairos should read
+
+| Capability | Required source permission | Kairos feature |
+| --- | --- | --- |
+| List schemas/tables/views | Catalog metadata read | Catalog discovery |
+| Read columns/types/nullability | Catalog metadata read | Schema tab |
+| Read primary/foreign keys | Catalog metadata read | Relationship candidates |
+| Read comments | Column/table comment read | Descriptions |
+| Read table statistics | Optional elevated permission | Profiling hints |
+| Read query logs | Separate elevated permission | Runtime lineage candidates |
+| Execute data queries | Separate explicit permission | Preview/profiling only |
+
+Kairos must distinguish:
+
+```text
+Catalog discovery ≠ query execution
+Query execution ≠ query-log capture
+Query-log capture ≠ complete runtime lineage
+```
+
+### Connection flow
+
+```text
+User creates PostgreSQL connection
+  → Supplies host, port, database, username, password/SSL config
+  → Kairos stores secret server-side
+  → Kairos tests connection
+  → Kairos checks metadata permissions
+  → User selects schemas/databases to catalog
+  → Kairos runs discovery
+  → Kairos normalizes tables/columns
+  → Kairos persists assets and provenance
+  → User browses catalog
+```
+
+## 7. Supabase / Kairos platform authorization
+
+Kairos’s own users should be authenticated with Supabase Auth. Supabase issues signed JWTs containing identity and authorization claims; these JWTs are the foundation for PostgreSQL Row Level Security. [supabase](https://supabase.com/docs/guides/auth)
+
+```text
+User signs in to Kairos
+  → Supabase Auth issues JWT
+  → Browser sends JWT with API request
+  → API validates JWT
+  → API queries using user-scoped client
+  → PostgreSQL RLS filters rows
+  → User sees only authorized metadata
+```
+
+Supabase distinguishes:
+
+| Role | Meaning | Security rule |
+| --- | --- | --- |
+| `anon` | Unauthenticated request | Only public data, if intentionally public |
+| `authenticated` | Signed-in user | RLS policies apply |
+| `service_role` / secret key | Server-side privileged access | Bypasses RLS; never expose to browser |
+
+Supabase explicitly warns that service-role/secret keys bypass RLS and must remain server-side. [supabase](https://supabase.com/docs/guides/database/postgres/row-level-security)
+
+### Kairos RLS model
+
+```sql
+-- Tenant/workspace membership
+create table kairos_workspace_members (
+  workspace_id uuid not null,
+  user_id uuid not null,
+  role text not null,
+  primary key (workspace_id, user_id)
+);
+
+-- Asset isolation
+alter table kairos_assets enable row level security;
+
+create policy assets_select_for_members
+on kairos_assets
+for select
+to authenticated
+using (
+  exists (
+    select 1
+    from kairos_workspace_members m
+    where m.workspace_id = kairos_assets.workspace_id
+      and m.user_id = auth.uid()
+  )
+);
+```
+
+Do not rely on `user_metadata` JWT claims for authorization, because authenticated users may be able to modify that metadata. Supabase explicitly warns against relying on user-metadata claims in RLS policies. [supabase](https://supabase.com/docs/guides/database/postgres/row-level-security)
+
+## 8. How PII access should work
+
+PII classification and PII access must be separated.
+
+```text
+PII classification = metadata about sensitivity
+PII access = permission to view sensitive values/content
+```
+
+| Action | Required permission |
+| --- | --- |
+| See that a column is tagged PII | `metadata:read` |
+| See PII classification provenance | `governance:read` |
+| Change PII classification | `governance:classify` |
+| View raw sample data | `data:preview` |
+| View unmasked PII | `data:pii:unmasked` |
+| Trigger masking policy | `governance:policy:apply` |
+| View PII lineage path | `lineage:read` |
+
+Atlan’s model is useful here: governance classifications such as PII propagate along lineage, while access enforcement is handled through personas, purposes, and connection access. 
+
+Kairos should therefore propagate a PII classification through lineage, but not automatically grant users access to the underlying sensitive data.
+
+## 9. Conflict prevention: user authorization vs source authorization
+
+This is the central conflict you identified.
+
+```text
+User says: “Kairos may read my GitHub repository.”
+≠
+User says: “Every Kairos user may see my repository metadata.”
+```
+
+Correct separation:
+
+```text
+Source credential
+  → authorizes KAIROS BACKEND to read SOURCE
+
+Kairos role / workspace membership
+  → authorizes a KAIROS USER to view CATALOG METADATA
+
+Source scope
+  → limits WHICH repositories/schemas/databases are read
+
+Evidence sensitivity
+  → limits WHO may view raw events, previews, or PII-related metadata
+```
+
+Example:
+
+| Situation | Correct behavior |
+| --- | --- |
+| User connects private GitHub repo | Only that user/workspace can see imported repo metadata |
+| User connects PostgreSQL with read-only role | Kairos reads only permitted schemas |
+| User has no `data:preview` permission | User sees schema/metadata but no row preview |
+| Another workspace user has no membership | User cannot see the connection or its assets |
+| Source credential expires | Connection becomes `CREDENTIALS_EXPIRED`; existing historical evidence may remain visible according to policy |
+| PII source column propagates downstream | Downstream columns inherit classification, not automatic data access |
+| RAG user asks about PII | Retrieval filters out metadata the user cannot access |
+
+## 10. Recommended Kairos connection UX
+
+### Connection creation screen
+
+```text
+Connect a source
+
+Source type:
+[ PostgreSQL ] [ GitHub ] [ dbt artifact ] [ OpenLineage ] [ JSON file ]
+
+PostgreSQL
+Host: [___________]
+Port: [5432]
+Database: [___________]
+Username: [___________]
+Password: [********]
+SSL: [Require] [Prefer] [Disable]
+
+Access scope:
+[x] Discover schemas
+[x] Discover tables and columns
+[ ] Read table comments
+[ ] Enable data preview
+[ ] Read query logs
+
+Kairos workspace:
+[ Finance Workspace ]
+
+Data visibility:
+[ Only me ]
+[ Workspace members ]
+[ Specific roles ]
+
+[Test connection]  [Cancel]
+```
+
+### Post-connection status
+
+```text
+Connection: Finance Warehouse
+Status: Connected — metadata discovery completed
+Credential: Valid
+Scope: analytics schema, metadata read only
+Last successful sync: 2 minutes ago
+Assets discovered: 42 tables, 318 columns
+Data preview: Disabled
+Query-log lineage: Not authorized
+```
+
+### Failure states
+
+| Failure | UI status | User action |
+| --- | --- | --- |
+| Wrong password | Authentication failed | Re-enter credential |
+| Network unreachable | Source unreachable | Check host/network |
+| Insufficient schema permission | Connected but partial authorization | Grant metadata read or reduce selected scope |
+| Expired GitHub token | Credentials expired | Reconnect GitHub |
+| Revoked GitHub App | Connection revoked | Reinstall/reauthorize |
+| Empty schema | Connected — no discoverable assets | Honest empty state |
+| Discovery partial failure | Partially discovered | Show succeeded/failed resource counts |
+
+## 11. What Kairos should copy—and avoid
+
+| Competitor practice | Copy? | Kairos adaptation |
+| --- | --- | --- |
+| Separate platform identity from source credentials | Yes | Supabase Auth + server-side source credential vault |
+| Service accounts for ingestion | Yes | Connector worker identity |
+| Secret references instead of plaintext credentials | Yes | Encrypted secret store / server-side env reference |
+| Metadata-only default posture | Yes | Request metadata read; make data preview opt-in |
+| Least-privilege source roles | Yes | Read-only PostgreSQL user; repository-scoped GitHub access |
+| Connection test before discovery | Yes | Separate `test` and `discover` operations |
+| Capability-specific asset tabs | Yes | Backend capability registry |
+| Personas/purposes | Later | Start with simple roles; defer purpose-based access |
+| Broad classic GitHub PAT | No | Use fine-grained PAT or GitHub App |
+| User’s admin database credentials | No | Require dedicated read-only Kairos role |
+| Automatic tenant isolation from UI hiding | No | Enforce server-side authorization + RLS |
+| Treating credential success as discovery success | No | Track each lifecycle stage separately |
+| Treating OpenLineage input/output as direct column lineage | No | Preserve run boundaries and evidence coverage |
+
+## 12. Recommended Kairos permission model
+
+### MVP roles
+
+| Role | Catalog read | Connection create | Connection admin | Metadata edit | PII classify | Data preview | Incident manage |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Viewer | Yes, authorized scope | No | No | No | No | No | No |
+| Steward | Yes, authorized scope | No | No | Yes | Yes | Optional | Yes |
+| Editor | Yes, authorized scope | No | No | Yes | No | Optional | No |
+| Connection owner | Yes, own connections | Yes | Yes, own connections | Yes | Yes | Optional | Yes |
+| Admin | Yes | Yes | Yes | Yes | Yes | Yes | Yes |
+
+### Permission claims
+
+```json
+{
+  "sub": "user-uuid",
+  "workspace_id": "workspace-uuid",
+  "role": "steward",
+  "permissions": [
+    "catalog:read",
+    "lineage:read",
+    "metadata:write",
+    "pii:classify",
+    "incident:manage"
+  ]
+}
+```
+
+Do not trust these claims if they can be edited by the client. Derive authorization from server-side workspace membership and database policies.
+
+## 13. Kairos end-to-end access flow
+
+```mermaid
+sequenceDiagram
+    participant U as Kairos User
+    participant FE as Kairos Frontend
+    participant API as Kairos API
+    participant AUTH as Supabase Auth
+    participant DB as Kairos PostgreSQL
+    participant SRC as User Source
+    participant SEC as Secret Store
+
+    U->>FE: Sign in
+    FE->>AUTH: Authenticate
+    AUTH-->>FE: User JWT
+    FE->>API: Create PostgreSQL connection
+    API->>AUTH: Validate JWT
+    API->>DB: Check workspace role
+    API->>SEC: Store credential reference
+    API->>SRC: Test metadata-only connection
+    SRC-->>API: Connection healthy
+    API->>DB: Save connection status
+    U->>FE: Run discovery
+    FE->>API: Start discovery
+    API->>SEC: Resolve credential
+    API->>SRC: Read permitted metadata
+    SRC-->>API: Schemas/tables/columns
+    API->>DB: Persist normalized assets + provenance
+    API-->>FE: Catalog updated
+    U->>FE: Open asset
+    FE->>API: Get asset by URN
+    API->>DB: RLS-scoped query
+    DB-->>API: Authorized asset only
+    API-->>FE: Asset profile
+```
+
+## 14. Demo-ready recommendation
+
+For the first reliable Kairos demonstration, implement this exact access model:
+
+1. User signs in with Supabase Auth.
+2. User creates a connection.
+3. Kairos stores only a server-side credential reference.
+4. Kairos tests the connection separately from discovery.
+5. Kairos runs discovery using a least-privilege source credential.
+6. Kairos persists raw evidence, normalized assets, provenance, and connector status.
+7. Kairos applies workspace membership and RLS before showing catalog/lineage/search results.
+8. Demo fixtures are explicitly labeled and never silently used when a live source fails.
+9. PII classification propagates through lineage, but PII data access remains separately authorized.
+10. The UI never claims semantic search, grounded RAG, live lineage, or tenant isolation unless those paths have been tested end to end.
+
+This gives Kairos the same security boundary as mature platforms—**scoped source access, server-side credential handling, platform-level authorization, and honest capability reporting**—without requiring a complex enterprise IAM system on day one. [docs.atlan](https://docs.atlan.com/product/connections/references/connector-auth-and-setup)
+
+
+
+
+
+Guys, for example, check how exactly the workflow of this competitors are, how exactly do they give the access to their users, how exactly the data sources are accessed, which are accessed, do all the competitor analysis. For example, a person sign ups, and then what happens? How does actually their whole metadata is captured, how many how does actually the authentication part is done, how does the actually user goes and check, uh, their metadata, and how which access is given by the user, uh, and all. So check, check it all, and how should check how exactly we will use it in our system, because we have to give that what exactly is user giving, because there shouldn't even actual. You know. Uh. There shouldn't be any actual conflict which happen for. Example, for example, that the. User is giving authentication that, okay, you have the access to read my file manager, and. I'm giving only example, not exactly this, but how will he give the authentication and then give the, you know, uh. The access, and how exactly a system is accessing, because it is a private thing. So you will, you will find the conflict, so how exactly it is handled. So do a competitor analysis for all the authentication part, how exactly the access is given by the competitors, and how exactly it is pulled from them.
+
+
