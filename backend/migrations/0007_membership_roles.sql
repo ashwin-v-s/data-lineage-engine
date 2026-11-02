@@ -94,3 +94,4 @@ SELECT id, owner_user_id, 'owner', 'active'
 FROM kairos_workspace
 WHERE owner_user_id IS NOT NULL
 ON CONFLICT (workspace_id, user_id) DO NOTHING;
+

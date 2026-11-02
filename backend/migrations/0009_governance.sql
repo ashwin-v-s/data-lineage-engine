@@ -4,7 +4,7 @@
 -- incident_event tables used by the freshness engine and the incident
 -- workflow.  Evidence-first: a dataset is never reported LATE or STALE without
 -- stored evidence, and exactly one incident exists per active breach.
--- APPLIED to the shared Supabase project; the 'freshness_sla',
+-- APPLIED to the shared Supabase project (verified 2026-11-03 via scripts/db/verify_applied.py); the 'freshness_sla',
 -- 'freshness_evaluation', 'incident' and 'incident_event' tables exist live.
 
 CREATE TABLE freshness_sla (
@@ -175,3 +175,4 @@ COMMENT ON TABLE incident_event IS
     'Append-only incident timeline: DETECTED, ACKNOWLEDGED, INVESTIGATING, RESOLVED, COMMENTED.';
 COMMENT ON COLUMN incident.dedupe_key IS
     'Stable per-breach key (e.g. "freshness:<dataset_id>"), unique per workspace among non-RESOLVED incidents, so repeated evaluations never open duplicates but a resolved breach can recur.';
+
