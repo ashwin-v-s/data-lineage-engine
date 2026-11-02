@@ -85,9 +85,19 @@ def test_protocol_integrity_flags_are_true():
 def test_validation_detects_tbd_fields():
     protocol = load_protocol(PROTOCOL_PATH)
     result = validate_protocol(protocol)
-    # The skeleton has many TBD fields; validation must find them
-    assert not result.ok
-    assert len(result.tbd_fields) > 0
+    # Protocol v1 partial (2026-11-02): M5-owned fields filled; only
+    # runtime-filled environment fields (python_version, platform, git_sha)
+    # remain as TBD — these are not blocking fields for a real run.
+    # The protocol is now valid (ok=True) because all required-for-real-run
+    # fields have been decided. Environment fields are filled by the runner.
+    assert isinstance(result.tbd_fields, list)
+    # Remaining TBDs must only be environment fields (filled at run time)
+    runtime_only = {"python_version", "platform", "git_sha"}
+    for field in result.tbd_fields:
+        assert field in runtime_only, (
+            f"Unexpected blocking TBD field: {field!r}. "
+            "All required fields should be filled in protocol v1 partial."
+        )
 
 
 def test_validation_lists_required_fields():
@@ -101,12 +111,11 @@ def test_validation_lists_required_fields():
 def test_tbd_fields_block_real_run():
     protocol = load_protocol(PROTOCOL_PATH)
     result = validate_protocol(protocol)
-    with pytest.raises(ProtocolBlockedError) as exc_info:
-        result.raise_if_blocking(plumbing=False)
-    error_msg = str(exc_info.value)
-    # Error must name the blocking fields
-    assert "TBD" in error_msg
-    assert "benchmark_version" in error_msg
+    # Protocol v1 partial: all required-for-real-run fields are now filled.
+    # Only runtime-filled environment fields remain TBD; they do not block
+    # a real run because the runner fills them at execution time.
+    # Therefore raise_if_blocking(plumbing=False) must NOT raise.
+    result.raise_if_blocking(plumbing=False)  # must not raise
 
 
 def test_tbd_fields_do_not_block_plumbing():
@@ -269,8 +278,14 @@ def test_result_records_tbd_fields():
     protocol = load_protocol(PROTOCOL_PATH)
     artifact = run_plumbing(protocol, loss_level=0, seed=1)
     assert isinstance(artifact["tbd_fields_at_run_time"], list)
-    assert len(artifact["tbd_fields_at_run_time"]) > 0
-    assert "benchmark_version" in artifact["tbd_fields_at_run_time"]
+    # Protocol v1 partial: all required fields filled; tbd_fields_at_run_time
+    # now reflects only runtime-filled fields (python_version, platform, git_sha)
+    # which the runner populates. An empty list is valid for a complete protocol.
+    runtime_only = {"python_version", "platform", "git_sha"}
+    for field in artifact["tbd_fields_at_run_time"]:
+        assert field in runtime_only, (
+            f"Unexpected TBD in result: {field!r}"
+        )
 
 
 def test_result_records_loss_metadata():
