@@ -1,4 +1,4 @@
-[build-system]
+﻿[build-system]
 requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
@@ -17,9 +17,6 @@ dependencies = [
     "sqlalchemy>=2,<3",
     "sqlglot>=26",
 ]
-
-[tool.vercel]
-entrypoint = "backend.api.index:app"
 
 [project.optional-dependencies]
 dev = [
@@ -47,4 +44,3 @@ extend-exclude = ["node_modules", "dist", "build", ".pw-browsers"]
 # on purpose -- they would flag large volumes of pre-existing code owned by the
 # M1-M5 workstreams, which this change must not touch.
 select = ["E9", "F", "I"]
-
