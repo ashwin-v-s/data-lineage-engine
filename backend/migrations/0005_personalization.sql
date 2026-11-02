@@ -43,8 +43,26 @@ CREATE POLICY kairos_workspace_isolation ON asset_star
 
 -- Personalization is a user-private preference, never shared through the
 -- generated PostgREST API. Only the restricted API login may touch it.
-REVOKE ALL ON TABLE asset_view FROM PUBLIC, anon, authenticated, service_role;
-REVOKE ALL ON TABLE asset_star FROM PUBLIC, anon, authenticated, service_role;
+DO $$
+DECLARE r TEXT;
+BEGIN
+    FOREACH r IN ARRAY ARRAY['anon','authenticated','service_role'] LOOP
+        IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = r) THEN
+            EXECUTE format('REVOKE ALL ON TABLE public.%I FROM %I', 'asset_view', r);
+        END IF;
+    END LOOP;
+END $$;
+REVOKE ALL ON TABLE asset_view FROM PUBLIC;
+DO $$
+DECLARE r TEXT;
+BEGIN
+    FOREACH r IN ARRAY ARRAY['anon','authenticated','service_role'] LOOP
+        IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = r) THEN
+            EXECUTE format('REVOKE ALL ON TABLE public.%I FROM %I', 'asset_star', r);
+        END IF;
+    END LOOP;
+END $$;
+REVOKE ALL ON TABLE asset_star FROM PUBLIC;
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE asset_view TO kairos_app;
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE asset_star TO kairos_app;
 

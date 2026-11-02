@@ -38,7 +38,16 @@ CREATE POLICY kairos_workspace_isolation ON source_connection
 
 -- Source credentials are workspace-private. Only the restricted API login may
 -- touch them; they are never exposed through the generated PostgREST API.
-REVOKE ALL ON TABLE source_connection FROM PUBLIC, anon, authenticated, service_role;
+DO $$
+DECLARE r TEXT;
+BEGIN
+    FOREACH r IN ARRAY ARRAY['anon','authenticated','service_role'] LOOP
+        IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = r) THEN
+            EXECUTE format('REVOKE ALL ON TABLE public.%I FROM %I', 'source_connection', r);
+        END IF;
+    END LOOP;
+END $$;
+REVOKE ALL ON TABLE source_connection FROM PUBLIC;
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE source_connection TO kairos_app;
 
 COMMENT ON TABLE source_connection IS

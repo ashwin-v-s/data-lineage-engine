@@ -38,7 +38,16 @@ CREATE POLICY kairos_workspace_isolation ON github_connection
 
 -- Credentials are workspace-private. Only the restricted API login may touch
 -- them; they are never exposed through the generated PostgREST API.
-REVOKE ALL ON TABLE github_connection FROM PUBLIC, anon, authenticated, service_role;
+DO $$
+DECLARE r TEXT;
+BEGIN
+    FOREACH r IN ARRAY ARRAY['anon','authenticated','service_role'] LOOP
+        IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = r) THEN
+            EXECUTE format('REVOKE ALL ON TABLE public.%I FROM %I', 'github_connection', r);
+        END IF;
+    END LOOP;
+END $$;
+REVOKE ALL ON TABLE github_connection FROM PUBLIC;
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE github_connection TO kairos_app;
 
 COMMENT ON TABLE github_connection IS

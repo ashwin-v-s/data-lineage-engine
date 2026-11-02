@@ -10,7 +10,7 @@ Endpoint
       ?asset_type=<str>    # filter by asset_type  e.g. TABLE, VIEW (optional)
       ?page=<int>          # 1-based page number   (default: 1)
       ?page_size=<int>     # results per page      (default: 20, max: 100)
-      ?sort_by=<field>     # name | schema_name | asset_type  (default: name)
+      ?sort_by=<field>     # any search-result column (default: name)
       ?sort_order=asc|desc (default: asc)
 
 Search strategy
@@ -34,8 +34,12 @@ from backend.app.schemas.search import SearchResponse, SearchResult
 
 router = APIRouter(dependencies=[Depends(require_user)])
 
-# Columns we allow sort_by on (whitelist to prevent SQL injection)
-_SORTABLE = {"name", "schema_name", "asset_type", "source_system"}
+# Columns we allow sort_by on — every column the search UNION actually selects,
+# whitelisted to prevent SQL injection.
+_SORTABLE = {
+    "id", "type", "name", "label", "schema", "owner", "description",
+    "created", "updated", "row_count", "steward", "tags",
+}
 
 _PLACEHOLDER_DATABASE = "metadata"
 

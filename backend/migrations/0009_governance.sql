@@ -120,10 +120,46 @@ CREATE POLICY kairos_workspace_isolation ON incident_event
 
 -- Governance records are workspace-private. Only the restricted API login may
 -- touch them; they are never exposed through the generated PostgREST API.
-REVOKE ALL ON TABLE freshness_sla FROM PUBLIC, anon, authenticated, service_role;
-REVOKE ALL ON TABLE freshness_evaluation FROM PUBLIC, anon, authenticated, service_role;
-REVOKE ALL ON TABLE incident FROM PUBLIC, anon, authenticated, service_role;
-REVOKE ALL ON TABLE incident_event FROM PUBLIC, anon, authenticated, service_role;
+DO $$
+DECLARE r TEXT;
+BEGIN
+    FOREACH r IN ARRAY ARRAY['anon','authenticated','service_role'] LOOP
+        IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = r) THEN
+            EXECUTE format('REVOKE ALL ON TABLE public.%I FROM %I', 'freshness_sla', r);
+        END IF;
+    END LOOP;
+END $$;
+REVOKE ALL ON TABLE freshness_sla FROM PUBLIC;
+DO $$
+DECLARE r TEXT;
+BEGIN
+    FOREACH r IN ARRAY ARRAY['anon','authenticated','service_role'] LOOP
+        IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = r) THEN
+            EXECUTE format('REVOKE ALL ON TABLE public.%I FROM %I', 'freshness_evaluation', r);
+        END IF;
+    END LOOP;
+END $$;
+REVOKE ALL ON TABLE freshness_evaluation FROM PUBLIC;
+DO $$
+DECLARE r TEXT;
+BEGIN
+    FOREACH r IN ARRAY ARRAY['anon','authenticated','service_role'] LOOP
+        IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = r) THEN
+            EXECUTE format('REVOKE ALL ON TABLE public.%I FROM %I', 'incident', r);
+        END IF;
+    END LOOP;
+END $$;
+REVOKE ALL ON TABLE incident FROM PUBLIC;
+DO $$
+DECLARE r TEXT;
+BEGIN
+    FOREACH r IN ARRAY ARRAY['anon','authenticated','service_role'] LOOP
+        IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = r) THEN
+            EXECUTE format('REVOKE ALL ON TABLE public.%I FROM %I', 'incident_event', r);
+        END IF;
+    END LOOP;
+END $$;
+REVOKE ALL ON TABLE incident_event FROM PUBLIC;
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE freshness_sla TO kairos_app;
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE freshness_evaluation TO kairos_app;
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE incident TO kairos_app;

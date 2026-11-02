@@ -18,7 +18,30 @@ CREATE TABLE IF NOT EXISTS kairos_workspace (
 -- PostgREST API or directly to browser roles.
 ALTER TABLE kairos_workspace ENABLE ROW LEVEL SECURITY;
 ALTER TABLE kairos_workspace FORCE ROW LEVEL SECURITY;
-REVOKE ALL ON TABLE kairos_workspace FROM PUBLIC, anon, authenticated, service_role;
+-- Explicit default-deny: only the SECURITY DEFINER provisioning function
+-- (whose owner bypasses RLS) may read this registry. No per-row policy is
+-- ever added here; the API role has no grants on this table at all.
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_policies
+        WHERE schemaname = 'public'
+          AND tablename = 'kairos_workspace'
+          AND policyname = 'kairos_workspace_registry_private'
+    ) THEN
+        CREATE POLICY kairos_workspace_registry_private ON kairos_workspace USING (false);
+    END IF;
+END $$;
+DO $$
+DECLARE r TEXT;
+BEGIN
+    FOREACH r IN ARRAY ARRAY['anon','authenticated','service_role'] LOOP
+        IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = r) THEN
+            EXECUTE format('REVOKE ALL ON TABLE public.%I FROM %I', 'kairos_workspace', r);
+        END IF;
+    END LOOP;
+END $$;
+REVOKE ALL ON TABLE kairos_workspace FROM PUBLIC;
 
 INSERT INTO kairos_workspace (id, owner_user_id, name, is_legacy)
 VALUES ('00000000-0000-4000-8000-000000000001', NULL, 'Legacy catalog', TRUE)
@@ -120,10 +143,16 @@ BEGIN
             table_name
         );
         EXECUTE format('ALTER TABLE public.%I ALTER COLUMN workspace_id SET NOT NULL', table_name);
-        EXECUTE format(
-            'ALTER TABLE public.%I ADD CONSTRAINT %I FOREIGN KEY (workspace_id) REFERENCES public.kairos_workspace(id)',
-            table_name, table_name || '_workspace_id_fkey'
-        );
+        IF NOT EXISTS (
+            SELECT 1 FROM pg_constraint
+            WHERE conname = table_name || '_workspace_id_fkey'
+              AND conrelid = format('public.%I', table_name)::regclass
+        ) THEN
+            EXECUTE format(
+                'ALTER TABLE public.%I ADD CONSTRAINT %I FOREIGN KEY (workspace_id) REFERENCES public.kairos_workspace(id)',
+                table_name, table_name || '_workspace_id_fkey'
+            );
+        END IF;
         EXECUTE format('ALTER TABLE public.%I ENABLE ROW LEVEL SECURITY', table_name);
         EXECUTE format('ALTER TABLE public.%I FORCE ROW LEVEL SECURITY', table_name);
         EXECUTE format('DROP POLICY IF EXISTS kairos_workspace_isolation ON public.%I', table_name);

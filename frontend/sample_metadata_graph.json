@@ -1,0 +1,60 @@
+{
+  "contract_version": "kairos.ingest.v1",
+  "source": {
+    "kind": "upload",
+    "ref": "sample_metadata_graph.json"
+  },
+  "assets": [
+    {
+      "id": "raw_customers",
+      "name": "raw_customers",
+      "namespace": "ecommerce/raw",
+      "type": "table",
+      "kind": "source",
+      "description": "Raw ingested customer registration records",
+      "tags": ["pii", "source", "raw"],
+      "metadata": {
+        "storage_format": "parquet",
+        "retention_days": 365
+      }
+    },
+    {
+      "id": "stg_customers",
+      "name": "stg_customers",
+      "namespace": "ecommerce/staging",
+      "type": "view",
+      "kind": "transform",
+      "description": "Cleaned and anonymized customer staging view",
+      "tags": ["staging", "anonymized"],
+      "metadata": {
+        "materialization": "view"
+      }
+    },
+    {
+      "id": "dim_customers",
+      "name": "dim_customers",
+      "namespace": "ecommerce/analytics",
+      "type": "table",
+      "kind": "transform",
+      "description": "Production customer dimension table for reporting",
+      "tags": ["analytics", "gold"],
+      "metadata": {
+        "update_frequency": "daily"
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "source_id": "raw_customers",
+      "target_id": "stg_customers",
+      "type": "declared_dependency",
+      "provenance": "dbt model staging transformation"
+    },
+    {
+      "source_id": "stg_customers",
+      "target_id": "dim_customers",
+      "type": "declared_dependency",
+      "provenance": "Star-schema dimension ETL build"
+    }
+  ]
+}

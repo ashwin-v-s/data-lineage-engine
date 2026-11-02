@@ -37,7 +37,16 @@ CREATE POLICY kairos_workspace_isolation ON import_run
     USING (workspace_id = NULLIF(current_setting('kairos.workspace_id', true), '')::uuid)
     WITH CHECK (workspace_id = NULLIF(current_setting('kairos.workspace_id', true), '')::uuid);
 
-REVOKE ALL ON TABLE import_run FROM PUBLIC, anon, authenticated, service_role;
+DO $$
+DECLARE r TEXT;
+BEGIN
+    FOREACH r IN ARRAY ARRAY['anon','authenticated','service_role'] LOOP
+        IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = r) THEN
+            EXECUTE format('REVOKE ALL ON TABLE public.%I FROM %I', 'import_run', r);
+        END IF;
+    END LOOP;
+END $$;
+REVOKE ALL ON TABLE import_run FROM PUBLIC;
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE import_run TO kairos_app;
 
 COMMENT ON TABLE import_run IS
