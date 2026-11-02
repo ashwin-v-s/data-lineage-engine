@@ -20,6 +20,7 @@
                       "backend/api/index.py":  {
                                                    "runtime":  "python3.12",
                                                    "maxDuration":  30,
+                                                   "entrypoint":  "backend/api/index.py",
                                                    "excludeFiles":  "{data/**,docs/**,tests/**,references/**,**/*.zip}"
                                                }
                   }
