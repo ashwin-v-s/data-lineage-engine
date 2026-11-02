@@ -21,9 +21,11 @@ Migrations whose header marks them "PROPOSAL ONLY / NOT APPLIED" are still
 reported and are still subject to check (3).  They are *not* automatically
 exempt from check (2): the whole point of this check is to catch a table that a
 migration defines but the verify list forgot (the class of gap that let
-``0006_github_connections.sql`` slip past).  The single deliberate exception is
-recorded in :data:`VERIFY_LIST_EXCLUSIONS` (``import_run``), and it is printed
-as a ``[NOTE]`` rather than a ``[FAIL]``.
+``0006_github_connections.sql`` slip past).  A deliberate exemption can be
+recorded in :data:`VERIFY_LIST_EXCLUSIONS` and is then printed as a ``[NOTE]``
+rather than a ``[FAIL]``; that map is currently empty because ``import_run``,
+``asset_view``, ``asset_star`` and ``github_connection`` are all applied to the
+shared project and listed in the live RLS gate.
 
 Exit codes mirror ``scripts/db/verify_rls.py``:
 
@@ -61,11 +63,10 @@ VERIFY_RLS_PATH = ROOT / "scripts" / "db" / "verify_rls.py"
 # reason.  Every other workspace-scoped table missing from that list is a gap.
 # Keep this in step with the matching comment in scripts/db/verify_rls.py and
 # the runbook in backend/migrations/README.md.
-VERIFY_LIST_EXCLUSIONS = {
-    "import_run": (
-        "0004_ingestion_import_runs.sql is PROPOSAL ONLY / NOT APPLIED; the live "
-        "gate would report it missing on the shared project"
-    ),
+VERIFY_LIST_EXCLUSIONS: dict[str, str] = {
+    # Empty: every workspace-scoped table a migration creates is now applied to
+    # the shared project and listed in verify_rls.py.  Add an entry here only if
+    # a table is intentionally kept out of the live RLS gate.
 }
 
 

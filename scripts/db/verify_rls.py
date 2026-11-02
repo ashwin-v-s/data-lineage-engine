@@ -38,16 +38,14 @@ from dotenv import load_dotenv
 # Kairos migrations:
 #   * 0003_personal_workspaces.sql - the "ALTER TABLE ... ENABLE/FORCE ROW LEVEL
 #     SECURITY" loop over the 17 business tables.
+#   * 0004_ingestion_import_runs.sql - import_run.
 #   * 0005_personalization.sql     - asset_view, asset_star.
 #   * 0006_github_connections.sql  - github_connection.
+#   * 0007_membership_roles.sql    - workspace_member, workspace_invite.
 #
-# 0004_ingestion_import_runs.sql (import_run) is intentionally omitted because it
-# is marked "PROPOSAL ONLY: NOT APPLIED" and would otherwise break the gate on
-# the shared project.  0006_github_connections.sql is *also* still a proposal,
-# but its github_connection table is listed here because it previously slipped
-# past this gate entirely; run this check only against a database where 0006 has
-# been applied, otherwise github_connection is reported as missing.  See
-# backend/migrations/README.md for per-migration apply status, and
+# 0003-0009 are applied to the shared Supabase project.  Every workspace-scoped
+# table created by a migration is listed here so the live RLS gate covers it.
+# See backend/migrations/README.md for per-migration apply status, and
 # scripts/db/check_migrations.py for the static cross-check that keeps this list
 # in sync with the migrations.
 WORKSPACE_SCOPED_TABLES = (
@@ -69,11 +67,23 @@ WORKSPACE_SCOPED_TABLES = (
     "asset_version",
     "audit_event",
     "rollback_record",
+    # 0004_ingestion_import_runs.sql
+    "import_run",
     # 0005_personalization.sql
     "asset_view",
     "asset_star",
     # 0006_github_connections.sql
     "github_connection",
+    # 0007_membership_roles.sql
+    "workspace_member",
+    "workspace_invite",
+    # 0008_source_connections.sql
+    "source_connection",
+    # 0009_governance.sql
+    "freshness_sla",
+    "freshness_evaluation",
+    "incident",
+    "incident_event",
 )
 
 # Exit codes.
