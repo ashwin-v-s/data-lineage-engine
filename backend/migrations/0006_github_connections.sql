@@ -1,5 +1,4 @@
--- PROPOSAL ONLY: NOT APPLIED TO THE SHARED SUPABASE PROJECT.
--- Requires M3 contract-owner review before deployment.
+-- APPLIED to the shared Supabase project; the `github_connection` table exists live.
 -- Migration 0006: workspace-scoped private GitHub App connections.
 -- Apply after 0005_personalization.sql.
 -- Only an explicit connect/callback action writes this table, and the stored

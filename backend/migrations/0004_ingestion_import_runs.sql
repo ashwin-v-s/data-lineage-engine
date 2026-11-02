@@ -1,5 +1,5 @@
--- PROPOSAL ONLY: NOT APPLIED TO THE SHARED SUPABASE PROJECT.
--- Requires M3 contract-owner review before deployment.
+-- APPLIED to the shared Supabase project; the `import_run` table exists live.
+-- M3 contract-owner review completed and deployment authorized.
 -- Migration 0004: workspace-scoped import provenance and idempotency records.
 -- Apply after 0003_personal_workspaces.sql.
 -- The preview path must not write this table; successful explicit commits do.

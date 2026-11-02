@@ -59,23 +59,63 @@ function. The shared Supabase project was verified with this migration applied
 on 2026-10-29.
 
 ### 0004_ingestion_import_runs.sql
-Local proposal only; it was not applied to the shared project. It adds the
-workspace-scoped import provenance/idempotency record described in the product
-architecture. M3 must review its contract fields and authorize deployment
-before it is applied.
+Adds the workspace-scoped import provenance/idempotency record (`import_run`)
+described in the product architecture. **Applied** to the shared Supabase
+project; the `import_run` table exists live. The preview path is read-only and
+never writes this table; only an explicit commit does.
 
 ### 0005_personalization.sql
 Adds the per-user `asset_view` (recently viewed) and `asset_star` (starred
 assets) tables used by the personalization endpoints under `/api/v1/me/*` and
 `/api/v1/assets/{asset_id}/star`. Both tables carry workspace RLS, are granted
 only to `kairos_app`, and are keyed on `(workspace_id, user_id, asset_id)` so a
-user's shortcuts stay private to that user inside that workspace.
+user's shortcuts stay private to that user inside that workspace. **Applied**
+to the shared Supabase project.
 
-Apply 0003 only after 0001 and 0002, using the privileged database connection
-used for schema migrations:
+### 0006_github_connections.sql
+Adds the workspace-scoped `github_connection` table holding only the AES-256-GCM
+encrypted GitHub App installation token (never plaintext). **Applied** to the
+shared Supabase project; the install/callback wiring is owned by M2.
+
+### 0007_membership_roles.sql
+Adds the workspace-scoped `workspace_member` table (a user's role inside one
+workspace, one row per `(workspace_id, user_id)`) and the `workspace_invite`
+table (a pending email invitation, one row per `(workspace_id, email)`). Both
+carry forced workspace RLS and are granted only to `kairos_app`. Membership is
+the source of truth for a user's role in a workspace; the role is never read
+from the JWT. An invite can grant `admin`, `editor`, or `viewer` — never
+`owner` — so ownership is only ever established through membership. A backfill
+makes every existing personal-workspace owner an `owner`/`active` member. **Applied**
+to the shared Supabase project.
+
+### 0008_source_connections.sql
+Adds the workspace-scoped `source_connection` table: one row per configured
+external source (currently PostgreSQL), holding the AES-256-GCM encrypted
+connection config (never plaintext) plus the connector lifecycle state
+`CONFIGURED → VERIFIED | ERROR → REVOKED`. Granted only to `kairos_app`. **Applied**
+to the shared Supabase project; the source endpoints return HTTP 503 only if the
+table is later dropped.
+
+### 0009_governance.sql
+Adds the workspace-scoped governance tables `freshness_sla`,
+`freshness_evaluation`, `incident` and `incident_event`. Freshness is
+evidence-first: a dataset with no stored source activity is `UNKNOWN`, never a
+false `LATE`/`STALE`; any source inferred from the database may derive from the
+schema but is never `LATE` without evidence of a breach. A partial unique index
+(`... WHERE status <> 'RESOLVED'`) keeps exactly one *open* incident per breach
+while still letting a resolved breach recur. **Applied** to the shared Supabase
+project.
+
+Apply the remaining migrations in order, using the privileged database
+connection used for schema migrations:
 
 ```powershell
-psql "$env:DATABASE_URL" -v ON_ERROR_STOP=1 -f backend/migrations/0003_personal_workspaces.sql
+psql "$env:DATABASE_URL" -v ON_ERROR_STOP=1 -f backend/migrations/0004_ingestion_import_runs.sql
+psql "$env:DATABASE_URL" -v ON_ERROR_STOP=1 -f backend/migrations/0005_personalization.sql
+psql "$env:DATABASE_URL" -v ON_ERROR_STOP=1 -f backend/migrations/0006_github_connections.sql
+psql "$env:DATABASE_URL" -v ON_ERROR_STOP=1 -f backend/migrations/0007_membership_roles.sql
+psql "$env:DATABASE_URL" -v ON_ERROR_STOP=1 -f backend/migrations/0008_source_connections.sql
+psql "$env:DATABASE_URL" -v ON_ERROR_STOP=1 -f backend/migrations/0009_governance.sql
 ```
 
 The API's `DATABASE_URL` role must be a member of `kairos_app`; the migration
@@ -94,8 +134,10 @@ GRANT kairos_app TO kairos;
 GRANT EXECUTE ON FUNCTION public.kairos_ensure_personal_workspace(uuid) TO kairos;
 ```
 
-To inspect migration state, verify that all 17 business tables have a
-`workspace_id` column, `kairos_workspace_isolation` policy, and RLS enabled.
+To inspect migration state, verify that all 28 workspace-scoped business tables
+have a `workspace_id` column, a `kairos_workspace_isolation` policy, and RLS
+enabled (run `python scripts/db/verify_rls.py` against a live database; the
+static cross-check is `python scripts/db/check_migrations.py`).
 Do not manually assign the legacy workspace to a user unless that user is
 intended to receive the pre-isolation catalog.
 
