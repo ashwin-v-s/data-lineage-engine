@@ -103,9 +103,9 @@ function Sidebar() {
       <div className="sidebar-bottom">
         <div className="sidebar-data-mode"><span>Data provenance</span><DataModeLabel mode={dataMode} /></div>
         <div className="health-card">
-          <div className="health-top"><span className="status-dot" /><strong>Workspace mode</strong><span className="health-live" id="sidebarModeBadge">DEMO</span></div>
-          <p id="sidebarModeDescription">Synthetic sample records; not production data.</p>
-          <div className="health-foot"><span>Data source</span><b id="sidebarSourceLabel">Demo</b></div>
+          <div className="health-top"><span className="status-dot" /><strong>Workspace mode</strong><span className="health-live" id="sidebarModeBadge">{window.kairosDemoPreview ? "DEMO" : "LIVE"}</span></div>
+          <p id="sidebarModeDescription">{window.kairosDemoPreview ? "Synthetic sample records; not production data." : "Connected to your workspace catalog."}</p>
+          <div className="health-foot"><span>Data source</span><b id="sidebarSourceLabel">{window.kairosDemoPreview ? "Demo" : "Connected"}</b></div>
         </div>
         <button aria-label="Open user profile" className="user-row profile-shortcut" data-view="profile" type="button">
           <span className="avatar profile-avatar">U</span><span className="user-copy"><strong className="profile-display-name">Workspace user</strong><small>Signed-in account</small></span><span aria-hidden="true" className="more">•••</span>
@@ -133,8 +133,8 @@ function DashboardShell() {
           <button aria-label="Open navigation" className="icon-btn menu-toggle" id="openNav">☰</button>
           <div className="breadcrumbs"><span>Workspace</span><b>/</b><strong id="breadcrumbTitle">Overview</strong></div>
           <div className="top-actions">
-            <div aria-label="Authenticated data source" className="data-mode-control"><span>DATA</span><strong>CONNECTED CATALOG</strong></div>
-            <div className="environment" id="environmentBadge"><span className="status-dot" />DEMO DATA</div>
+            <div aria-label="Authenticated data source" className="data-mode-control"><span>DATA</span><strong>{window.kairosDemoPreview ? "DEMO CATALOG" : "CONNECTED CATALOG"}</strong></div>
+            <div className="environment" id="environmentBadge"><span className="status-dot" />{window.kairosDemoPreview ? "DEMO DATA" : "LIVE DATA"}</div>
             <button aria-label="Switch between light and dark theme" className="top-icon" id="themeToggle" title="Switch light / dark">◴</button>
             <button aria-label="Search workspace (Ctrl+K)" className="top-icon" id="globalSearchButton" title="Search (Ctrl+K)">⌕</button>
             <button aria-label="Help" className="top-icon" id="helpButton" title="Help">?</button>
@@ -142,7 +142,7 @@ function DashboardShell() {
           </div>
         </header>
         <DashboardContent />
-        <footer className="footer"><span><i className="status-dot" /> Kairos metadata engine <b>·</b> <span id="footerModeLabel">Demo mode</span></span><span>Evidence-first lineage <b>·</b> v0.1 prototype <b>·</b> build v305</span></footer>
+        <footer className="footer"><span><i className="status-dot" /> Kairos metadata engine <b>·</b> <span id="footerModeLabel">{window.kairosDemoPreview ? "Demo mode" : "Live mode"}</span></span><span>Evidence-first lineage <b>·</b> v0.1 prototype <b>·</b> build v305</span></footer>
       </div>
     </div>
   );
@@ -173,3 +173,5 @@ function App() {
 }
 
 createRoot(document.getElementById('root')).render(<App />);
+
+
