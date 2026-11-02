@@ -1,3 +1,5 @@
+-- NOT VERIFIED APPLIED: workspace_member and workspace_invite not confirmed in
+-- live DB. Run `python scripts/db/verify_applied.py` before marking Applied.
 -- Migration 0007: workspace membership and invitations.
 -- Apply after 0006_github_connections.sql.
 -- Adds workspace_member (a user's role inside one workspace) and

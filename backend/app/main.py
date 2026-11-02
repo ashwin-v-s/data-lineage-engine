@@ -4,7 +4,7 @@ from pathlib import Path
 
 from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 from backend.app.api.errors import api_error
@@ -152,8 +152,34 @@ def auth_config():
 
 
 @app.get("/ingestion.html", include_in_schema=False)
-def authenticated_ingestion_page(user: dict = Depends(require_user)):
-    """Serve the standalone ingestion workspace only to signed-in users."""
+async def authenticated_ingestion_page(request: Request):
+    """Serve the ingestion workspace to signed-in users.
+
+    An unauthenticated browser navigation (no Authorization header) gets a
+    302 redirect to the sign-in page instead of a raw JSON 401 body (J7).
+    Only /api/* routes return JSON error envelopes.
+    """
+    from fastapi import HTTPException as _HTTPException
+    from fastapi.security import HTTPAuthorizationCredentials
+
+    # Build credentials from the raw header, if present.
+    auth_header = request.headers.get("authorization", "")
+    parts = auth_header.split(" ", 1)
+    if len(parts) == 2 and parts[0].lower() == "bearer":
+        creds: HTTPAuthorizationCredentials | None = HTTPAuthorizationCredentials(
+            scheme=parts[0], credentials=parts[1]
+        )
+    else:
+        creds = None
+
+    try:
+        async for _user in require_user(credentials=creds):  # type: ignore[arg-type]
+            break
+    except _HTTPException:
+        return RedirectResponse(url="/?signin_required=1", status_code=302)
+    except Exception:
+        return RedirectResponse(url="/?signin_required=1", status_code=302)
+
     return FileResponse(FRONTEND_SOURCE_DIR / "ingestion.html", media_type="text/html")
 
 

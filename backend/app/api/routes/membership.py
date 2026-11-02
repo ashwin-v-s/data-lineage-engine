@@ -45,23 +45,51 @@ def _member_role(conn, workspace_id: str, user_id: str) -> Optional[str]:
 
 
 def require_role(*minimum_roles: str):
-    """Dependency: the verified user must hold at least one of these roles."""
+    """Dependency: the verified user must hold at least one of these roles.
+
+    The inner ``guard`` is a plain function (no nested ``Depends``) so that
+    monkeypatching ``membership.get_conn`` in tests works correctly — the
+    reference is resolved at call time via the module-level name.
+    """
     minimum = {r: _ROLE_ORDER[r] for r in minimum_roles}
 
     def guard(user: dict = Depends(require_user)):
         user_id = user.get("id") or user.get("sub")
         if not user_id:
             raise HTTPException(status_code=401, detail="Authenticated user id is missing")
-        from backend.app.db import _workspace_id
 
-        workspace_id = _workspace_id.get()
+        from backend.app import db as _db
+        workspace_id = _db._workspace_id.get()
         if not workspace_id:
-            raise HTTPException(status_code=403, detail="No workspace context; roles cannot be verified")
-        with get_conn() as conn:
-            role = _member_role(conn, workspace_id, user_id)
-        if role is None or _ROLE_ORDER.get(role, -1) < max(minimum.values()):
+            raise HTTPException(
+                status_code=403,
+                detail="No workspace context; roles cannot be verified",
+            )
+
+        # Resolve get_conn at call-time through the module so tests can patch it.
+        import sys
+        _mod = sys.modules[__name__]
+        with _mod.get_conn() as conn:
+            with conn.cursor() as cur:
+                if _table_missing(cur, "workspace_member"):
+                    raise HTTPException(status_code=503, detail=_UNPROVISIONED_DETAIL)
+                cur.execute(
+                    "SELECT role FROM workspace_member "
+                    "WHERE workspace_id = %s AND user_id = %s AND status = 'active'",
+                    (workspace_id, user_id),
+                )
+                row = cur.fetchone()
+                role = row[0] if row else None
+
+        # Pass if the user's role rank is >= the LOWEST required rank.
+        # e.g. require_role("owner", "admin") → min rank is admin(2);
+        # an admin(2) satisfies it, a viewer(0) does not.
+        if role is None or _ROLE_ORDER.get(role, -1) < min(minimum.values()):
             allowed = ", ".join(sorted(minimum, key=_ROLE_ORDER.get, reverse=True))
-            raise HTTPException(status_code=403, detail=f"Requires one of these roles: {allowed}")
+            raise HTTPException(
+                status_code=403,
+                detail=f"Requires one of these roles: {allowed}",
+            )
         return user
 
     return guard

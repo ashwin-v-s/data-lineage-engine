@@ -120,7 +120,10 @@ def test_members_unprovisioned_returns_503(client, monkeypatch):
     _use(monkeypatch, conn)
     response = client.get("/api/v1/members")
     assert response.status_code == 503
-    assert "0007" in response.json()["detail"]
+    body = response.json()
+    # The global error envelope wraps the detail into error.message.
+    detail_text = body.get("detail") or body.get("error", {}).get("message", "")
+    assert "0007" in detail_text
     assert conn.cursor_obj is not None
     assert not any("id::text" in sql for sql, _ in conn.cursor_obj.stmts)
 
@@ -159,7 +162,12 @@ def test_viewer_cannot_create_invite(client, monkeypatch):
 
 def test_admin_can_create_invite(client, monkeypatch):
     def insert(stmts, params):
-        assert params == ("x@y.com", "editor", "user-1")
+        # Route inserts (email, role, invited_by, token, expires_at)
+        assert params[0] == "x@y.com"
+        assert params[1] == "editor"
+        assert params[2] == "user-1"
+        assert isinstance(params[3], str) and len(params[3]) > 0  # token
+        # params[4] is expires_at datetime
         return [("invite-1",)]
 
     conn = _Conn(

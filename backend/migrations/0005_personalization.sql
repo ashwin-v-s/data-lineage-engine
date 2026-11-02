@@ -1,3 +1,6 @@
+-- NOT VERIFIED APPLIED: asset_view and asset_star were absent from the live DB
+-- as of 2026-10-30. Run `python scripts/db/verify_applied.py` before marking
+-- this Applied. See docs/DECISION_LOG.md D12 for the verification process.
 -- Migration 0005: per-user personalization records.
 -- Apply after 0003_personal_workspaces.sql.
 -- Read-only browse/preview paths must not write these tables; only an explicit

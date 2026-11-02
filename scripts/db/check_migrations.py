@@ -69,6 +69,14 @@ VERIFY_LIST_EXCLUSIONS: dict[str, str] = {
     # a table is intentionally kept out of the live RLS gate.
 }
 
+# Supabase built-in role names that appear in GRANT/REVOKE statements inside
+# migrations (e.g. "REVOKE ALL ON TABLE x FROM anon, authenticated, service_role").
+# The SQL parser misidentifies these as table names; exclude them from every
+# workspace-scoped table check so they never produce false FAILs.
+_SUPABASE_ROLES: frozenset[str] = frozenset(
+    {"anon", "authenticated", "service_role", "postgres", "supabase_admin"}
+)
+
 
 # ---------------------------------------------------------------------------
 # Static SQL parsing helpers (no database, no sqlglot dependency).
@@ -356,6 +364,10 @@ def run_checks(migrations: list[Migration], verified: list[str]):
     scoping: dict[str, list[Migration]] = {}
     for mig in migrations:
         for table in mig.workspace_scoped:
+            # Skip Supabase built-in role names that the SQL parser picks up
+            # from GRANT/REVOKE statements — they are never real tables.
+            if table in _SUPABASE_ROLES:
+                continue
             scoping.setdefault(table, []).append(mig)
 
     coverage_gaps: list[str] = []

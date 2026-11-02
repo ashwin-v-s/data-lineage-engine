@@ -1,3 +1,5 @@
+-- NOT VERIFIED APPLIED: source_connection not confirmed in live DB.
+-- Run `python scripts/db/verify_applied.py` before marking Applied.
 -- Migration 0008: workspace-scoped live PostgreSQL source connections.
 -- Apply after 0007_membership_roles.sql.
 -- Adds source_connection: a private, workspace-scoped connector to an external

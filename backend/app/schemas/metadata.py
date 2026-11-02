@@ -11,7 +11,7 @@ from uuid import UUID
 class MetadataUpdateRequest(BaseModel):
     """Request to update asset metadata"""
     description: Optional[str] = Field(None, max_length=500)
-    tags: Optional[list[str]] = Field(None, max_items=20)
+    tags: Optional[list[str]] = Field(None, max_length=20)
     custom_properties: Optional[dict] = Field(None, description="Custom key-value metadata")
 
 
