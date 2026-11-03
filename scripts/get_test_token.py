@@ -1,4 +1,4 @@
-"""
+﻿"""
 scripts/get_test_token.py
 ──────────────────────────
 Sign up (or sign in) a dedicated test account on the shared Supabase project
@@ -21,14 +21,14 @@ import os
 import sys
 from pathlib import Path
 
+import httpx
+
 # Load .env from repo root
 root = Path(__file__).resolve().parent.parent
 env_file = root / ".env"
 if env_file.exists():
     from dotenv import load_dotenv
     load_dotenv(env_file, override=False)
-
-import httpx
 
 SUPABASE_URL = os.getenv("SUPABASE_URL", "").rstrip("/")
 ANON_KEY = os.getenv("SUPABASE_PUBLISHABLE_KEY", "")
@@ -85,7 +85,7 @@ def main() -> None:
     data = sign_in()
     if data and data.get("access_token"):
         token = data["access_token"]
-        print(f"\n✅ Signed in successfully!")
+        print("\n✅ Signed in successfully!")
         print(f"\nKAIROS_TEST_USER_TOKEN={token}")
         print("\nAdd that line to your .env file.")
         return
@@ -103,19 +103,19 @@ def main() -> None:
     access_token = data.get("access_token")
 
     if access_token:
-        print(f"\n✅ Signed up and got token immediately (email confirmation not required).")
+        print("\n✅ Signed up and got token immediately (email confirmation not required).")
         print(f"\nKAIROS_TEST_USER_TOKEN={access_token}")
         print("\nAdd that line to your .env file.")
         return
 
     if not email_confirmed:
-        print(f"\n📧 Sign-up succeeded but EMAIL CONFIRMATION IS REQUIRED.")
-        print(f"\nWhat to do:")
+        print("\n📧 Sign-up succeeded but EMAIL CONFIRMATION IS REQUIRED.")
+        print("\nWhat to do:")
         print(f"  1. Check the inbox for: {TEST_EMAIL}")
-        print(f"     (This is a Gmail — you need to create this account or use your own email below)")
-        print(f"  2. Click the confirmation link in the email.")
-        print(f"  3. Then re-run this script — it will sign in and print the token.")
-        print(f"\nOR — change TEST_EMAIL in this script to your own email and re-run.")
+        print("     (This is a Gmail — you need to create this account or use your own email below)")
+        print("  2. Click the confirmation link in the email.")
+        print("  3. Then re-run this script — it will sign in and print the token.")
+        print("\nOR — change TEST_EMAIL in this script to your own email and re-run.")
         return
 
     print(f"\nUnexpected response: {data}")

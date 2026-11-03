@@ -1,4 +1,4 @@
-"""Kairos M5 — Offline API verification script.
+﻿"""Kairos M5 — Offline API verification script.
 
 Exercises the real FastAPI application using TestClient (no network required).
 Each check shows the actual route, status code, and relevant fields.
@@ -29,9 +29,8 @@ ROOT_DIR = Path(__file__).resolve().parent.parent
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
-from fastapi.testclient import TestClient
-
-from backend.app.main import app
+from fastapi.testclient import TestClient  # noqa: E402
+from backend.app.main import app  # noqa: E402
 
 PASS = "PASS"
 FAIL = "FAIL"
@@ -175,3 +174,4 @@ def run_demo() -> int:
 
 if __name__ == "__main__":
     sys.exit(run_demo())
+
