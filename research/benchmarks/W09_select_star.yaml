@@ -1,0 +1,73 @@
+# W09 — SELECT * (all columns from source → target)
+# Split: held_out
+# SQL construct: SELECT_STAR
+case_id: W09
+case_version: "1.0"
+split: held_out
+sql_construct: SELECT_STAR
+description: >
+  SELECT * copies all columns from the source table to the target.
+  All source columns are dependencies. This is the maximal lineage case.
+  DO NOT tune on this case.
+
+sql: |
+  CREATE TABLE orders_backup AS
+  SELECT *
+  FROM orders;
+
+schema:
+  orders:
+    columns: [order_id, customer_id, amount, status, created_at]
+  orders_backup:
+    columns: [order_id, customer_id, amount, status, created_at]
+
+expected_static_candidates:
+  - source: orders.order_id
+    target: orders_backup.order_id
+    operator: SELECT_STAR
+    parser_status: SUPPORTED
+  - source: orders.customer_id
+    target: orders_backup.customer_id
+    operator: SELECT_STAR
+    parser_status: SUPPORTED
+  - source: orders.amount
+    target: orders_backup.amount
+    operator: SELECT_STAR
+    parser_status: SUPPORTED
+  - source: orders.status
+    target: orders_backup.status
+    operator: SELECT_STAR
+    parser_status: SUPPORTED
+  - source: orders.created_at
+    target: orders_backup.created_at
+    operator: SELECT_STAR
+    parser_status: SUPPORTED
+
+ground_truth:
+  provider: ReferenceInterpreterProvider
+  provider_version: "reference-1.0"
+  labels:
+    - source: orders.order_id
+      target: orders_backup.order_id
+      label: PROPAGATED
+      rationale: SELECT * copies all columns.
+    - source: orders.customer_id
+      target: orders_backup.customer_id
+      label: PROPAGATED
+      rationale: SELECT * copies all columns.
+    - source: orders.amount
+      target: orders_backup.amount
+      label: PROPAGATED
+      rationale: SELECT * copies all columns.
+    - source: orders.status
+      target: orders_backup.status
+      label: PROPAGATED
+      rationale: SELECT * copies all columns.
+    - source: orders.created_at
+      target: orders_backup.created_at
+      label: PROPAGATED
+      rationale: SELECT * copies all columns.
+
+never_proves:
+  - SELECT * dependency does not prove the backup ran in a specific window.
+  - Schema evolution (added columns) would change the dependency set silently.

@@ -1,6 +1,6 @@
-# Kairos Decision Log
+﻿# Kairos Decision Log
 
-## D12: Database Runtime � DECIDED 2026-11-03
+## D12: Database Runtime ù DECIDED 2026-11-03
 
 **Decision:** Use shared **Supabase PostgreSQL** project (credentials restored).
 
@@ -14,7 +14,7 @@
 - python scripts/test_connection.py ? PASS (PostgreSQL 17.6 on aws-0-ap-south-1)
 - python scripts/db/list_tables.py ? 29 tables listed
 - python scripts/db/verify_applied.py ? PASS (all expected tables exist)
-- python scripts/db/verify_rls.py ? 28/28 tables RLS-hardened (connecting as postgres superuser, which can bypass � expected)
+- python scripts/db/verify_rls.py ? 28/28 tables RLS-hardened (connecting as postgres superuser, which can bypass ù expected)
 
 **Impact:**
 - ? All Wave 1 integration tests can now run (live workspace_member table exists)
@@ -23,7 +23,7 @@
 
 ---
 
-## Verification Scripts Status � FIXED 2026-11-03
+## Verification Scripts Status ù FIXED 2026-11-03
 
 All four database probe scripts now properly exit with non-zero on failure:
 
@@ -39,7 +39,7 @@ All scripts follow standard exit code conventions and can be used in CI pipeline
 
 ---
 
-## Unowned Items � Assigned 2026-11-02
+## Unowned Items ù Assigned 2026-11-02
 
 ### Item 1: 0008 lifecycle_state CHECK constraint
 **Status:** Assigned to M2 (Anushka)
@@ -98,7 +98,7 @@ All scripts follow standard exit code conventions and can be used in CI pipeline
 
 ---
 
-## Migration Application Verification � COMPLETE 2026-11-03
+## Migration Application Verification ù COMPLETE 2026-11-03
 
 All 9 migrations verified applied to shared Supabase (verified 2026-11-03 16:30 UTC):
 
@@ -116,7 +116,7 @@ All 9 migrations verified applied to shared Supabase (verified 2026-11-03 16:30 
 Expected tables: 29
 Live tables:    29
 
-RESULT: PASS � All expected migrations are applied
+RESULT: PASS ù All expected migrations are applied
 `
 
 ---
@@ -160,7 +160,7 @@ RESULT: PASS � All expected migrations are applied
 
 ---
 
-## Wave 1 Completion � Verified 2026-11-03 (Final)
+## Wave 1 Completion ù Verified 2026-11-03 (Final)
 
 ### Item 7: 0007 applied + verified ?
 - Confirmed: 29 tables in live Supabase
@@ -185,7 +185,7 @@ RESULT: PASS � All expected migrations are applied
 
 ---
 
-## Wave 4 Status � Ready for Deployment
+## Wave 4 Status ù Ready for Deployment
 
 ### Item 11: Deploy to Vercel ? READY
 - Code: all routes + tests committed
@@ -204,7 +204,7 @@ RESULT: PASS � All expected migrations are applied
 
 ---
 
-## Test Results � Current
+## Test Results ù Current
 
 388 passed, 84 skipped
 
@@ -212,3 +212,128 @@ Breakdown:
 - 381 original tests: all passing
 - 7 new workspace tests: all passing
 - 84 skipped: 76 for KAIROS_TEST_USER_TOKEN, 2 for known LEFT/RIGHT JOIN issue, 6 for live DB requirements
+
+---
+
+## Research-D01 — Kill criteria K1–K8 thresholds
+
+**Status:** DECIDED — 2026-11-02
+**Owner:** M5 (Pranav `pranav-samal`)
+**Affects:** `research/protocol/v1.yaml`, experiment runner, findings report
+
+**Decision:**
+Kill criteria thresholds set for a 10-case SQL-subset benchmark.
+Conservative thresholds reflecting the limited scope:
+
+| Criterion | Threshold | Verdict if failed |
+|---|---|---|
+| K1 | proposed false_refutation < B2 at level 0 | Rejected |
+| K2 | false_refutation <= 0.15 at level 0 | Rejected |
+| K3 | false_observation <= 0.20 at level 0 | Inconclusive |
+| K4 | unknown_rate <= 0.40 at level 0 | Inconclusive |
+| K5 | recall_strict >= B1 recall_strict at level 0 | Inconclusive |
+| K6 | recall_strict[90] <= recall_strict[0] (monotone erosion) | Inconclusive |
+| K7 | false_refutation == 0 at level 0 | Rejected |
+| K8 | committed_accuracy > B3 committed_accuracy at level 0 | Inconclusive |
+
+Full text in `research/protocol/v1.yaml` §kill_criteria.
+
+---
+
+## Research-D02 — Primary metric (D-05)
+
+**Status:** DECIDED — 2026-11-02
+**Owner:** M5 (Pranav `pranav-samal`)
+**Affects:** `research/protocol/v1.yaml`, findings report
+
+**Decision:**
+Primary metric is `false_refutation` — the rate at which a PROPAGATED truth
+dependency is predicted REFUTED_FOR_RUN. This is the central safety property:
+the system must not confidently deny propagation when it actually occurred.
+The proposed engine must beat B2 (negative assumption baseline) on this metric.
+
+---
+
+## Research-D03 — Contribution semantics (D-11)
+
+**Status:** DECIDED — 2026-11-02
+**Owner:** M5 (Pranav `pranav-samal`)
+**Affects:** ground-truth construction, benchmark case design
+
+**Decision:**
+Where-provenance: a dependency is PROPAGATED if at least one source column
+value contributed to at least one target column value in the run.
+Why-provenance (which rules triggered) is out of scope for this benchmark.
+
+---
+
+## Research-D04 — Prediction-unit universe (D-12)
+
+**Status:** DECIDED — 2026-11-02
+**Owner:** M5 (Pranav `pranav-samal`)
+**Affects:** experiment runner, metrics
+
+**Decision:**
+The prediction universe is the union of:
+1. All static candidates (pairs with any StaticEvidence)
+2. All pairs with at least one RUNTIME_POSITIVE evidence record
+The full cross-product of all possible column pairs is NOT used (would inflate
+trivial non-dependency correct predictions).
+
+---
+
+## Research-D05 — Zero-arrival semantics
+
+**Status:** DECIDED — 2026-11-02
+**Owner:** M5 (Pranav `pranav-samal`)
+**Affects:** MCAR loss simulator, capture manifest
+
+**Decision:**
+Option B: a run with 0 events produces no evidence records (not a negative
+evaluation). The engine receives no RuntimeEvidence and falls to R4 (POSSIBLE)
+or R5 (UNKNOWN). Zero arrival is NOT treated as proof of non-propagation.
+This is consistent with the core "missing events != refutation" property.
+
+---
+
+## Research-D06 — Confidence interval method (D-08)
+
+**Status:** DECIDED — 2026-11-02
+**Owner:** M5 (Pranav `pranav-samal`)
+**Affects:** findings report, metrics
+
+**Decision:**
+Bootstrap 95% CI, 1000 resamples, percentile method.
+Chosen for its assumption-free properties on small samples (10 cases).
+
+---
+
+## Research-D07 — Aggregation across cases and loss levels (D-05)
+
+**Status:** DECIDED — 2026-11-02
+**Owner:** M5 (Pranav `pranav-samal`)
+**Affects:** experiment runner, findings report
+
+**Decision:**
+Macro-average across cases at each loss level independently.
+Do not pool across loss levels into a single aggregate number.
+Report one row per (loss_level, method) in the findings table.
+
+---
+
+## Research-D08 — AQ-1: UNSUPPORTED + positive evidence
+
+**Status:** DECIDED — 2026-11-02
+**Owner:** M5 (Pranav `pranav-samal`)
+**Affects:** `research/reasoning/engine.py`, `tests/test_engine_rules.py`
+
+**Decision:**
+The engine returns UNKNOWN when parser_status == UNSUPPORTED even if positive
+runtime evidence exists. Rationale: the engine cannot verify that the static
+semantics support the observed propagation. The runtime event may be at dataset
+granularity while the dependency is column-level; without a parseable static
+candidate the column-level claim is unverifiable.
+
+The existing test `test_r1_unsupported_static_gives_unknown_even_with_positive_evidence`
+correctly locks this behavior. The architecture §14 expanded table is inconsistent
+with this decision; the table will be corrected in the next architecture update.

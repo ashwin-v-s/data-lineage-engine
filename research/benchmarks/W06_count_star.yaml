@@ -1,0 +1,43 @@
+# W06 — COUNT(*) aggregate (no specific source column → target)
+# Split: validation
+# SQL construct: AGGREGATE_COUNT_STAR
+case_id: W06
+case_version: "1.0"
+split: validation
+sql_construct: AGGREGATE_COUNT_STAR
+description: >
+  COUNT(*) aggregation — the row count does not depend on any specific column.
+  The group-by key propagates; no individual column propagates into count.
+
+sql: |
+  CREATE TABLE order_counts AS
+  SELECT status,
+         COUNT(*) AS order_count
+  FROM orders
+  GROUP BY status;
+
+schema:
+  orders:
+    columns: [order_id, status, amount, created_at]
+  order_counts:
+    columns: [status, order_count]
+
+expected_static_candidates:
+  - source: orders.status
+    target: order_counts.status
+    operator: PROJECTION
+    parser_status: SUPPORTED
+  # COUNT(*) has no specific source column dependency — table-level only
+
+ground_truth:
+  provider: ReferenceInterpreterProvider
+  provider_version: "reference-1.0"
+  labels:
+    - source: orders.status
+      target: order_counts.status
+      label: PROPAGATED
+      rationale: GROUP BY key — always present in output.
+
+never_proves:
+  - COUNT(*) does not imply any specific column propagated.
+  - order_id, amount, created_at are in the table but not selected — no dependency.
