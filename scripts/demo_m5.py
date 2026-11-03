@@ -39,7 +39,10 @@ FAIL = "FAIL"
 
 def check(label: str, condition: bool, detail: str = "") -> bool:
     status = PASS if condition else FAIL
-    print(f"  [{status}] {label}" + (f" — {detail}" if detail else ""))
+    msg = f"  [{status}] {label}"
+    if detail:
+        msg += f" -- {detail}"
+    print(msg)
     return condition
 
 
@@ -76,7 +79,7 @@ def run_demo() -> int:
           res.status_code == 401, f"status={res.status_code}")
 
     # ── 2. Auth is fail-closed ────────────────────────────────────
-    print("\n[2] Auth fail-closed (no token → 401/403)")
+    print("\n[2] Auth fail-closed (no token -> 401/403)")
     protected = [
         "/api/v1/catalog",
         "/api/v1/search?q=orders",
@@ -84,7 +87,7 @@ def run_demo() -> int:
     ]
     for path in protected:
         res = client.get(path)
-        ok = check(f"{path} → 401/403 without token",
+        ok = check(f"{path} -> 401/403 without token",
                    res.status_code in (401, 403),
                    f"status={res.status_code}")
         if not ok:
