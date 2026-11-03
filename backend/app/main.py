@@ -25,6 +25,7 @@ from backend.app.api.routes.personalization import router as personalization_rou
 from backend.app.api.routes.rea import router as rea_router
 from backend.app.api.routes.search import router as search_router
 from backend.app.api.routes.sources import router as sources_router
+from backend.app.api.routes.workspaces import router as workspaces_router
 from backend.app.auth import auth_disabled, require_user, supabase_auth_url
 
 # Largest request body the API will accept, in bytes.  Import payloads are
@@ -127,6 +128,7 @@ app.include_router(membership_router, prefix="/api/v1")
 app.include_router(sources_router, prefix="/api/v1")
 app.include_router(governance_router, prefix="/api/v1")
 app.include_router(capabilities_router, prefix="/api/v1")
+app.include_router(workspaces_router, prefix="/api/v1")
 
 
 # ── Liveness probe ────────────────────────────────────────────────────────────
@@ -189,3 +191,7 @@ FRONTEND_SOURCE_DIR = Path(__file__).resolve().parents[2] / "frontend"
 FRONTEND_DIR = FRONTEND_SOURCE_DIR / "dist"
 if FRONTEND_DIR.is_dir():
     app.mount("/", StaticFiles(directory=FRONTEND_DIR, html=True), name="frontend")
+
+
+
+

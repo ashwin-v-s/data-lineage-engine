@@ -1,4 +1,4 @@
-# Kairos Deployment Runbook
+﻿# Kairos Deployment Runbook
 
 This is the operational runbook for deploying the Kairos API + frontend. It
 covers the shared **Supabase** project (Auth + hosted PostgreSQL), database
@@ -24,9 +24,9 @@ It complements, and does not replace, [`SUPABASE_SETUP.md`](SUPABASE_SETUP.md)
 
 | Setting | Where to find it | Used as |
 | --- | --- | --- |
-| Project URL | Project Settings → API (`https://PROJECT_REF.supabase.co`) | `SUPABASE_URL` |
-| Publishable key (older projects: `anon`) | Project Settings → API | `SUPABASE_PUBLISHABLE_KEY` |
-| Pooler connection string (URI) | Project Settings → Database → Connection string → **Transaction pooler** | `DATABASE_URL` |
+| Project URL | Project Settings â†’ API (`https://PROJECT_REF.supabase.co`) | `SUPABASE_URL` |
+| Publishable key (older projects: `anon`) | Project Settings â†’ API | `SUPABASE_PUBLISHABLE_KEY` |
+| Pooler connection string (URI) | Project Settings â†’ Database â†’ Connection string â†’ **Transaction pooler** | `DATABASE_URL` |
 
 The pooler URI already contains the project-specific host and database
 password. The `service_role` key is **never** used by this application and must
@@ -51,10 +51,10 @@ memory. `Secret?` marks whether the value may be handled as a secret.
 | `VITE_SUPABASE_URL` | `backend/app/auth.py`, `backend/app/main.py` (fallbacks only) | Runtime (backend) | No | Optional. Only used if `SUPABASE_URL` is unset. |
 | `VITE_SUPABASE_PUBLISHABLE_KEY` | `backend/app/auth.py`, `backend/app/main.py` (fallbacks only) | Runtime (backend) | No | Optional. Only used if `SUPABASE_PUBLISHABLE_KEY` is unset. |
 | `FRONTEND_ORIGIN` | `backend/app/main.py` (CORS `allow_origins`) | Runtime (backend) | No | Defaults to `http://localhost:3000`; a deployed frontend on a different origin will fail CORS. |
-| `KAIROS_LIVE_API_TESTS` | `tests/conftest.py` | Test-time only | No | Unset ⇒ live integration tests are skipped (the default, offline suite still runs). |
-| `KAIROS_ENV` | — (declared in `.env.example`, not read by current code) | — | No | No effect today; reserved. |
-| `KAIROS_LOG_LEVEL` | — (declared in `.env.example`, not read by current code) | — | No | No effect today; reserved. |
-| `NEO4J_URI`, `NEO4J_USER`, `NEO4J_PASSWORD` | — (not read by current code) | — | Yes (password) | No effect today; only relevant if the optional graph projection gate (D-06) is passed. |
+| `KAIROS_LIVE_API_TESTS` | `tests/conftest.py` | Test-time only | No | Unset â‡’ live integration tests are skipped (the default, offline suite still runs). |
+| `KAIROS_ENV` | â€” (declared in `.env.example`, not read by current code) | â€” | No | No effect today; reserved. |
+| `KAIROS_LOG_LEVEL` | â€” (declared in `.env.example`, not read by current code) | â€” | No | No effect today; reserved. |
+| `NEO4J_URI`, `NEO4J_USER`, `NEO4J_PASSWORD` | â€” (not read by current code) | â€” | Yes (password) | No effect today; only relevant if the optional graph projection gate (D-06) is passed. |
 
 ### Frontend variables
 
@@ -82,19 +82,19 @@ psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f backend/migrations/0002_audit_ownersh
 psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f backend/migrations/0003_personal_workspaces.sql
 ```
 
-- `0001_core.sql` — foundational schema (datasets, columns, jobs, runs, raw
+- `0001_core.sql` â€” foundational schema (datasets, columns, jobs, runs, raw
   events, evidence, lineage edges, bitemporal versions, execution state).
-- `0002_audit_ownership_metadata.sql` — ownership, description, audit, version,
+- `0002_audit_ownership_metadata.sql` â€” ownership, description, audit, version,
   and rollback tables used by the governance API.
-- `0003_personal_workspaces.sql` — personal workspace provisioning, forced
+- `0003_personal_workspaces.sql` â€” personal workspace provisioning, forced
   row-level security, and the `kairos_workspace_isolation` policy. **Required
   for any authenticated route to work**: without it, `require_user` fails closed
   with **503** when it cannot provision a workspace.
-- `0004_ingestion_import_runs.sql` — **NOT applied**. It is a local proposal
+- `0004_ingestion_import_runs.sql` â€” **NOT applied**. It is a local proposal
   for the M3 persistent import/import-run record and must be reviewed and
   authorized by M3 before deployment.
 
-> ⚠️ **Do not run destructive or reset commands against the shared project.**
+> âš ï¸ **Do not run destructive or reset commands against the shared project.**
 > Never run `DROP`, `TRUNCATE`, `DELETE` without a `WHERE`, `ALTER ... DROP`,
 > `prisma migrate reset`, or a local "recreate from scratch" flow against the
 > shared database. Test destructive experiments on a separate Supabase
@@ -113,15 +113,14 @@ The API's database login must be a member of `kairos_app` and able to execute
   (`npm --prefix frontend ci && npm --prefix frontend run build`;
   output `frontend/dist`). Do not override these in the dashboard.
 - **Serverless function:** `backend/api/index.py` exports the FastAPI `app`
-  (see `pyproject.toml` → `[tool.vercel] entrypoint =
-  "backend.api.index:app"`). It re-exports the same `app` object, with no
+  (configured in `vercel.json`). It re-exports the same `app` object, with no
   import-time side effects beyond constructing the FastAPI instance.
-- **Routing / rewrites** (`vercel.json` → `rewrites`):
-  - `/healthz` → the Python function (unauthenticated liveness probe).
-  - `/api/(.*)` → the Python function (all `/api/v1/...` routes).
-  - `/ingestion.html` → the Python function (auth-gated ingestion page).
+- **Routing / rewrites** (`vercel.json` â†’ `rewrites`):
+  - `/healthz` â†’ the Python function (unauthenticated liveness probe).
+  - `/api/(.*)` â†’ the Python function (all `/api/v1/...` routes).
+  - `/ingestion.html` â†’ the Python function (auth-gated ingestion page).
   - Everything else is served as static files from `frontend/dist`.
-  - ⚠️ A **new top-level route** on the Python function (anything not under
+  - âš ï¸ A **new top-level route** on the Python function (anything not under
     `/api/`) requires a matching `rewrites` entry, or it will be treated as a
     missing static file and return 404.
 
@@ -129,15 +128,15 @@ The API's database login must be a member of `kairos_app` and able to execute
 
 Set these for the **Production** (and Preview, as needed) environment:
 
-- `DATABASE_URL` — the Supabase transaction-pooler URI (**secret**).
-- `SUPABASE_URL` — project URL.
-- `SUPABASE_PUBLISHABLE_KEY` — publishable/anon key.
-- `FRONTEND_ORIGIN` — the deployed frontend origin, e.g.
+- `DATABASE_URL` â€” the Supabase transaction-pooler URI (**secret**).
+- `SUPABASE_URL` â€” project URL.
+- `SUPABASE_PUBLISHABLE_KEY` â€” publishable/anon key.
+- `FRONTEND_ORIGIN` â€” the deployed frontend origin, e.g.
   `https://kairos.example.com` (no trailing slash; CORS compares exactly one
   origin).
 - Optional: `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY` (fallbacks).
 
-`DATABASE_URL` and the pooler password are secrets — store them as Vercel
+`DATABASE_URL` and the pooler password are secrets â€” store them as Vercel
 encrypted environment variables and never commit them.
 
 ### Deploying
@@ -173,13 +172,13 @@ deploy (see `.github/workflows/ci.yml`); release is a manual/team decision.
    ```
 
    `/api/v1/health` requires a valid Supabase session, so a `curl` without a
-   token cannot use it as a platform probe — use `/healthz` for that.
+   token cannot use it as a platform probe â€” use `/healthz` for that.
 
 3. **Telling a 401 from a 503** (both use the stable `{"error": {...}}`
    envelope and carry `X-Request-ID`):
-   - **401 `UNAUTHENTICATED`** — Supabase was reachable but the request had no
+   - **401 `UNAUTHENTICATED`** â€” Supabase was reachable but the request had no
      valid session (missing/expired token, or a rejected session).
-   - **503 `AUTH_UNAVAILABLE`** — the auth/workspace layer is not ready:
+   - **503 `AUTH_UNAVAILABLE`** â€” the auth/workspace layer is not ready:
      `SUPABASE_URL` is unset, the Auth service is unreachable, or the database
      / workspace provisioning failed (commonly **migration 0003 not applied**,
      or the API login is not a member of `kairos_app`).
@@ -196,8 +195,8 @@ CI job:
   (`{"status": "ok", "db": ...}` from
   [`../backend/app/api/routes/health.py`](../backend/app/api/routes/health.py)),
   printing the HTTP status and latency;
-- it asserts that every variable a deployment needs — `DATABASE_URL`,
-  `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `FRONTEND_ORIGIN` (see §2) — is
+- it asserts that every variable a deployment needs â€” `DATABASE_URL`,
+  `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `FRONTEND_ORIGIN` (see Â§2) â€” is
   present and non-empty, reading `.env` with `python-dotenv` like the other
   operator scripts. **Secret values are checked for presence only and are never
   printed.**
@@ -217,10 +216,10 @@ exits non-zero if any check fails (exit code 2 when `--base-url` is missing).
 
 The `.github/workflows/live-smoke.yml` workflow runs the same command against a
 deployed environment. It is **not** part of the default CI: trigger it manually
-from **Actions → live-smoke → Run workflow**, or let its nightly `schedule`
+from **Actions â†’ live-smoke â†’ Run workflow**, or let its nightly `schedule`
 (every day at 03:00 UTC) run it. It reads the deployment target and the required
-variables from repository secrets (set them under **Settings → Secrets and
-variables → Actions**):
+variables from repository secrets (set them under **Settings â†’ Secrets and
+variables â†’ Actions**):
 
 | Secret | Meaning |
 | --- | --- |
@@ -258,7 +257,7 @@ Be explicit about these before treating any deployment as production:
   down, all authenticated routes fail closed with 503.
 - **Migration 0003 must be applied** for any authenticated route to work. It
   powers workspace provisioning and row-level isolation; without it the API
-  returns 503 (see §3 and §5).
+  returns 503 (see Â§3 and Â§5).
 - **No Docker image** is provided; hosting is Vercel (Python function) +
   Supabase. There is no container build in this repository.
 - **The persistent import API is not implemented.** Migration
@@ -292,3 +291,5 @@ Be explicit about these before treating any deployment as production:
   browser-visible. The Supabase **publishable/anon** key is safe to expose; the
   **`service_role`** key and any database credential are not, and must stay
   server-side (`SUPABASE_*` / `DATABASE_URL`, no `VITE_` prefix).
+
+

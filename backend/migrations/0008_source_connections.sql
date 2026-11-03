@@ -60,3 +60,4 @@ COMMENT ON COLUMN source_connection.config_key_version IS
     'Key version of config_ciphertext, used to drive rotation via token_crypto.';
 COMMENT ON COLUMN source_connection.lifecycle_state IS
     'Connector lifecycle state machine: CONFIGURED -> VERIFIED -> ERROR -> REVOKED.';
+

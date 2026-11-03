@@ -18,12 +18,10 @@ dependencies = [
     "sqlglot>=26",
 ]
 
-[tool.vercel]
-entrypoint = "backend.api.index:app"
-
 [project.optional-dependencies]
 dev = [
     "pytest>=8",
+    "pytest-cov>=4",
     "ruff>=0.14,<0.18",
 ]
 # Exact versions are NOT YET FROZEN: freeze at the first working build (Pack Section 42).
@@ -47,4 +45,3 @@ extend-exclude = ["node_modules", "dist", "build", ".pw-browsers"]
 # on purpose -- they would flag large volumes of pre-existing code owned by the
 # M1-M5 workstreams, which this change must not touch.
 select = ["E9", "F", "I"]
-

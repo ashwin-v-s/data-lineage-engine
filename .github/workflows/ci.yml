@@ -1,4 +1,4 @@
-name: ci
+﻿name: ci
 on:
   pull_request:
   push:
@@ -53,8 +53,11 @@ jobs:
         run: python -c "from backend.api.index import app; assert app"
       - name: Tests
         run: python -m pytest -q
+      - name: Coverage floor
+        run: python -m pytest --cov=backend.app --cov-fail-under=40 -q
       - name: AI CI Healer
         if: failure()
         uses: mariorazo97/ai-ci-healer@v1.0.0
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+

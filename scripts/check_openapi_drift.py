@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+﻿#!/usr/bin/env python
 """OpenAPI contract-drift gate for the Kairos FastAPI application.
 
 This script freezes the HTTP contract owned by workstreams M1-M5.  It
@@ -6,9 +6,7 @@ regenerates the OpenAPI 3.1 schema from the live application, normalizes it so
 the result is deterministic and free of environment-specific values, and
 compares it against a committed snapshot.
 
-The application object is obtained through the canonical deployed entrypoint
-``backend.api.index:app`` declared in ``pyproject.toml`` ``[tool.vercel]`` and
-asserted by CI; that module simply re-exports ``backend.app.main:app`` (the
+The application object is obtained through the canonical deployed entrypoint ``backend.api.index:app`` (configured in `vercel.json`); that module simply re-exports ``backend.app.main:app`` (the
 object ``scripts/export_openapi.py`` imports), so both names resolve to the same
 application.  This script never modifies the application -- it only imports and
 introspects it.
@@ -244,3 +242,4 @@ def main(argv: Sequence[str] | None = None) -> int:
 
 if __name__ == "__main__":
     sys.exit(main())
+

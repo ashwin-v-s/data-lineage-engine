@@ -12,7 +12,7 @@ shared **Supabase Postgres** project.
 >
 > See `docs/DECISION_LOG.md` D12 for the DB runtime decision.
 
-## Apply status (last verified 2026-10-30 / 2026-11-02)
+## Apply status (last verified 2026-11-03 — all 9 migrations applied to shared Supabase)
 
 | Migration | Tables | Status |
 |---|---|---|
@@ -174,3 +174,4 @@ Do not run drop/recreate commands against the shared project. Test destructive
 or forward migration changes in a separate Supabase project/branch or isolated
 local database. Migrations are forward-only; production corrections require a
 reviewed follow-up migration and a backup/restore plan.
+

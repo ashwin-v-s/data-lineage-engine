@@ -1,4 +1,4 @@
-# Kairos Team Guide: What Is in the Zip, How to Start, and What Each Member Does Next
+﻿# Kairos Team Guide: What Is in the Zip, How to Start, and What Each Member Does Next
 
 ## 1. The 60-Second Summary
 
@@ -117,6 +117,29 @@ If something goes wrong:
 - `31 passed, 1 skipped` is the baseline (the skipped file is the API test, which needs `pip install fastapi httpx`; with those installed you get `34 passed`). If you change shared code and a test you did not write fails, stop and ask the owner.
 - Windows and ProvSQL: the ProvSQL spike may need WSL2 (Windows Subsystem for Linux). M2 records what works. Everyone else can develop natively.
 
+### Playwright Setup (Browser Testing)
+
+If you will be running the browser smoke tests, install Playwright's browser binaries:
+
+`ash
+npx playwright install chromium
+`
+
+This downloads the Chromium engine needed for the smoke tests (e2e/shell.smoke.spec.js). Without this, tests will fail with chrome-headless-shell.exe not found (or equivalent on macOS/Linux).
+
+**One-time setup per machine.** The binaries are stored in ~/.cache/ms-playwright/ and do not need to be re-downloaded unless you upgrade Playwright.
+
+## 4a. Stream Ownership and Branches
+
+| Stream | Owner | GitHub Handle | Branch | Responsibility |
+|--------|-------|---------------|--------|-----------------|
+| M1 | Jatin | Jat-in32006 | eature/platform-identity | Platform, identity, migrations, deployment |
+| M2 | Anushka | AnaaMorr | eature/ingestion-connectors | Connectors, ingestion, SQL lineage |
+| M3 | Ashwin | ashwin-v-s | eature/catalog-lineage | Catalog, lineage graph, evidence, search |
+| M4 | Gauree | gaureehatkar | eature/governance-freshness | Governance, freshness, incidents, frontend shell |
+| M5 | Pranav | pranav-samal | eature/research-integrity | Research, integrity, demo honesty |
+
+See CODEOWNERS for the definitive path-to-owner mapping.
 ## 5. How the Code Fits Together
 
 The pack's central idea, in code terms:
@@ -716,3 +739,5 @@ python scripts/make_fixtures.py
 | What are the open decisions? | Pack Section 46 (D-01 to D-20) |
 | Why was something decided this way? | Pack Section 47 (conflict table) and Section 48 (decision log) |
 | Who reviews my pull request? | Pack Section 29 (responsibility matrix) |
+
+
