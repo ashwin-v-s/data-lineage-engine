@@ -1,30 +1,30 @@
-# Database Migrations (M1 — Jatin, contract custodian)
+﻿# Database Migrations (M1 â€” Jatin, contract custodian)
 
 Numbered migration files that create and modify the schema in the team's
 shared **Supabase Postgres** project.
 
 > **How to verify:** `python scripts/db/verify_applied.py`
 > This connects to the live DB and checks each migration's tables exist.
-> A migration header — and this README — may only say **"Applied"** once that
+> A migration header â€” and this README â€” may only say **"Applied"** once that
 > script exits 0 for the relevant tables. Never quote `check_migrations.py`'s
 > output as proof of application; it is a static file check that never contacts
 > the database.
 >
 > See `docs/DECISION_LOG.md` D12 for the DB runtime decision.
 
-## Apply status (last verified 2026-11-03 � all 9 migrations applied to shared Supabase)
+## Apply status (last verified 2026-11-03 — all 9 migrations applied to shared Supabase)
 
 | Migration | Tables | Status |
 |---|---|---|
-| 0001_core | dataset, column_record, job, execution_run, raw_event, evidence, lineage_edge, edge_temporal_version, execution_state, projection_outbox | ✅ Applied — confirmed 2026-10-29 |
-| 0002_audit_ownership_metadata | team_member, owner_assignment, owner_request, audit_log, asset_version, audit_event, rollback_record | ✅ Applied — confirmed 2026-10-29 |
-| 0003_personal_workspaces | kairos_workspace | ✅ Applied — confirmed 2026-10-29 |
-| 0004_ingestion_import_runs | import_run | ✅ Applied — import_run confirmed 2026-10-30 |
-| 0005_personalization | asset_view, asset_star | ⚠️ NOT VERIFIED — tables absent 2026-10-30; run verify_applied.py |
-| 0006_github_connections | github_connection | ⚠️ NOT VERIFIED — table absent 2026-10-30; run verify_applied.py |
-| 0007_membership_roles | workspace_member, workspace_invite | ⚠️ NOT VERIFIED — run verify_applied.py |
-| 0008_source_connections | source_connection | ⚠️ NOT VERIFIED — run verify_applied.py |
-| 0009_governance | freshness_sla, freshness_evaluation, incident, incident_event | ⚠️ CLAIMED Applied in header — run verify_applied.py to confirm |
+| 0001_core | dataset, column_record, job, execution_run, raw_event, evidence, lineage_edge, edge_temporal_version, execution_state, projection_outbox | âœ… Applied â€” confirmed 2026-10-29 |
+| 0002_audit_ownership_metadata | team_member, owner_assignment, owner_request, audit_log, asset_version, audit_event, rollback_record | âœ… Applied â€” confirmed 2026-10-29 |
+| 0003_personal_workspaces | kairos_workspace | âœ… Applied â€” confirmed 2026-10-29 |
+| 0004_ingestion_import_runs | import_run | âœ… Applied â€” import_run confirmed 2026-10-30 |
+| 0005_personalization | asset_view, asset_star | âš ï¸ NOT VERIFIED â€” tables absent 2026-10-30; run verify_applied.py |
+| 0006_github_connections | github_connection | âš ï¸ NOT VERIFIED â€” table absent 2026-10-30; run verify_applied.py |
+| 0007_membership_roles | workspace_member, workspace_invite | âš ï¸ NOT VERIFIED â€” run verify_applied.py |
+| 0008_source_connections | source_connection | âš ï¸ NOT VERIFIED â€” run verify_applied.py |
+| 0009_governance | freshness_sla, freshness_evaluation, incident, incident_event | âš ï¸ CLAIMED Applied in header â€” run verify_applied.py to confirm |
 
 
 
@@ -91,7 +91,7 @@ never writes this table; only an explicit commit does.
 Adds the per-user `asset_view` (recently viewed) and `asset_star` (starred
 assets) tables. Both carry workspace RLS, are granted only to `kairos_app`,
 and are keyed on `(workspace_id, user_id, asset_id)`.
-**Status: NOT VERIFIED APPLIED** — tables were absent from the live DB on
+**Status: NOT VERIFIED APPLIED** â€” tables were absent from the live DB on
 2026-10-30. Run `python scripts/db/verify_applied.py` before enabling
 personalization routes in production.
 
@@ -103,14 +103,14 @@ shared Supabase project; the install/callback wiring is owned by M2.
 ### 0007_membership_roles.sql
 Adds `workspace_member` (a user's role in a workspace) and `workspace_invite`
 (a pending invitation; cannot grant `owner`). Both carry forced workspace RLS.
-Membership is the source of truth for a user's role — never the JWT.
-**Status: NOT VERIFIED APPLIED** — run `python scripts/db/verify_applied.py`.
+Membership is the source of truth for a user's role â€” never the JWT.
+**Status: NOT VERIFIED APPLIED** â€” run `python scripts/db/verify_applied.py`.
 
 ### 0008_source_connections.sql
 Adds `source_connection`: one row per configured external source (PostgreSQL),
 holding an AES-256-GCM encrypted connection config plus lifecycle state
-`CONFIGURED → VERIFIED | ERROR → REVOKED`. Granted only to `kairos_app`.
-**Status: NOT VERIFIED APPLIED** — run `python scripts/db/verify_applied.py`.
+`CONFIGURED â†’ VERIFIED | ERROR â†’ REVOKED`. Granted only to `kairos_app`.
+**Status: NOT VERIFIED APPLIED** â€” run `python scripts/db/verify_applied.py`.
 
 ### 0009_governance.sql
 Adds the workspace-scoped governance tables `freshness_sla`,
@@ -160,7 +160,7 @@ intended to receive the pre-isolation catalog.
 ## Supabase connection string
 
 ```
-Use the transaction-pooler URI copied from Supabase Project Settings → Database.
+Use the transaction-pooler URI copied from Supabase Project Settings â†’ Database.
 ```
 
 Store the exact URI in `.env` (never commit `.env`):
@@ -174,4 +174,5 @@ Do not run drop/recreate commands against the shared project. Test destructive
 or forward migration changes in a separate Supabase project/branch or isolated
 local database. Migrations are forward-only; production corrections require a
 reviewed follow-up migration and a backup/restore plan.
+
 

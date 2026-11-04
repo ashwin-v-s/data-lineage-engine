@@ -1,4 +1,4 @@
--- NOT VERIFIED APPLIED: source_connection not confirmed in live DB.
+﻿-- NOT VERIFIED APPLIED: source_connection not confirmed in live DB.
 -- Run `python scripts/db/verify_applied.py` before marking Applied.
 -- Migration 0008: workspace-scoped live PostgreSQL source connections.
 -- Apply after 0007_membership_roles.sql.
@@ -60,4 +60,5 @@ COMMENT ON COLUMN source_connection.config_key_version IS
     'Key version of config_ciphertext, used to drive rotation via token_crypto.';
 COMMENT ON COLUMN source_connection.lifecycle_state IS
     'Connector lifecycle state machine: CONFIGURED -> VERIFIED -> ERROR -> REVOKED.';
+
 
