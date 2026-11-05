@@ -12,10 +12,10 @@
 |---|---|---|
 | K1 | ✅ PASS | proposed=0.0 == B2=0.0 == 0 (both perfect — no false refutations) |
 | K2 | ✅ PASS | false_refutation=0.0 <= 0.15 |
-| K3 | ✅ PASS | false_observation=N/A (no NOT_PROPAGATED cases in ground truth — all benchmark labels are PROPAGATED) |
+| K3 | ✅ PASS | false_observation=0.0 |
 | K4 | ✅ PASS | unknown_rate=0.0 |
 | K5 | ✅ PASS | proposed_recall=1.0 vs B1=0.0 |
-| K6 | ✅ PASS | recall at levels: [(0, 1.0), (10, 0.9091), (30, 0.697), (50, 0.5152), (70, 0.303), (90, 0.0909)] |
+| K6 | ✅ PASS | recall at levels: [(0, 1.0), (10, 0.8947), (30, 0.7105), (50, 0.5), (70, 0.2895), (90, 0.1053)] |
 | K7 | ✅ PASS | false_refutation=0.0 == 0 at level 0 |
 | K8 | ✅ PASS | proposed_committed_acc=1.0 >= B3=1.0 |
 
@@ -27,78 +27,78 @@
 
 | Method | false_refutation | false_observation | committed_acc | recall_strict | unknown_rate |
 |---|---|---|---|---|---|
-| proposed | 0.0 | None | 1.0 | 1.0 | 0.0 |
-| B1 | 0.0 | None | None | 0.0 | 0.0 |
-| B2 | 0.0 | None | 1.0 | 1.0 | 0.0 |
-| B3 | 0.0 | None | 1.0 | 1.0 | 0.0 |
-| B4 | 0.0 | None | 1.0 | 1.0 | 0.0 |
-| B5 | 0.0 | None | 1.0 | 1.0 | 0.0 |
+| proposed | 0.0 | 0.0 | 1.0 | 1.0 | 0.0 |
+| B1 | 0.0 | 0.0 | None | 0.0 | 0.0 |
+| B2 | 0.0 | 0.0 | 1.0 | 1.0 | 0.0 |
+| B3 | 0.0 | 0.0 | 1.0 | 1.0 | 0.0 |
+| B4 | 0.0 | 0.0 | 1.0 | 1.0 | 0.0 |
+| B5 | 0.0 | 0.0 | 1.0 | 1.0 | 0.1364 |
 
 ### OPERATOR mechanism
 
 | Method | false_refutation | false_observation | committed_acc | recall_strict | unknown_rate |
 |---|---|---|---|---|---|
-| proposed | 0.0 | None | 1.0 | 1.0 | 0.0 |
-| B1 | 0.0 | None | None | 0.0 | 0.0 |
-| B2 | 0.0 | None | 1.0 | 1.0 | 0.0 |
-| B3 | 0.0 | None | 1.0 | 1.0 | 0.0 |
-| B4 | 0.0 | None | 1.0 | 1.0 | 0.0 |
-| B5 | 0.0 | None | 1.0 | 1.0 | 0.0 |
+| proposed | 0.0 | 0.0 | 1.0 | 1.0 | 0.0 |
+| B1 | 0.0 | 0.0 | None | 0.0 | 0.0 |
+| B2 | 0.0 | 0.0 | 1.0 | 1.0 | 0.0 |
+| B3 | 0.0 | 0.0 | 1.0 | 1.0 | 0.0 |
+| B4 | 0.0 | 0.0 | 1.0 | 1.0 | 0.0 |
+| B5 | 0.0 | 0.0 | 1.0 | 1.0 | 0.1364 |
 
 ### DATASET mechanism
 
 | Method | false_refutation | false_observation | committed_acc | recall_strict | unknown_rate |
 |---|---|---|---|---|---|
-| proposed | 0.0 | None | 1.0 | 1.0 | 0.0 |
-| B1 | 0.0 | None | None | 0.0 | 0.0 |
-| B2 | 0.0 | None | 1.0 | 1.0 | 0.0 |
-| B3 | 0.0 | None | 1.0 | 1.0 | 0.0 |
-| B4 | 0.0 | None | 1.0 | 1.0 | 0.0 |
-| B5 | 0.0 | None | 1.0 | 1.0 | 0.0 |
+| proposed | 0.0 | 0.0 | 1.0 | 1.0 | 0.0 |
+| B1 | 0.0 | 0.0 | None | 0.0 | 0.0 |
+| B2 | 0.0 | 0.0 | 1.0 | 1.0 | 0.0 |
+| B3 | 0.0 | 0.0 | 1.0 | 1.0 | 0.0 |
+| B4 | 0.0 | 0.0 | 1.0 | 1.0 | 0.0 |
+| B5 | 0.0 | 0.0 | 1.0 | 1.0 | 0.1364 |
 
 ### BRANCH mechanism
 
 | Method | false_refutation | false_observation | committed_acc | recall_strict | unknown_rate |
 |---|---|---|---|---|---|
-| proposed | 0.0 | None | 1.0 | 1.0 | 0.0 |
-| B1 | 0.0 | None | None | 0.0 | 0.0 |
-| B2 | 0.0 | None | 1.0 | 1.0 | 0.0 |
-| B3 | 0.0 | None | 1.0 | 1.0 | 0.0 |
-| B4 | 0.0 | None | 1.0 | 1.0 | 0.0 |
-| B5 | 0.0 | None | 1.0 | 1.0 | 0.0 |
+| proposed | 0.0 | 0.0 | 1.0 | 1.0 | 0.0 |
+| B1 | 0.0 | 0.0 | None | 0.0 | 0.0 |
+| B2 | 0.0 | 0.0 | 1.0 | 1.0 | 0.0 |
+| B3 | 0.0 | 0.0 | 1.0 | 1.0 | 0.0 |
+| B4 | 0.0 | 0.0 | 1.0 | 1.0 | 0.0 |
+| B5 | 0.0 | 0.0 | 1.0 | 1.0 | 0.1364 |
 
 ### COMPLETE_RUN mechanism
 
 | Method | false_refutation | false_observation | committed_acc | recall_strict | unknown_rate |
 |---|---|---|---|---|---|
-| proposed | 0.0 | None | 1.0 | 1.0 | 0.0 |
-| B1 | 0.0 | None | None | 0.0 | 0.0 |
-| B2 | 0.0 | None | 1.0 | 1.0 | 0.0 |
-| B3 | 0.0 | None | 1.0 | 1.0 | 0.0 |
-| B4 | 0.0 | None | 1.0 | 1.0 | 0.0 |
-| B5 | 0.0 | None | 1.0 | 1.0 | 0.0 |
+| proposed | 0.0 | 0.0 | 1.0 | 1.0 | 0.0 |
+| B1 | 0.0 | 0.0 | None | 0.0 | 0.0 |
+| B2 | 0.0 | 0.0 | 1.0 | 1.0 | 0.0 |
+| B3 | 0.0 | 0.0 | 1.0 | 1.0 | 0.0 |
+| B4 | 0.0 | 0.0 | 1.0 | 1.0 | 0.0 |
+| B5 | 0.0 | 0.0 | 1.0 | 1.0 | 0.1364 |
 
 ### CORRELATED mechanism
 
 | Method | false_refutation | false_observation | committed_acc | recall_strict | unknown_rate |
 |---|---|---|---|---|---|
-| proposed | 0.0 | None | 1.0 | 1.0 | 0.0 |
-| B1 | 0.0 | None | None | 0.0 | 0.0 |
-| B2 | 0.0 | None | 1.0 | 1.0 | 0.0 |
-| B3 | 0.0 | None | 1.0 | 1.0 | 0.0 |
-| B4 | 0.0 | None | 1.0 | 1.0 | 0.0 |
-| B5 | 0.0 | None | 1.0 | 1.0 | 0.0 |
+| proposed | 0.0 | 0.0 | 1.0 | 1.0 | 0.0 |
+| B1 | 0.0 | 0.0 | None | 0.0 | 0.0 |
+| B2 | 0.0 | 0.0 | 1.0 | 1.0 | 0.0 |
+| B3 | 0.0 | 0.0 | 1.0 | 1.0 | 0.0 |
+| B4 | 0.0 | 0.0 | 1.0 | 1.0 | 0.0 |
+| B5 | 0.0 | 0.0 | 1.0 | 1.0 | 0.1364 |
 
 ## Recall Erosion as Loss Increases (MCAR, proposed engine)
 
 | Loss Level | recall_strict | false_refutation | committed_acc |
 |---|---|---|---|
 | 0% | 1.0 | 0.0 | 1.0 |
-| 10% | 0.9091 | 0.0 | 1.0 |
-| 30% | 0.697 | 0.0 | 1.0 |
-| 50% | 0.5152 | 0.0 | 1.0 |
-| 70% | 0.303 | 0.0 | 1.0 |
-| 90% | 0.0909 | 0.0 | 1.0 |
+| 10% | 0.8947 | 0.0 | 1.0 |
+| 30% | 0.7105 | 0.0 | 1.0 |
+| 50% | 0.5 | 0.0 | 1.0 |
+| 70% | 0.2895 | 0.0 | 1.0 |
+| 90% | 0.1053 | 0.0 | 1.0 |
 
 ## Limitations
 

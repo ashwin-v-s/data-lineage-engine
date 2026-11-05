@@ -353,7 +353,7 @@ with this decision; the table will be corrected in the next architecture update.
 
 ---
 
-## Scheduler proposal — freshness and source pulls
+## Scheduler — freshness and source pulls
 
 **Status:** PROPOSED — 2026-11-05; M2 agreement required before implementation.
 **Owners:** M1 (runner authentication/deployment), M2 (batch evaluator and source-sync behavior).
@@ -361,3 +361,103 @@ with this decision; the table will be corrected in the next architecture update.
 M5's message calls this scheduler question “D12 Wave 4”, but D12 is already the database-runtime decision (Supabase PostgreSQL) in this log and in Architecture v2 §11. Keep the scheduler decision separate; do not reuse D12.
 
 **M1 proposal:** use a GitHub Actions scheduled workflow hourly for the MVP freshness sweep. M2 owns the idempotent, workspace-by-workspace evaluation/sync batch; M1 owns a narrowly scoped machine-auth path and its GitHub secret. The existing user-token-only evaluation route is not directly callable by a scheduler. The job must not accept a caller-selected workspace without server-side authorization. M2 must confirm that this runner and ownership split meet connector scheduling needs before this proposal becomes DECIDED.
+
+---
+
+## Scheduler-DECIDED — freshness and source pulls
+
+**Status:** DECIDED — 2026-11-03
+**Owners:** M1 (Jatin) owns runner auth + GitHub secret; M2 (Anushka) owns batch evaluator + source-sync.
+**Supersedes:** "Scheduler proposal" entry above (which was PROPOSED pending M2 confirmation).
+
+**Decision:** GitHub Actions scheduled workflow (hourly) for MVP freshness sweep.
+
+- M1 owns: machine-auth path + KAIROS_SCHEDULER_TOKEN GitHub Actions secret
+- M2 owns: idempotent workspace-by-workspace evaluation batch
+- M2 confirmation: PR #22 (feature/m2-ingestion-groundtruth-complete, merged 2026-11-03) ships the complete ingestion pipeline with idempotent workspace-scoped evaluation — ownership split is confirmed compatible
+- On-demand route /api/v1/governance/freshness available now; scheduled job pending M1 deployment
+- Demo must state: "scheduled freshness monitoring — on-demand only, no scheduler running yet"
+
+
+## D13: Migration Numbering and Ownership — DECIDED 2026-11-05
+
+**Decision:** All future migrations must include ownership marker in filename.
+Pattern: {number}_{owner_initials}_{feature}.sql
+
+**Existing migrations updated:**
+  • 0010_source_connection_lifecycle.sql → 0010_m2_source_connection_lifecycle.sql (M2: Anushka)
+  • M4 (Gauree) will use: 0011_m4_governance.sql (next available)
+
+**Rationale:**
+- Prevents collision when multiple teams author migrations simultaneously
+- Makes migration ownership explicit in filename
+- Preserves chronological order
+- Aligns with git blame and change tracking
+
+**Impact:**
+- M2's migration renaming is breaking; re-apply requires DB restart or manual cleanup
+- M4 must author governance migration as 0011, not 0010
+- All future M1-M5 migrations follow this convention
+
+---
+
+## D14: Database Verification Authority — DECIDED 2026-11-05
+
+**Decision:** Database state verified directly against live Supabase (2026-11-05 22:03 UTC).
+
+**Verification output (authoritative):**
+  • 0001-0009: ALL APPLIED (29 tables in public schema)
+  • 0010_m2: NOT YET APPLIED
+  • 0011_m4: NOT YET AUTHORED
+  • RLS: 100% enabled on all 29 tables
+  • Workspace isolation: 28 workspace_id policies confirmed
+
+**Supersedes:**
+  • 2026-10-30 README claiming "0005 and 0006 NOT VERIFIED"
+  • Any static schema check (check_migrations.py)
+  • All prior reports with outdated table counts
+
+**Authority:**
+  • Direct SQL queries against aws-0-ap-south-1.supabase.com
+  • Verified by M1 (Jatin) on 2026-11-05
+
+---
+
+## D15: M2 0010_m2_source_connection_lifecycle Approval Gate
+
+**Status:** FILE APPROVED, NOT APPLIED
+
+**Review completed by M1:**
+  ✅ Migration syntax valid
+  ✅ RLS policy pattern correct (workspace_id isolation)
+  ✅ Table schema aligns with architecture
+  ✅ No modifications to existing 0001-0009 tables
+
+**Awaiting:**
+  • M2 confirmation of intended application date
+  • M1 final approval to apply to shared Supabase
+  • Once approved: psql "\" -f backend/migrations/0010_m2_source_connection_lifecycle.sql
+
+---
+
+## D16: M4 0011_m4_governance Authorship & Review
+
+**Status:** NOT YET AUTHORED
+
+**Requirements for M4 (Gauree):**
+  1. Author 0011_m4_governance.sql (use this number, not 0010)
+  2. Define governance tables needed (SLA details, settings, etc.)
+  3. All tables must carry workspace_id + RLS isolation policy
+  4. Follow naming convention: snake_case, clear semantics
+  5. NO modifications to existing tables unless absolutely justified
+
+**M1 Review checklist (before application):**
+  ✅ RLS policy enforces workspace_id isolation
+  ✅ All UUIDs use uuid_generate_v4()
+  ✅ FORCE ROW LEVEL SECURITY on all tables
+  ✅ Grant only to kairos_app role
+  ✅ No modifications to 0001-0010 tables
+  ✅ Aligns with architecture & handout requirements
+
+**Approval gate:** M1 (Jatin) must approve before application to Supabase.
+

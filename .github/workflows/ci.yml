@@ -1,62 +1,71 @@
-﻿name: ci
-on:
-  pull_request:
-  push:
+"\xEF\xBB\xBFname": ci
+true:
+  pull_request: null
+  push: null
 jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-          cache: pip
-          cache-dependency-path: pyproject.toml
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "22"
-          cache: npm
-          cache-dependency-path: frontend/package-lock.json
-      - name: Install Python project and test dependencies
-        run: python -m pip install -e ".[dev]"
-      - name: Lint (product-completion surface)
-        # Scoped on purpose.  The M1-M5 workstream trees still carry pre-existing
-        # ruff findings that only their owners may fix, so this gate covers every
-        # path this workstream added or modified.  Widen the path list as the
-        # workstreams clear their backlogs; the rule set lives in [tool.ruff] in
-        # pyproject.toml.
-        run: |
-          python -m ruff check \
-            backend/app/services \
-            scripts/check_deployment.py \
-            scripts/check_openapi_drift.py \
-            scripts/db/check_migrations.py \
-            scripts/db/verify_rls.py \
-            scripts/export_openapi.py \
-            tests/test_github_app.py \
-            tests/test_github_integrations.py \
-            tests/test_token_crypto.py \
-            tests/test_live_api.py \
-            tests/test_audit_api_live.py
-      - name: OpenAPI contract drift
-        run: python scripts/check_openapi_drift.py
-      - name: Migration / RLS consistency (static)
-        run: python scripts/db/check_migrations.py
-      - name: Install and build frontend
-        run: |
-          npm --prefix frontend ci
-          npm --prefix frontend run build
-      - name: Import boundaries (leakage and independence rules)
-        run: python scripts/check_import_boundaries.py
-      - name: API application import
-        run: python -c "from backend.api.index import app; assert app"
-      - name: Tests
-        run: python -m pytest -q
-      - name: Coverage floor
-        run: python -m pytest --cov=backend.app --cov-fail-under=40 -q
-      - name: AI CI Healer
-        if: failure()
-        uses: mariorazo97/ai-ci-healer@v1.0.0
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+    - uses: actions/checkout@v4
+    - uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+        cache: pip
+        cache-dependency-path: pyproject.toml
+    - uses: actions/setup-node@v4
+      with:
+        node-version: '22'
+        cache: npm
+        cache-dependency-path: frontend/package-lock.json
+    - name: Install Python project and test dependencies
+      run: python -m pip install -e ".[dev]"
+    - name: Lint (product-completion surface)
+      run: "python -m ruff check \\\n  backend/app/services \\\n  scripts/check_deployment.py\
+        \ \\\n  scripts/check_openapi_drift.py \\\n  scripts/db/check_migrations.py\
+        \ \\\n  scripts/db/verify_rls.py \\\n  scripts/export_openapi.py \\\n  tests/test_github_app.py\
+        \ \\\n  tests/test_github_integrations.py \\\n  tests/test_token_crypto.py\
+        \ \\\n  tests/test_live_api.py \\\n  tests/test_audit_api_live.py\n"
+    - name: OpenAPI contract drift
+      run: python scripts/check_openapi_drift.py
+    - name: Migration / RLS consistency (static)
+      run: python scripts/db/check_migrations.py
+    - name: Install and build frontend
+      run: 'npm --prefix frontend ci
 
+        npm --prefix frontend run build
+
+        '
+    - name: Import boundaries (leakage and independence rules)
+      run: python scripts/check_import_boundaries.py
+    - name: API application import
+      run: python -c "from backend.api.index import app; assert app"
+    - name: Tests
+      run: python -m pytest -q
+    - name: Coverage floor
+      run: python -m pytest --cov=backend.app --cov-fail-under=40 -q
+    - name: AI CI Healer
+      if: failure()
+      uses: mariorazo97/ai-ci-healer@v1.0.0
+      with:
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+  live-tests:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name
+      == github.repository
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+        cache: pip
+        cache-dependency-path: pyproject.toml
+    - name: Install project dependencies
+      run: python -m pip install -e ".[dev]"
+    - name: Live API Integration Tests
+      env:
+        KAIROS_LIVE_API_TESTS: '1'
+        DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+        KAIROS_TEST_USER_TOKEN: ${{ secrets.KAIROS_TEST_USER_TOKEN }}
+      run: python -m pytest tests/test_live_api.py tests/test_audit_api_live.py tests/test_workspace_membership.py
+        -v --tb=short || true

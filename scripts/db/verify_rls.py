@@ -84,6 +84,8 @@ WORKSPACE_SCOPED_TABLES = (
     "freshness_evaluation",
     "incident",
     "incident_event",
+    # 0010_source_connection_lifecycle.sql
+    "sync_job",
 )
 
 # Exit codes.
