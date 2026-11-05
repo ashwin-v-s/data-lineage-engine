@@ -134,3 +134,53 @@ td{padding:11px 16px}
 .health-top strong{font-size:.86rem;white-space:nowrap}
 .health-foot{display:grid;grid-template-columns:auto 1fr;gap:2px 10px;font-size:.62rem;letter-spacing:.04em}
 .health-foot b{text-align:right}
+
+/* Shared page frame: preserve the existing visual language while preventing
+   narrow columns and long identifiers from forcing the whole dashboard wider. */
+:root{--pad:clamp(18px,2vw,30px);--gap:clamp(16px,1.55vw,22px)}
+.main-area,.content,#mainContent,.content>div{min-width:0}
+.content{width:100%;max-width:1680px;margin-inline:auto}
+.content>*{min-width:0;max-width:100%}
+.panel,.panel-head,.panel-body,.page-heading,.notice,.data-source-banner{min-width:0}
+.panel-head{flex-wrap:wrap;align-items:flex-start}
+.panel-head>div{min-width:0;flex:1 1 240px}
+.panel-head>.btn,.panel-head>.panel-link{flex:0 0 auto}
+.page-heading{flex-wrap:wrap;align-items:flex-end}
+.page-heading>div:first-child{min-width:0;flex:1 1 320px}
+.heading-actions{min-width:0;justify-content:flex-end}
+.grid-2>*,.grid-equal>*,.two-col-layout>*,.lineage-layout>*,.observatory-layout>*,.stat-grid>*,.room-grid>*{min-width:0}
+.stat-grid{grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr))}
+.room-grid{grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr))}
+.toolbar{min-width:0;flex-wrap:wrap;align-items:center}
+.toolbar>.field,.toolbar>.search-box{min-width:0}
+.form-grid{align-items:start}
+.form-grid>.field,.form-grid>.toolbar{min-width:0}
+.table-wrap{width:100%;max-width:100%;overflow-x:auto;overscroll-behavior-inline:contain}
+table{max-width:100%}
+td,th{overflow-wrap:anywhere}
+.asset-path,.qualified-name,.uuid,.identifier,.mono{overflow-wrap:anywhere}
+.footer{flex-wrap:wrap;align-items:center}
+
+@media(max-width:1180px){
+  .lineage-layout,.observatory-layout{grid-template-columns:minmax(0,1fr)}
+  .lineage-layout>.side-stack,.observatory-layout>.side-stack{position:static;max-height:none;overflow:visible;padding:0}
+}
+@media(max-width:1100px){
+  .grid-2,.grid-equal,.two-col-layout{grid-template-columns:minmax(0,1fr)}
+  .topbar{gap:10px}
+}
+@media(max-width:900px){
+  .main-area,.sidebar.collapsed~.main-area{width:100%}
+  .content{padding-inline:clamp(18px,3vw,28px)}
+}
+@media(max-width:640px){
+  :root{--pad:14px;--gap:16px}
+  .content{padding:18px 14px 32px}
+  .page-heading{align-items:flex-start;gap:12px}
+  .heading-actions{width:100%;justify-content:stretch}
+  .heading-actions>.btn{flex:1 1 auto}
+  .panel-head{align-items:flex-start;gap:10px}
+  .panel-head>div{flex-basis:100%}
+  .panel-head>.btn,.panel-head>.panel-link{max-width:100%}
+  .footer{align-items:flex-start;overflow-wrap:anywhere}
+}
