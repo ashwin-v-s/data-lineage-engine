@@ -48,26 +48,20 @@ describe('ingestion navigation', () => {
   });
 });
 
-describe('demo and live catalog modes', () => {
-  it('offers both modes in the dashboard top bar', () => {
+describe('catalog provenance and graph behavior', () => {
+  it('does not expose a demo data mode', () => {
     const shell = read('src/main.jsx');
-    expect(shell).toContain('data-mode-switch="demo"');
-    expect(shell).toContain('data-mode-switch="postgresql"');
-    expect(shell).toContain('Live catalog');
+    expect(shell).not.toContain('data-mode-switch="demo"');
+    expect(read('app.js')).not.toContain("S.dataMode='demo'");
   });
 
-  it('switches and remembers the chosen mode without touching the catalog', () => {
-    const app = read('app.js');
-    // The click handler must route through the one mode setter.
-    expect(app).toContain("closest('[data-mode-switch]')");
-    expect(app).toContain("localStorage.setItem('kairos_dataMode','demo')");
-    expect(app).toContain("localStorage.setItem('kairos_dataMode','postgresql')");
-    // A guest demo preview has no authenticated catalog and must say so.
-    expect(app).toContain('The guest demo preview has no authenticated catalog.');
+  it('requires authentication and has no anonymous preview handler', () => {
+    expect(read('auth.js')).not.toContain("message.type === 'demo-preview'");
+    expect(read('auth-stitch.html')).not.toContain('Preview dashboard with sample data');
   });
 
-  it('keeps demo fixtures clearly labelled as synthetic', () => {
-    expect(read('app.js')).toContain('Demo mode · synthetic sample data');
+  it('starts catalog collections empty until the API returns records', () => {
+    expect(read('app.js')).toContain('const A=[],E=[],V=[],R=[],Q=[];');
   });
 
   it('derives graph columns from the tested mapping module', () => {

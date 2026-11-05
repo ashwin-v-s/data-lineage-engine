@@ -181,6 +181,9 @@ input::placeholder,textarea::placeholder{color:var(--muted)}
 /* KPI cards: separate outlined cards, the lead one tinted by meaning */
 .stat-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:var(--gap) 24px;margin-bottom:var(--gap)}
 .stat-card{padding:20px 22px;border:2px solid var(--ink);border-radius:20px;background:var(--surface);box-shadow:0 5px 0 var(--ink)}
+.metric-card-link{display:block;width:100%;padding:0;border:0;background:transparent;color:inherit;text-align:left;cursor:pointer}
+.metric-card-link:hover .stat-card{transform:translateY(-2px);box-shadow:0 7px 0 var(--ink)}
+.metric-card-link:focus-visible{outline:3px solid var(--blue);outline-offset:5px;border-radius:20px}
 .stat-card.lead{background:var(--tint-green)}
 .stat-top{display:flex;align-items:center;justify-content:space-between;font:500 .68rem var(--font-mono);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
 .stat-card.lead .stat-top{color:var(--ink)}
@@ -263,6 +266,8 @@ td .subline{margin-top:2px;font-size:.8rem;color:var(--muted)}
 .graph-toolbar .btn{height:34px;padding:0 12px;font-size:.82rem;display:inline-flex;align-items:center;justify-content:center;white-space:nowrap}
 .time-context-note{margin:0;padding:0 26px 14px;font-size:.84rem;line-height:1.5;color:var(--muted)}
 .graph-stage{position:relative;height:520px;overflow:hidden;border-top:2px solid var(--ink);background-color:var(--surface);background-image:linear-gradient(to right,var(--grid) 1px,transparent 1px),linear-gradient(to bottom,var(--grid) 1px,transparent 1px);background-size:36px 36px}
+.lineage-minimap{position:absolute;z-index:3;right:12px;top:52px;width:148px;height:94px;overflow:hidden;border:1px solid var(--line);border-radius:10px;background:var(--surface);opacity:.92;box-shadow:0 2px 8px #0002;pointer-events:none}
+.lineage-minimap svg{display:block;width:100%;height:100%;position:static!important;inset:auto!important}
 .graph-stage canvas{display:block;width:100%;height:100%}
 .graph-stage svg{touch-action:none;user-select:none}
 .graph-stage svg :focus-visible{outline:3px solid var(--blue);outline-offset:3px}

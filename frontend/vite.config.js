@@ -1,5 +1,5 @@
 import { copyFileSync, mkdirSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { dirname, resolve } from 'node:path';
 import { defineConfig } from 'vite';
 
 const frontendRoot = import.meta.dirname;
@@ -24,6 +24,8 @@ const runtimeFiles = [
   'accent-bg.png',
   'empty-state.png',
   'supabase-icon-green-transparent.svg',
+  'vendors/three.min.js',
+  'vendors/chart.umd.min.js',
 ];
 
 export default defineConfig({
@@ -34,7 +36,9 @@ export default defineConfig({
       const output = resolve(frontendRoot, 'dist');
       mkdirSync(output, { recursive: true });
       for (const file of runtimeFiles) {
-        copyFileSync(resolve(frontendRoot, file), resolve(output, file));
+        const destination = resolve(output, file);
+        mkdirSync(dirname(destination), { recursive: true });
+        copyFileSync(resolve(frontendRoot, file), destination);
       }
     },
   }],
