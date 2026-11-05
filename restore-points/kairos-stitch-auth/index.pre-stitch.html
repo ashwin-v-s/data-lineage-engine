@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#F3F4F6">
+<title>Kairos — Metadata Lineage Platform</title>
+<script>try{var t=localStorage.getItem('kairos_theme');if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
+<link rel="stylesheet" href="/styles.neo.css?v=305">
+<link rel="stylesheet" href="/assets.css?v=4">
+<link rel="stylesheet" href="/layout.css?v=304">
+<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script src="/observatory.js?v=304"></script>
+<script src="/stewardship.js?v=304"></script>
+<script>
+  !function(t,e){var o,n,p,r;e.__SV||(window.posthog=e,e._i=[],e.init=function(i,s,a){function g(t,e){var o=e.split(".");2==o.length&&(t=t[o[0]],e=o[1]),t[e]=function(){t.push([e].concat(Array.prototype.slice.call(arguments,0)))}}(p=t.createElement("script")).type="text/javascript",p.async=!0,p.crossOrigin="anonymous",p.src=s.api_host.replace(".i.posthog.com","-assets.i.posthog.com")+"/static/array.js",(r=t.getElementsByTagName("script")[0]).parentNode.insertBefore(p,r);var u=e;for(void 0!==a?u=e[a]=[]:a="posthog",u.people=u.people||[],u.toString=function(t){var e="posthog";return"posthog"!==a&&(e+="."+a),t||(e+=" (stub)"),e},u.people.toString=function(){return u.toString(1)+".people (stub)"},o="init capture identify reset get_distinct_id".split(" "),n=0;n<o.length;n++)g(u,o[n]);e._i.push([i,s,a])},e.__SV=1)}(document,window.posthog||[]);
+  posthog.init("phc_pf8dji3FiRUdgnPZbs2vd7PyEMyCCbSUTqs3Q2mwWQ67",{api_host:"https://us.i.posthog.com", autocapture:true, capture_pageview:true, capture_pageleave:true});
+</script>
+</head>
+<body>
+<a class="skip-link" href="#mainContent">Skip to main content</a>
+<div class="app-shell">
+  <aside class="sidebar" id="sidebar">
+    <div class="brand"><img class="brand-logo" src="/logo.png" alt="Kairos logo"><div><strong>KAIROS</strong><small>METADATA PLATFORM</small></div><button class="icon-btn mobile-close" id="closeNav" aria-label="Close navigation">×</button><button class="icon-btn" id="sidebarToggleBtn" aria-label="Toggle sidebar" title="Collapse sidebar" style="margin-left:auto; width:28px; height:28px; font-size:12px;">◀</button></div>
+    <nav class="nav-list nav-groups" aria-label="Main navigation">
+      <button class="nav-item nav-primary active" data-view="overview"><span class="nav-icon">▫</span>Home</button>
+      <div class="nav-group" data-nav-group="catalog">
+        <button class="nav-item nav-primary" data-view="assets" aria-expanded="false"><span class="nav-icon">▤</span>Catalog<span class="nav-chevron" aria-hidden="true">⌄</span></button>
+        <div class="nav-sublist" hidden>
+          <button class="nav-item nav-child" data-action="open-all-assets">All assets</button>
+          <button class="nav-item nav-child" data-view="catalog">Catalog structure</button>
+          <button class="nav-item nav-child" data-view="search">Catalog search</button>
+          <button class="nav-item nav-child" data-view="products">Data Products <span class="nav-tag">NEW</span></button>
+        </div>
+      </div>
+      <div class="nav-group" data-nav-group="lineage">
+        <button class="nav-item nav-primary" data-view="lineage" aria-expanded="false"><span class="nav-icon">⌘</span>Lineage<span class="nav-chevron" aria-hidden="true">⌄</span></button>
+        <div class="nav-sublist" hidden>
+          <button class="nav-item nav-child" data-view="lineage">Visual explorer</button>
+          <button class="nav-item nav-child" data-view="history">Time travel</button>
+          <button class="nav-item nav-child" data-view="sql">SQL analysis</button>
+          <button class="nav-item nav-child" data-view="observatory">3D observatory <span class="nav-tag">BETA</span></button>
+        </div>
+      </div>
+      <div class="nav-group" data-nav-group="operations">
+        <button class="nav-item nav-primary" data-view="runs" aria-expanded="false"><span class="nav-icon">↻</span>Operations<span class="nav-chevron" aria-hidden="true">⌄</span></button>
+        <div class="nav-sublist" hidden>
+          <a class="nav-item nav-child" href="/ingestion.html">Import metadata</a>
+          <button class="nav-item nav-child" data-view="runs">Pipeline runs</button>
+        </div>
+      </div>
+      <div class="nav-group" data-nav-group="trust">
+        <button class="nav-item nav-primary" data-view="evidence" aria-expanded="false"><span class="nav-icon">🛡</span>Trust & governance<span class="nav-chevron" aria-hidden="true">⌄</span></button>
+        <div class="nav-sublist" hidden>
+          <button class="nav-item nav-child" data-view="evidence">Evidence & reasoning</button>
+          <button class="nav-item nav-child" data-view="quality">Data quality</button>
+          <button class="nav-item nav-child" data-view="incidents">Incident console <span class="nav-tag">NEW</span></button>
+          <button class="nav-item nav-child" data-view="stewardship">Stewardship <span class="nav-tag">NEW</span></button>
+        </div>
+      </div>
+      <div class="nav-group" data-nav-group="settings">
+        <button class="nav-item nav-primary" data-view="integrations" aria-expanded="false"><span class="nav-icon">⚙</span>System<span class="nav-chevron" aria-hidden="true">⌄</span></button>
+        <div class="nav-sublist" hidden>
+          <button class="nav-item nav-child" data-view="integrations">Integrations & API</button>
+          <button class="nav-item nav-child" data-view="settings">Preferences</button>
+        </div>
+      </div>
+    </nav>
+    <div class="sidebar-bottom">
+      <div class="health-card"><div class="health-top"><span class="status-dot"></span><strong>Workspace mode</strong><span class="health-live" id="sidebarModeBadge">DEMO</span></div><p id="sidebarModeDescription">Synthetic sample records; not production data.</p><div class="health-foot"><span>Data source</span><b id="sidebarSourceLabel">Demo</b></div></div>
+      <button class="user-row profile-shortcut" type="button" data-view="profile" aria-label="Open user profile"><span class="avatar profile-avatar">JS</span><span class="user-copy"><strong class="profile-display-name">Jatin Shende</strong><small>Data Engineer & Steward</small></span><span class="more" aria-hidden="true">•••</span></button>
+    </div>
+  </aside>
+  <div class="main-area">
+    <header class="topbar"><button class="icon-btn menu-toggle" id="openNav" aria-label="Open navigation">☰</button><div class="breadcrumbs"><span>Workspace</span><b>/</b><strong id="breadcrumbTitle">Overview</strong></div><div class="top-actions"><label class="data-mode-control" for="dataModeSelect"><span>DATA</span><select id="dataModeSelect" aria-label="Choose data source"><option value="demo">Demo workspace</option><option value="postgresql">Connected catalog</option></select></label><div class="environment" id="environmentBadge"><span class="status-dot"></span>DEMO DATA</div><button class="top-icon" id="themeToggle" title="Switch light / dark" aria-label="Switch between light and dark theme">◴</button><button class="top-icon" title="Search (Ctrl+K)" aria-label="Search workspace (Ctrl+K)" id="globalSearchButton">⌕</button><button class="top-icon" title="Help" aria-label="Help" id="helpButton">?</button><button class="top-avatar profile-avatar" type="button" data-view="profile" aria-label="Open user profile">JS</button></div></header>
+    <main id="mainContent" class="content"><div class="loading-state">Loading workspace…</div></main>
+    <footer class="footer"><span><i class="status-dot"></i> Kairos metadata engine <b>·</b> <span id="footerModeLabel">Demo mode</span></span><span>Evidence-first lineage <b>·</b> v0.1 prototype <b>·</b> build v305</span></footer>
+    </div>
+</div>
+<div class="toast-region" id="toastRegion" aria-live="polite"></div>
+<div class="modal-backdrop" id="modalBackdrop" hidden><section class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle"><div class="modal-head"><div><h2 id="modalTitle">Details</h2></div><button class="icon-btn" id="modalClose" aria-label="Close dialog">×</button></div><div id="modalBody"></div></section></div>
+<script src="/app.js?v=305"></script>
+<script src="/pii-lineage-enhancements.js?v=304"></script>
+</body></html>

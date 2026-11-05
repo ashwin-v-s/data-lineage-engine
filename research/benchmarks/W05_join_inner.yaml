@@ -1,0 +1,71 @@
+# W05 — INNER JOIN (two sources, join key + projected columns)
+# Split: development
+# SQL construct: JOIN_INNER
+case_id: W05
+case_version: "1.0"
+split: development
+sql_construct: JOIN_INNER
+description: >
+  INNER JOIN between orders and customers on customer_id.
+  Both tables contribute columns to the output; the join key creates
+  a dependency on both tables.
+
+sql: |
+  CREATE TABLE order_details AS
+  SELECT o.order_id,
+         o.amount,
+         c.customer_name,
+         c.country
+  FROM orders o
+  INNER JOIN customers c ON o.customer_id = c.customer_id;
+
+schema:
+  orders:
+    columns: [order_id, customer_id, amount]
+  customers:
+    columns: [customer_id, customer_name, country]
+  order_details:
+    columns: [order_id, amount, customer_name, country]
+
+expected_static_candidates:
+  - source: orders.order_id
+    target: order_details.order_id
+    operator: PROJECTION
+    parser_status: SUPPORTED
+  - source: orders.amount
+    target: order_details.amount
+    operator: PROJECTION
+    parser_status: SUPPORTED
+  - source: customers.customer_name
+    target: order_details.customer_name
+    operator: PROJECTION
+    parser_status: SUPPORTED
+  - source: customers.country
+    target: order_details.country
+    operator: PROJECTION
+    parser_status: SUPPORTED
+
+ground_truth:
+  provider: ReferenceInterpreterProvider
+  provider_version: "reference-1.0"
+  labels:
+    - source: orders.order_id
+      target: order_details.order_id
+      label: PROPAGATED
+      rationale: Direct projection from orders.
+    - source: orders.amount
+      target: order_details.amount
+      label: PROPAGATED
+      rationale: Direct projection from orders.
+    - source: customers.customer_name
+      target: order_details.customer_name
+      label: PROPAGATED
+      rationale: Direct projection from customers.
+    - source: customers.country
+      target: order_details.country
+      label: PROPAGATED
+      rationale: Direct projection from customers.
+
+never_proves:
+  - JOIN dependency does not prove matching rows existed in both tables for this run.
+  - An INNER JOIN with no matching rows would produce an empty output.

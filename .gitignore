@@ -1,11 +1,56 @@
+# Byte-compiled / optimized / test caches
 __pycache__/
-*.pyc
+*.py[cod]
+*$py.class
 .pytest_cache/
+.coverage
+htmlcov/
+.cache/
+
+# Environments and Secrets
 .venv/
+env/
+venv/
+ENV/
 .env
+.env.local
+*.env
+backend/.env.local
+frontend/.env.local
+
+# Data and large datasets
 data/*
 !data/.gitkeep
+!data/olist/
+data/olist/*
+!data/olist/*.csv
 research/results/*
 !research/results/.gitkeep
+# Consolidated benchmark-matrix summaries are committed deliverables;
+# the individual result_*.json artifacts remain ignored.
+!research/results/summary.json
+!research/results/summary.md
+*.zip
+*.tar.gz
+*.csv.gz
+
+# Temporary dumps and scratch files
+rea_*.json
+*.tsbuildinfo
+
+# Dependencies and build outputs
 node_modules/
+dist/
+build/
 *.egg-info/
+
+# Playwright artifacts
+playwright-report/
+test-results/
+.pw-browsers/
+
+# IDE and OS artifacts
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

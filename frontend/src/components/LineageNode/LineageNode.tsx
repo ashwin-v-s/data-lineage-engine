@@ -109,7 +109,7 @@ export const LineageNodeComponent: React.FC<NodeProps> = memo(({ data, selected 
         </div>
       )}
 
-      {/* Left / Right Expansion Affordance Pills for Anchor */}
+      {/* Anchor node expansion affordance — counts hidden until real data available */}
       {isAnchor && (
         <div className="flex items-center justify-between mt-2 pt-2 border-t border-surface-container-highest font-mono-sm text-[10px]">
           <span
@@ -120,7 +120,7 @@ export const LineageNodeComponent: React.FC<NodeProps> = memo(({ data, selected 
             }}
           >
             <span className="material-symbols-outlined text-[12px] text-primary">arrow_back</span>
-            Upstream (4)
+            Upstream
           </span>
           <span
             className="text-outline hover:text-primary flex items-center gap-0.5 cursor-pointer"
@@ -129,27 +129,13 @@ export const LineageNodeComponent: React.FC<NodeProps> = memo(({ data, selected 
               node.onExpandDirection?.('downstream', node.id);
             }}
           >
-            Downstream (2)
+            Downstream
             <span className="material-symbols-outlined text-[12px] text-primary">arrow_forward</span>
           </span>
         </div>
       )}
 
-      {/* Downstream Expansion Trigger on Staging View */}
-      {node.name === 'stg_customer_orders' && (
-        <button
-          className="absolute -right-3 top-1/2 -translate-y-1/2 z-30 flex items-center gap-0.5 px-2 py-1 rounded-full bg-surface-container-highest hover:bg-primary hover:text-on-primary text-outline border border-outline-variant/50 shadow-md font-mono-sm text-[10px] font-bold transition-all group"
-          onClick={(e) => {
-            e.stopPropagation();
-            node.onOpenPopover?.(node.id);
-          }}
-          title="Downstream: 1 target link"
-          type="button"
-        >
-          <span className="group-hover:text-on-primary">+ Downstream (1)</span>
-          <span className="material-symbols-outlined text-[13px]">chevron_right</span>
-        </button>
-      )}
+      {/* Downstream popover — removed hardcoded mock check */}
     </div>
   );
 });

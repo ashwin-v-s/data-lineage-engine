@@ -1,5 +1,7 @@
 """CLI script to start the Kairos backend server and serve the frontend."""
 import argparse
+import os
+import subprocess
 import sys
 import webbrowser
 from pathlib import Path
@@ -16,6 +18,20 @@ def main():
     parser.add_argument("--port", type=int, default=8000, help="Port to bind")
     parser.add_argument("--open-browser", action="store_true", help="Automatically open browser")
     args = parser.parse_args()
+
+    frontend_dir = ROOT_DIR / "frontend"
+    vite_binary = frontend_dir / "node_modules" / "vite" / "bin" / "vite.js"
+    if not vite_binary.is_file():
+        raise SystemExit(
+            "React frontend dependencies are missing. Run `npm install` in "
+            "the frontend directory, then start Kairos again."
+        )
+    build_command = ["cmd.exe", "/d", "/c", "npm", "run", "build"] if os.name == "nt" else ["npm", "run", "build"]
+    subprocess.run(
+        build_command,
+        cwd=frontend_dir,
+        check=True,
+    )
 
     url = f"http://{args.host}:{args.port}"
     print(f"\nStarting Kairos Lineage Engine at {url}")

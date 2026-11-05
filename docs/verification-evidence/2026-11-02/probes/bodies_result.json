@@ -1,0 +1,754 @@
+{
+ "modules_patched": 15,
+ "total_endpoints": 72,
+ "bodies_executed": 13,
+ "validation_only": 12,
+ "crashed_before_db": 44,
+ "auth_or_404": 3,
+ "rows": [
+  {
+   "endpoint": "GET    /api/v1/assets/{asset_id}",
+   "status": 500,
+   "code": null,
+   "detail": null
+  },
+  {
+   "endpoint": "GET    /api/v1/assets/{asset_id}/capabilities",
+   "status": 500,
+   "code": null,
+   "detail": null
+  },
+  {
+   "endpoint": "GET    /api/v1/assets/{asset_id}/downstream-impact",
+   "status": 500,
+   "code": null,
+   "detail": null
+  },
+  {
+   "endpoint": "GET    /api/v1/assets/{asset_id}/lineage",
+   "status": 500,
+   "code": null,
+   "detail": null
+  },
+  {
+   "endpoint": "POST   /api/v1/assets/{asset_id}/star",
+   "status": 500,
+   "code": null,
+   "detail": null
+  },
+  {
+   "endpoint": "DELETE /api/v1/assets/{asset_id}/star",
+   "status": 500,
+   "code": null,
+   "detail": null
+  },
+  {
+   "endpoint": "GET    /api/v1/audit/{asset_id}/compliance-report",
+   "status": 500,
+   "code": null,
+   "detail": null
+  },
+  {
+   "endpoint": "POST   /api/v1/audit/{asset_id}/export-audit",
+   "status": 500,
+   "code": null,
+   "detail": null
+  },
+  {
+   "endpoint": "POST   /api/v1/audit/{asset_id}/rollback",
+   "status": 422,
+   "code": null,
+   "detail": [
+    {
+     "type": "missing",
+     "loc": [
+      "body",
+      "asset_id"
+     ],
+     "msg": "Field required",
+     "input": {},
+     "url": "https://errors.pydantic.dev/2.13/v/missing"
+    },
+    {
+     "type": "missing",
+     "loc": [
+      "body",
+      "from_version"
+     ],
+     "msg": "Field required",
+     "input": {},
+     "url": "https://errors.pydantic.dev/2.13/v/missing"
+    },
+    {
+     "type": "missing",
+     "loc": [
+      "body",
+      "to_version"
+     ],
+     "msg": "Field required",
+     "input": {},
+     "url": "https://errors.pydantic.dev/2.13/v/missing"
+    },
+    {
+     "type": "missing",
+     "loc": [
+      "body",
+      "rollback_reason"
+     ],
+     "msg": "Field required",
+     "input": {},
+     "url": "https://errors.pydantic.dev/2.13/v/missing"
+    }
+   ]
+  },
+  {
+   "endpoint": "GET    /api/v1/audit/{asset_id}/statistics",
+   "status": 500,
+   "code": null,
+   "detail": null
+  },
+  {
+   "endpoint": "GET    /api/v1/audit/{asset_id}/trail",
+   "status": 500,
+   "code": null,
+   "detail": null
+  },
+  {
+   "endpoint": "GET    /api/v1/audit/{asset_id}/versions",
+   "status": 500,
+   "code": null,
+   "detail": null
+  },
+  {
+   "endpoint": "GET    /api/v1/audit/{asset_id}/versions/diff",
+   "status": 422,
+   "code": null,
+   "detail": [
+    {
+     "type": "missing",
+     "loc": [
+      "query",
+      "from_version"
+     ],
+     "msg": "Field required",
+     "input": null,
+     "url": "https://errors.pydantic.dev/2.13/v/missing"
+    },
+    {
+     "type": "missing",
+     "loc": [
+      "query",
+      "to_version"
+     ],
+     "msg": "Field required",
+     "input": null,
+     "url": "https://errors.pydantic.dev/2.13/v/missing"
+    }
+   ]
+  },
+  {
+   "endpoint": "GET    /api/v1/auth/config",
+   "status": 200,
+   "code": null,
+   "detail": null
+  },
+  {
+   "endpoint": "GET    /api/v1/catalog",
+   "status": 500,
+   "code": null,
+   "detail": null
+  },
+  {
+   "endpoint": "GET    /api/v1/column-lineage",
+   "status": 500,
+   "code": null,
+   "detail": null
+  },
+  {
+   "endpoint": "GET    /api/v1/evidence-at-time",
+   "status": 422,
+   "code": null,
+   "detail": [
+    {
+     "type": "missing",
+     "loc": [
+      "query",
+      "valid_as_of"
+     ],
+     "msg": "Field required",
+     "input": null,
+     "url": "https://errors.pydantic.dev/2.13/v/missing"
+    },
+    {
+     "type": "missing",
+     "loc": [
+      "query",
+      "recorded_as_of"
+     ],
+     "msg": "Field required",
+     "input": null,
+     "url": "https://errors.pydantic.dev/2.13/v/missing"
+    }
+   ]
+  },
+  {
+   "endpoint": "POST   /api/v1/governance/datasets/{asset_id}/evaluate",
+   "status": 500,
+   "code": null,
+   "detail": null
+  },
+  {
+   "endpoint": "GET    /api/v1/governance/freshness",
+   "status": 500,
+   "code": null,
+   "detail": null
+  },
+  {
+   "endpoint": "GET    /api/v1/governance/incidents",
+   "status": 500,
+   "code": null,
+   "detail": null
+  },
+  {
+   "endpoint": "GET    /api/v1/governance/incidents/{incident_id}",
+   "status": 500,
+   "code": null,
+   "detail": null
+  },
+  {
+   "endpoint": "POST   /api/v1/governance/incidents/{incident_id}/acknowledge",
+   "status": 500,
+   "code": null,
+   "detail": null
+  },
+  {
+   "endpoint": "POST   /api/v1/governance/incidents/{incident_id}/investigate",
+   "status": 500,
+   "code": null,
+   "detail": null
+  },
+  {
+   "endpoint": "POST   /api/v1/governance/incidents/{incident_id}/resolve",
+   "status": 500,
+   "code": null,
+   "detail": null
+  },
+  {
+   "endpoint": "GET    /api/v1/governance/slas",
+   "status": 500,
+   "code": null,
+   "detail": null
+  },
+  {
+   "endpoint": "POST   /api/v1/governance/slas",
+   "status": 422,
+   "code": null,
+   "detail": [
+    {
+     "type": "missing",
+     "loc": [
+      "body",
+      "asset_id"
+     ],
+     "msg": "Field required",
+     "input": {},
+     "url": "https://errors.pydantic.dev/2.13/v/missing"
+    },
+    {
+     "type": "missing",
+     "loc": [
+      "body",
+      "warn_after_minutes"
+     ],
+     "msg": "Field required",
+     "input": {},
+     "url": "https://errors.pydantic.dev/2.13/v/missing"
+    },
+    {
+     "type": "missing",
+     "loc": [
+      "body",
+      "error_after_minutes"
+     ],
+     "msg": "Field required",
+     "input": {},
+     "url": "https://errors.pydantic.dev/2.13/v/missing"
+    },
+    {
+     "type": "missing",
+     "loc": [
+      "body",
+      "signal"
+     ],
+     "msg": "Field required",
+     "input": {},
+     "url": "https://errors.pydantic.dev/2.13/v/missing"
+    }
+   ]
+  },
+  {
+   "endpoint": "GET    /api/v1/health",
+   "status": 200,
+   "code": null,
+   "detail": null
+  },
+  {
+   "endpoint": "POST   /api/v1/ingest/commit",
+   "status": 422,
+   "code": null,
+   "detail": [
+    {
+     "type": "missing",
+     "loc": [
+      "body",
+      "kind"
+     ],
+     "msg": "Field required",
+     "input": {},
+     "url": "https://errors.pydantic.dev/2.13/v/missing"
+    },
+    {
+     "type": "missing",
+     "loc": [
+      "body",
+      "content"
+     ],
+     "msg": "Field required",
+     "input": {},
+     "url": "https://errors.pydantic.dev/2.13/v/missing"
+    },
+    {
+     "type": "missing",
+     "loc": [
+      "body",
+      "idempotency_key"
+     ],
+     "msg": "Field required",
+     "input": {},
+     "url": "https://errors.pydantic.dev/2.13/v/missing"
+    }
+   ]
+  },
+  {
+   "endpoint": "POST   /api/v1/ingest/preview",
+   "status": 422,
+   "code": null,
+   "detail": [
+    {
+     "type": "missing",
+     "loc": [
+      "body",
+      "kind"
+     ],
+     "msg": "Field required",
+     "input": {},
+     "url": "https://errors.pydantic.dev/2.13/v/missing"
+    },
+    {
+     "type": "missing",
+     "loc": [
+      "body",
+      "content"
+     ],
+     "msg": "Field required",
+     "input": {},
+     "url": "https://errors.pydantic.dev/2.13/v/missing"
+    }
+   ]
+  },
+  {
+   "endpoint": "GET    /api/v1/ingest/runs",
+   "status": 500,
+   "code": null,
+   "detail": null
+  },
+  {
+   "endpoint": "GET    /api/v1/ingest/runs/{import_id}",
+   "status": 500,
+   "code": null,
+   "detail": null
+  },
+  {
+   "endpoint": "POST   /api/v1/integrations/github/callback",
+   "status": 422,
+   "code": null,
+   "detail": [
+    {
+     "type": "missing",
+     "loc": [
+      "body",
+      "code"
+     ],
+     "msg": "Field required",
+     "input": {},
+     "url": "https://errors.pydantic.dev/2.13/v/missing"
+    },
+    {
+     "type": "missing",
+     "loc": [
+      "body",
+      "state"
+     ],
+     "msg": "Field required",
+     "input": {},
+     "url": "https://errors.pydantic.dev/2.13/v/missing"
+    }
+   ]
+  },
+  {
+   "endpoint": "GET    /api/v1/integrations/github/connect-url",
+   "status": 503,
+   "code": null,
+   "detail": null
+  },
+  {
+   "endpoint": "GET    /api/v1/integrations/github/connections",
+   "status": 503,
+   "code": null,
+   "detail": null
+  },
+  {
+   "endpoint": "DELETE /api/v1/integrations/github/connections/{connection_id}",
+   "status": 503,
+   "code": null,
+   "detail": null
+  },
+  {
+   "endpoint": "GET    /api/v1/integrations/github/status",
+   "status": 200,
+   "code": null,
+   "detail": null
+  },
+  {
+   "endpoint": "GET    /api/v1/lineage/{asset_id}/{direction}",
+   "status": 400,
+   "code": null,
+   "detail": "Invalid direction 'ffdcde74-5f17-4412-b7ec-90d083b6e77c'. Use 'upstream' or 'downstream'."
+  },
+  {
+   "endpoint": "GET    /api/v1/me/recently-viewed",
+   "status": 500,
+   "code": null,
+   "detail": null
+  },
+  {
+   "endpoint": "DELETE /api/v1/me/recently-viewed",
+   "status": 500,
+   "code": null,
+   "detail": null
+  },
+  {
+   "endpoint": "POST   /api/v1/me/recently-viewed/{asset_id}",
+   "status": 500,
+   "code": null,
+   "detail": null
+  },
+  {
+   "endpoint": "GET    /api/v1/me/starred-assets",
+   "status": 500,
+   "code": null,
+   "detail": null
+  },
+  {
+   "endpoint": "POST   /api/v1/metadata/bulk-update",
+   "status": 422,
+   "code": null,
+   "detail": [
+    {
+     "type": "missing",
+     "loc": [
+      "body",
+      "asset_ids"
+     ],
+     "msg": "Field required",
+     "input": {},
+     "url": "https://errors.pydantic.dev/2.13/v/missing"
+    }
+   ]
+  },
+  {
+   "endpoint": "POST   /api/v1/metadata/validate",
+   "status": 422,
+   "code": null,
+   "detail": [
+    {
+     "type": "missing",
+     "loc": [
+      "query",
+      "field"
+     ],
+     "msg": "Field required",
+     "input": null,
+     "url": "https://errors.pydantic.dev/2.13/v/missing"
+    },
+    {
+     "type": "missing",
+     "loc": [
+      "query",
+      "value"
+     ],
+     "msg": "Field required",
+     "input": null,
+     "url": "https://errors.pydantic.dev/2.13/v/missing"
+    }
+   ]
+  },
+  {
+   "endpoint": "PUT    /api/v1/metadata/{asset_id}/description",
+   "status": 500,
+   "code": null,
+   "detail": null
+  },
+  {
+   "endpoint": "GET    /api/v1/metadata/{asset_id}/editable",
+   "status": 500,
+   "code": null,
+   "detail": "Failed to fetch metadata"
+  },
+  {
+   "endpoint": "PUT    /api/v1/metadata/{asset_id}/tags",
+   "status": 500,
+   "code": null,
+   "detail": null
+  },
+  {
+   "endpoint": "POST   /api/v1/owner/assign/{asset_id}",
+   "status": 400,
+   "code": null,
+   "detail": "Provide an owner or steward email to assign"
+  },
+  {
+   "endpoint": "POST   /api/v1/owner/request",
+   "status": 422,
+   "code": null,
+   "detail": [
+    {
+     "type": "missing",
+     "loc": [
+      "body",
+      "dataset_id"
+     ],
+     "msg": "Field required",
+     "input": {},
+     "url": "https://errors.pydantic.dev/2.13/v/missing"
+    },
+    {
+     "type": "missing",
+     "loc": [
+      "body",
+      "requested_owner"
+     ],
+     "msg": "Field required",
+     "input": {},
+     "url": "https://errors.pydantic.dev/2.13/v/missing"
+    }
+   ]
+  },
+  {
+   "endpoint": "GET    /api/v1/owner/requests/pending",
+   "status": 500,
+   "code": null,
+   "detail": "Failed to fetch requests"
+  },
+  {
+   "endpoint": "POST   /api/v1/owner/requests/{request_id}/approve",
+   "status": 500,
+   "code": null,
+   "detail": null
+  },
+  {
+   "endpoint": "GET    /api/v1/owner/stats/overview",
+   "status": 500,
+   "code": null,
+   "detail": "Failed to calculate stats"
+  },
+  {
+   "endpoint": "GET    /api/v1/owner/team-members",
+   "status": 500,
+   "code": null,
+   "detail": "Failed to fetch team members"
+  },
+  {
+   "endpoint": "GET    /api/v1/owner/team-members/search",
+   "status": 422,
+   "code": null,
+   "detail": [
+    {
+     "type": "missing",
+     "loc": [
+      "query",
+      "q"
+     ],
+     "msg": "Field required",
+     "input": null,
+     "url": "https://errors.pydantic.dev/2.13/v/missing"
+    }
+   ]
+  },
+  {
+   "endpoint": "GET    /api/v1/owner/{asset_id}/history",
+   "status": 500,
+   "code": null,
+   "detail": "Failed to fetch history"
+  },
+  {
+   "endpoint": "GET    /api/v1/raw-events",
+   "status": 500,
+   "code": null,
+   "detail": null
+  },
+  {
+   "endpoint": "GET    /api/v1/rea/analysis/components",
+   "status": 200,
+   "code": null,
+   "detail": null
+  },
+  {
+   "endpoint": "GET    /api/v1/rea/competitor/{system}",
+   "status": 200,
+   "code": null,
+   "detail": null
+  },
+  {
+   "endpoint": "GET    /api/v1/rea/implementation-guide",
+   "status": 200,
+   "code": null,
+   "detail": null
+  },
+  {
+   "endpoint": "GET    /api/v1/rea/patterns/entity",
+   "status": 200,
+   "code": null,
+   "detail": null
+  },
+  {
+   "endpoint": "GET    /api/v1/rea/patterns/evidence",
+   "status": 200,
+   "code": null,
+   "detail": null
+  },
+  {
+   "endpoint": "GET    /api/v1/rea/patterns/search",
+   "status": 200,
+   "code": null,
+   "detail": null
+  },
+  {
+   "endpoint": "GET    /api/v1/rea/recommendations",
+   "status": 200,
+   "code": null,
+   "detail": null
+  },
+  {
+   "endpoint": "GET    /api/v1/runs/{run_id}/dependency/{source}/{target}",
+   "status": 500,
+   "code": null,
+   "detail": null
+  },
+  {
+   "endpoint": "GET    /api/v1/search",
+   "status": 500,
+   "code": null,
+   "detail": null
+  },
+  {
+   "endpoint": "GET    /api/v1/sources",
+   "status": 500,
+   "code": null,
+   "detail": null
+  },
+  {
+   "endpoint": "POST   /api/v1/sources",
+   "status": 422,
+   "code": null,
+   "detail": [
+    {
+     "type": "missing",
+     "loc": [
+      "body",
+      "name"
+     ],
+     "msg": "Field required",
+     "input": {},
+     "url": "https://errors.pydantic.dev/2.13/v/missing"
+    },
+    {
+     "type": "missing",
+     "loc": [
+      "body",
+      "host"
+     ],
+     "msg": "Field required",
+     "input": {},
+     "url": "https://errors.pydantic.dev/2.13/v/missing"
+    },
+    {
+     "type": "missing",
+     "loc": [
+      "body",
+      "dbname"
+     ],
+     "msg": "Field required",
+     "input": {},
+     "url": "https://errors.pydantic.dev/2.13/v/missing"
+    },
+    {
+     "type": "missing",
+     "loc": [
+      "body",
+      "user"
+     ],
+     "msg": "Field required",
+     "input": {},
+     "url": "https://errors.pydantic.dev/2.13/v/missing"
+    },
+    {
+     "type": "missing",
+     "loc": [
+      "body",
+      "password"
+     ],
+     "msg": "Field required",
+     "input": {},
+     "url": "https://errors.pydantic.dev/2.13/v/missing"
+    }
+   ]
+  },
+  {
+   "endpoint": "GET    /api/v1/sources/{source_id}",
+   "status": 500,
+   "code": null,
+   "detail": null
+  },
+  {
+   "endpoint": "DELETE /api/v1/sources/{source_id}",
+   "status": 500,
+   "code": null,
+   "detail": null
+  },
+  {
+   "endpoint": "POST   /api/v1/sources/{source_id}/preview",
+   "status": 500,
+   "code": null,
+   "detail": null
+  },
+  {
+   "endpoint": "POST   /api/v1/sources/{source_id}/sync",
+   "status": 500,
+   "code": null,
+   "detail": null
+  },
+  {
+   "endpoint": "POST   /api/v1/sources/{source_id}/test",
+   "status": 500,
+   "code": null,
+   "detail": null
+  },
+  {
+   "endpoint": "GET    /healthz",
+   "status": 200,
+   "code": null,
+   "detail": null
+  }
+ ]
+}

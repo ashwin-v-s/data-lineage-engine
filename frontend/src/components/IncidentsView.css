@@ -1,0 +1,140 @@
+/*
+ * Incident console — view-specific styles only.
+ *
+ * Every rule here is scoped to the `kv-incidents-*` prefix. Shared primitives
+ * (`kv-view`, `kv-card`, `kv-table`, `kv-chip`, `kv-note`, …) live in
+ * `liveViews.css` and are intentionally not redefined.
+ */
+
+.kv-incidents-filter--active {
+  border-color: var(--link);
+  color: var(--link);
+}
+
+.kv-incidents-count {
+  font-size: 12px;
+}
+
+/* ────────────────────────────── incident table ────────────────────────────── */
+
+.kv-incidents-row {
+  cursor: pointer;
+}
+
+.kv-incidents-row:hover {
+  background: var(--code-bg);
+}
+
+.kv-incidents-row--selected {
+  background: var(--tint-green);
+}
+
+.kv-incidents-row:focus-visible {
+  outline: 2px solid var(--link);
+  outline-offset: -2px;
+}
+
+/* ─────────────────────────────── detail panel ─────────────────────────────── */
+
+.kv-incidents-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.kv-incidents-placeholder {
+  margin: 0;
+  font-size: 12.5px;
+}
+
+.kv-incidents-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 10px 16px;
+  margin: 0;
+}
+
+.kv-incidents-fields > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.kv-incidents-fields dt {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.kv-incidents-fields dd {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+.kv-incidents-fields-wide {
+  grid-column: 1 / -1;
+}
+
+.kv-incidents-actions {
+  align-items: center;
+}
+
+/* ──────────────────────────────── timeline ──────────────────────────────── */
+
+.kv-incidents-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.kv-incidents-timeline-title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.kv-incidents-events {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.kv-incidents-event {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-left: 12px;
+  border-left: 2px solid var(--line);
+}
+
+.kv-incidents-event-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.kv-incidents-event-time {
+  margin-left: auto;
+}
+
+/* ─────────────────────────── raw JSON payloads ─────────────────────────── */
+
+.kv-incidents-json {
+  margin: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--code-bg);
+  color: var(--ink);
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 220px;
+  overflow: auto;
+}

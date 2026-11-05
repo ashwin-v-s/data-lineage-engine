@@ -1,0 +1,8 @@
+# Keep byte-sensitive test fixtures exactly as committed. Git's autocrlf
+# conversion on Windows rewrites line endings and changes file digests, which
+# breaks fixtures that assert a content hash.
+tests/fixtures/** -text
+
+# Normalize line endings for source and docs so contributors on Windows and
+# Linux produce identical diffs.
+* text=auto eol=lf

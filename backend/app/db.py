@@ -19,6 +19,8 @@ as a context manager – the connection is returned to the pool automatically.
 from __future__ import annotations
 
 import os
+import logging
+from contextvars import ContextVar
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Generator
@@ -50,6 +52,68 @@ DATABASE_URL: str | None = os.getenv("DATABASE_URL")
 
 # ── Connection pool (lazy singleton) ─────────────────────────────────────────
 _pool: pg_pool.ThreadedConnectionPool | None = None
+logger = logging.getLogger(__name__)
+
+# Populated only after Supabase has verified the bearer token.  The database
+# layer applies this identity to every transaction, so route SQL cannot omit
+# workspace scoping accidentally.
+_workspace_id: ContextVar[str | None] = ContextVar("kairos_workspace_id", default=None)
+
+
+def set_workspace_id(workspace_id: str):
+    return _workspace_id.set(workspace_id)
+
+
+def reset_workspace_id(token) -> None:
+    _workspace_id.reset(token)
+
+
+def _apply_workspace_scope(conn) -> None:
+    workspace_id = _workspace_id.get()
+    if not workspace_id:
+        raise RuntimeError("Authenticated workspace context is missing")
+    with conn.cursor() as cur:
+        # The migration creates this restricted role and grants membership to
+        # the database login used by the API.  RLS remains enabled even when
+        # the connection string belongs to a privileged Supabase role.
+        cur.execute("SET LOCAL ROLE kairos_app")
+        cur.execute("SELECT current_user")
+        row = cur.fetchone()
+        role = row[0] if row else None
+        if role != "kairos_app":
+            raise RuntimeError(
+                "Workspace scope refused: expected 'kairos_app' but the "
+                f"connection is still '{role}' — RLS isolation is not applied."
+            )
+        cur.execute(
+            "SELECT set_config('kairos.workspace_id', %s, true)",
+            (workspace_id,),
+        )
+
+
+def provision_personal_workspace(user_id: str) -> str:
+    """Create or return a user's workspace using the migration-owned function.
+
+    This narrowly scoped call runs before SET ROLE; no route query gets a
+    privileged connection.  The SQL function is SECURITY DEFINER and only
+    returns the workspace for the supplied verified Supabase UUID.
+    """
+    pool = _get_pool()
+    conn = pool.getconn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT kairos_ensure_personal_workspace(%s)", (user_id,))
+            row = cur.fetchone()
+            if not row or not row[0]:
+                raise RuntimeError("Workspace provisioning returned no workspace")
+            workspace_id = str(row[0])
+        conn.commit()
+        return workspace_id
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        pool.putconn(conn)
 
 
 def _get_pool() -> pg_pool.ThreadedConnectionPool:
@@ -86,6 +150,7 @@ def get_conn() -> Generator[psycopg2.extensions.connection, None, None]:
     p = _get_pool()
     conn = p.getconn()
     try:
+        _apply_workspace_scope(conn)
         yield conn
         conn.commit()
     except Exception:
@@ -95,6 +160,75 @@ def get_conn() -> Generator[psycopg2.extensions.connection, None, None]:
         p.putconn(conn)
 
 
+class _PooledConnectionCompat:
+    """Pooled psycopg2 connection exposed with the connection API expected by
+    the audit / owner / metadata route modules.
+
+    Those modules call ``get_db_connection()`` and then use
+    ``conn.cursor(row_factory=dict)``, ``conn.commit()``, ``conn.rollback()``
+    and ``conn.close()``.  ``close()`` returns the connection to the pool
+    instead of closing it, and discards any uncommitted work.
+    """
+
+    def __init__(self, pool: pg_pool.ThreadedConnectionPool, conn) -> None:
+        self._pool = pool
+        self._conn = conn
+        self._returned = False
+
+    def cursor(self, *args, **kwargs):
+        row_factory = kwargs.pop("row_factory", None)
+        if row_factory is not None and "cursor_factory" not in kwargs:
+            kwargs["cursor_factory"] = RealDictCursor
+        return self._conn.cursor(*args, **kwargs)
+
+    def commit(self) -> None:
+        self._conn.commit()
+        _apply_workspace_scope(self._conn)
+
+    def rollback(self) -> None:
+        self._conn.rollback()
+        _apply_workspace_scope(self._conn)
+
+    def close(self) -> None:
+        if self._returned:
+            return
+        self._returned = True
+        conn = self._conn
+        try:
+            if conn.closed:
+                self._pool.putconn(conn, close=True)
+            else:
+                conn.rollback()  # drop any uncommitted work
+                self._pool.putconn(conn)
+        except Exception:
+            pass
+
+    def __del__(self) -> None:
+        """Safety net: routes call ``conn.close()`` inside their ``try`` block,
+        so an exception raised mid-query skips it.  Returning the connection
+        here guarantees it is never permanently leaked from the pool."""
+        try:
+            self.close()
+        except Exception:
+            pass
+
+    def __getattr__(self, name: str):
+        return getattr(object.__getattribute__(self, "_conn"), name)
+
+
+def get_db_connection() -> _PooledConnectionCompat:
+    """Return a pooled connection for the audit / owner / metadata routes."""
+    pool = _get_pool()
+    conn = pool.getconn()
+    try:
+        _apply_workspace_scope(conn)
+    except Exception:
+        conn.rollback()
+        pool.putconn(conn)
+        raise
+    return _PooledConnectionCompat(pool, conn)
+
+
 def health_check() -> dict:
     """Quick connectivity check used by /health endpoint."""
     try:
@@ -102,5 +236,6 @@ def health_check() -> dict:
             with conn.cursor() as cur:
                 cur.execute("SELECT 1")
         return {"db": "connected"}
-    except Exception as exc:
-        return {"db": f"error: {exc}"}
+    except Exception:
+        logger.exception("Database health check failed")
+        return {"db": "unavailable"}

@@ -1,21 +1,53 @@
-# Replace the placeholder handles with real GitHub usernames (Pack Section 18).
-/ingestion/sql/ @M1-handle
-/ingestion/dbt/ @M1-handle
-/ingestion/openlineage/ @M2-handle
-/research/ground_truth/ @M2-handle
-/backend/migrations/ @M3-handle
-/backend/app/temporal/ @M3-handle
-/backend/app/identity/ @M3-handle
-/backend/app/repositories/ @M3-handle
-/research/protocol/ @M4-handle
-/research/baselines/ @M4-handle
-/research/reasoning/ @M4-handle
-/research/missingness/ @M4-handle
-/research/metrics/ @M4-handle
-/research/experiments/ @M4-handle
-/contracts/ @M4-handle @M1-handle @M2-handle @M3-handle @M5-handle
-/backend/app/api/ @M5-handle
-/backend/app/schemas/ @M5-handle
-/backend/app/services/ @M5-handle
-/frontend/ @M5-handle
-/docs/ @M4-handle @M1-handle @M2-handle @M3-handle @M5-handle
+# Kairos CODEOWNERS
+# Updated 2026-11-02: replaced placeholder handles with real GitHub usernames.
+# Stream-to-owner mapping from Architecture v2 §7.
+#
+#   M1 — Jatin       Jat-in32006   platform / identity / migrations / deployment
+#   M2 — Anushka     AnaaMorr      connectors / ingestion / SQL lineage
+#   M3 — Ashwin      ashwin-v-s    catalog / lineage graph / evidence / search
+#   M4 — Gauree      gaureehatkar  governance / freshness / incidents / frontend shell
+#   M5 — Pranav      pranav-samal  research / integrity / demo honesty
+
+# ── Platform, identity, deployment, migrations (M1 — Jatin) ─────────────────
+/backend/migrations/                  @Jat-in32006
+/backend/app/auth.py                  @Jat-in32006
+/backend/app/db.py                    @Jat-in32006
+/scripts/                             @Jat-in32006
+/vercel.json                          @Jat-in32006
+/.github/                             @Jat-in32006
+/contracts/api/                       @Jat-in32006
+
+# ── Connectors, ingestion, SQL lineage (M2 — Anushka) ───────────────────────
+/ingestion/                           @AnaaMorr
+/backend/app/api/routes/ingest.py     @AnaaMorr
+/backend/app/api/routes/ingestion.py  @AnaaMorr
+/backend/app/api/routes/sources.py    @AnaaMorr
+
+# ── Catalog, lineage graph, evidence, search (M3 — Ashwin) ──────────────────
+/backend/app/api/routes/assets.py       @ashwin-v-s
+/backend/app/api/routes/lineage.py      @ashwin-v-s
+/backend/app/api/routes/search.py       @ashwin-v-s
+/backend/app/api/routes/capabilities.py @ashwin-v-s
+/backend/app/api/routes/dependency.py   @ashwin-v-s
+
+# ── Governance, freshness, incidents, frontend shell (M4 — Gauree) ───────────
+/backend/app/api/routes/governance.py   @gaureehatkar
+/backend/app/api/routes/audit.py        @gaureehatkar
+/backend/app/api/routes/owner.py        @gaureehatkar
+/backend/app/api/routes/metadata.py     @gaureehatkar
+/backend/app/api/routes/membership.py   @gaureehatkar @Jat-in32006
+/backend/app/api/routes/personalization.py @gaureehatkar
+/backend/app/services/                  @gaureehatkar
+/frontend/                              @gaureehatkar
+
+# ── Research, integrity, demo honesty (M5 — Pranav) ─────────────────────────
+/research/                             @pranav-samal
+/contracts/evidence.py                 @pranav-samal
+/contracts/truth.py                    @pranav-samal
+/contracts/mocks/                      @pranav-samal
+
+# ── Shared contracts — all reviewers ────────────────────────────────────────
+/contracts/                @Jat-in32006 @AnaaMorr @ashwin-v-s @gaureehatkar @pranav-samal
+
+# ── Docs — all reviewers ────────────────────────────────────────────────────
+/docs/                     @Jat-in32006 @AnaaMorr @ashwin-v-s @gaureehatkar @pranav-samal

@@ -1,0 +1,10 @@
+source:
+  type: "csv"
+  config:
+    directory: "./data" # Create a folder named "data" and put some test .csv files in it
+
+destination:
+  type: "kairos_rest_api"
+  config:
+    endpoint: "https://kairos-metadata.hatchable.site/api/v1/ingest"
+    token: "krs_demo_token_123"

@@ -1,0 +1,81 @@
+# W03 — CASE WHEN (conditional branch — the core research motif)
+# Split: development
+# SQL construct: CASE_WHEN
+case_id: W03
+case_version: "1.0"
+split: development
+sql_construct: CASE_WHEN
+description: >
+  CASE WHEN conditional: the source column country controls which branch executes,
+  and salary is the value column. This is the core research motif for
+  execution-conditioned lineage — whether salary propagates depends on
+  which country values exist in the data.
+
+sql: |
+  CREATE TABLE out_adjusted AS
+  SELECT employee_id,
+         country,
+         CASE
+           WHEN country = 'US' THEN salary
+           ELSE 0
+         END AS adjusted_salary
+  FROM employees_a;
+
+schema:
+  employees_a:
+    columns: [employee_id, country, salary]
+  out_adjusted:
+    columns: [employee_id, country, adjusted_salary]
+
+expected_static_candidates:
+  - source: employees_a.employee_id
+    target: out_adjusted.employee_id
+    operator: PROJECTION
+    parser_status: SUPPORTED
+  - source: employees_a.country
+    target: out_adjusted.country
+    operator: PROJECTION
+    parser_status: SUPPORTED
+  - source: employees_a.country
+    target: out_adjusted.adjusted_salary
+    operator: CASE_WHEN
+    parser_status: SUPPORTED
+  - source: employees_a.salary
+    target: out_adjusted.adjusted_salary
+    operator: CASE_WHEN
+    parser_status: SUPPORTED
+
+ground_truth:
+  provider: ReferenceInterpreterProvider
+  provider_version: "reference-1.0"
+  labels:
+    - source: employees_a.salary
+      target: out_adjusted.adjusted_salary
+      label: PROPAGATED
+      rationale: >
+        At least one employee has country='US' in the fixture data, so the
+        THEN branch executes and salary propagates. This is the OBSERVED case.
+    - source: employees_a.country
+      target: out_adjusted.adjusted_salary
+      label: PROPAGATED
+      rationale: >
+        country controls the CASE branch — it always contributes to the
+        conditional evaluation regardless of its value.
+    - source: employees_a.country
+      target: out_adjusted.country
+      label: PROPAGATED
+      rationale: Direct copy.
+    - source: employees_a.employee_id
+      target: out_adjusted.employee_id
+      label: PROPAGATED
+      rationale: Direct copy.
+
+never_proves:
+  - Static CASE WHEN dependency does not prove the THEN branch executed in a run.
+  - salary propagation depends on data values (country='US' rows) not just the SQL.
+  - A run with no US employees would leave salary un-propagated despite the static candidate.
+
+notes: >
+  This case is the core research motif. The distinction between PROPAGATED (run
+  with US employees) and NOT_PROPAGATED (run with no US employees) is exactly
+  what execution-conditioned reasoning is designed to capture.

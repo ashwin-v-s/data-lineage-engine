@@ -1,0 +1,41 @@
+/* Data-provenance badge: LIVE | IMPORTED. */
+.data-mode-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border: 1px solid var(--control, #d1d5db);
+  border-radius: var(--radius-pill, 999px);
+  font: 600 10px var(--font-mono, monospace);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.data-mode-badge--live {
+  border-color: #15803d;
+  color: #15803d;
+}
+
+.data-mode-badge--imported {
+  border-color: #2563eb;
+  color: #2563eb;
+}
+
+.data-mode-badge--not-connected {
+  border-color: #a16207;
+  color: #854d0e;
+}
+
+.data-mode-badge--error {
+  border-color: #b91c1c;
+  color: #b91c1c;
+}
+
+.sidebar-data-mode {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 12px;
+  font-size: 11px;
+  color: var(--faint, #6b7280);
+}

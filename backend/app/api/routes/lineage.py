@@ -17,13 +17,27 @@ import re
 from datetime import datetime, timezone
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
+from backend.app.auth import require_user
 from psycopg2.extras import RealDictCursor
 
 from backend.app.db import get_conn
 from backend.app.schemas.lineage import LineageEdge, LineageNode, LineageResponse
+from backend.app.services.evidence_strength import STRENGTH_RULE_VERSION, evidence_strength
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(require_user)])
+
+_SECRET_KEY_RE = re.compile(r"(?:token|secret|password|credential|private.?key|api.?key)", re.I)
+
+
+def _sanitize_evidence_payload(value):
+    """Redact secret-like keys before returning stored source evidence."""
+    if isinstance(value, dict):
+        return {key: _sanitize_evidence_payload(child) for key, child in value.items()
+                if not _SECRET_KEY_RE.search(str(key))}
+    if isinstance(value, list):
+        return [_sanitize_evidence_payload(child) for child in value]
+    return value
 
 _UUID_RE = re.compile(
     r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$',
@@ -35,8 +49,150 @@ def _now_utc() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+@router.get("/lineage/edges/{edge_id}/evidence")
+def edge_evidence(edge_id: str, user: dict = Depends(require_user)):
+    """Return stored provenance for one edge, including safe raw/normalized views."""
+    if not _UUID_RE.match(edge_id):
+        raise HTTPException(status_code=404, detail="Lineage edge not found.")
+    with get_conn() as conn:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(
+                """
+                SELECT le.id::text AS edge_id, le.granularity, le.operator_fingerprint,
+                       e.id::text AS evidence_row_id, e.evidence_id, e.evidence_type,
+                       e.source_system, e.run_id, e.coverage, e.parser_status, e.operator,
+                       e.diagnostics, e.event_time, e.effective_time,
+                       e.ingestion_time, e.source_dataset_id::text AS source_dataset_id,
+                       e.target_dataset_id::text AS target_dataset_id,
+                       e.source_column_id::text AS source_column_id,
+                       e.target_column_id::text AS target_column_id,
+                       sd.name AS source_dataset, sc.column_name AS source_column,
+                       td.name AS target_dataset, tc.column_name AS target_column,
+                       etv.valid_from, etv.valid_to, etv.effective_time_status,
+                       etv.transaction_from AS recorded_from, etv.transaction_to AS recorded_to,
+                       raw.payload AS raw_payload,
+                       COALESCE((
+                           SELECT es.state FROM execution_state es
+                           WHERE e.run_id IS NOT NULL AND es.run_id = e.run_id
+                             AND es.source_column_id = e.source_column_id
+                             AND es.target_column_id = e.target_column_id
+                           ORDER BY es.computed_at DESC LIMIT 1
+                       ), 'UNKNOWN') AS state,
+                       ARRAY(
+                           SELECT DISTINCT es.state FROM execution_state es
+                           WHERE e.run_id IS NOT NULL AND es.run_id = e.run_id
+                             AND es.source_column_id = e.source_column_id
+                             AND es.target_column_id = e.target_column_id
+                             AND es.state IN ('OBSERVED', 'REFUTED_FOR_RUN')
+                       ) AS execution_states
+                FROM lineage_edge le
+                LEFT JOIN edge_temporal_version etv ON etv.edge_id = le.id
+                LEFT JOIN evidence e ON e.id = etv.evidence_id
+                LEFT JOIN raw_event raw ON raw.event_id = e.raw_event_id
+                LEFT JOIN column_record sc ON sc.id = e.source_column_id
+                LEFT JOIN dataset sd ON sd.id = COALESCE(sc.dataset_id, e.source_dataset_id)
+                LEFT JOIN column_record tc ON tc.id = e.target_column_id
+                LEFT JOIN dataset td ON td.id = COALESCE(tc.dataset_id, e.target_dataset_id)
+                WHERE le.id = %s::uuid
+                ORDER BY e.ingestion_time DESC NULLS LAST, etv.transaction_from DESC NULLS LAST
+                LIMIT 501
+                """,
+                (edge_id,),
+            )
+            rows = [dict(row) for row in cur.fetchall()]
+    if not rows:
+        raise HTTPException(status_code=404, detail="Lineage edge not found.")
+
+    truncated = len(rows) > 500
+    rows = rows[:500]
+    evidence = []
+    states_by_run: dict[str, set[str]] = {}
+    for row in rows:
+        # A logical edge can exist before any evidence has been attached. The
+        # LEFT JOIN row identifies the edge, but is not an evidence record.
+        if row.get("evidence_row_id") is None:
+            continue
+        state = row.get("state") or "UNKNOWN"
+        if row.get("run_id"):
+            recorded_states = row.get("execution_states") or [state]
+            states_by_run.setdefault(row["run_id"], set()).update(
+                value for value in recorded_states if value in {"OBSERVED", "REFUTED_FOR_RUN"}
+            )
+        raw = _sanitize_evidence_payload(row.get("raw_payload"))
+        normalized = {
+            "evidence_id": row.get("evidence_id"),
+            "evidence_type": row.get("evidence_type"),
+            "source_system": row.get("source_system"),
+            "run_id": row.get("run_id"),
+            "source_dataset": row.get("source_dataset"),
+            "source_column": row.get("source_column"),
+            "target_dataset": row.get("target_dataset"),
+            "target_column": row.get("target_column"),
+            "coverage": row.get("coverage"),
+            "parser_status": row.get("parser_status"),
+            "diagnostics": _sanitize_evidence_payload(row.get("diagnostics")),
+        }
+        strength = evidence_strength(
+            state=state,
+            evidence_type=row.get("evidence_type"),
+            coverage=row.get("coverage"),
+            parser_status=row.get("parser_status"),
+        )
+        evidence.append({
+            "evidence_row_id": row.get("evidence_row_id"),
+            "evidence_id": row.get("evidence_id"),
+            "relationship_type": row.get("operator") or row.get("operator_fingerprint") or row.get("granularity"),
+            "state": state,
+            "evidence_type": row.get("evidence_type"),
+            "source_system": row.get("source_system"),
+            "run_id": row.get("run_id"),
+            "coverage": row.get("coverage"),
+            "strength": strength,
+            "strength_rule_version": STRENGTH_RULE_VERSION,
+            "valid_time": {
+                "from": row["valid_from"].isoformat() if row.get("valid_from") else None,
+                "to": row["valid_to"].isoformat() if row.get("valid_to") else None,
+                "status": row.get("effective_time_status"),
+            },
+            "recorded_time": {
+                "from": row["recorded_from"].isoformat() if row.get("recorded_from") else None,
+                "to": row["recorded_to"].isoformat() if row.get("recorded_to") else None,
+            },
+            "explanation": (
+                row["diagnostics"].get("explanation")
+                if isinstance(row.get("diagnostics"), dict) and row["diagnostics"].get("explanation")
+                else "Stored evidence record; interpret it within its run, coverage, and time scope."
+            ),
+            "provenance": {
+                "raw_available": raw is not None,
+                "raw": raw,
+                "parser": {
+                    "adapter": raw.get("provenance", {}).get("adapter") if isinstance(raw, dict) else row.get("source_system"),
+                    "adapter_version": raw.get("provenance", {}).get("adapter_version") if isinstance(raw, dict) else None,
+                },
+                "normalized": normalized,
+                "canonical": {
+                    "source_dataset_id": row.get("source_dataset_id"),
+                    "source_column_id": row.get("source_column_id"),
+                    "target_dataset_id": row.get("target_dataset_id"),
+                    "target_column_id": row.get("target_column_id"),
+                },
+            },
+        })
+    conflicts = [run_id for run_id, states in states_by_run.items()
+                 if {"OBSERVED", "REFUTED_FOR_RUN"}.issubset(states)]
+    return {
+        "edge_id": edge_id,
+        "granularity": rows[0].get("granularity"),
+        "evidence": evidence,
+        "conflict": bool(conflicts),
+        "conflicting_runs": sorted(conflicts),
+        "truncated": truncated,
+    }
+
+
 def _resolve_asset(cur, asset_id: str) -> dict | None:
-    """Resolve by UUID or name; return full row including schema_name."""
+    """Resolve dataset or column IDs/names to a dataset graph anchor."""
     if _UUID_RE.match(asset_id):
         cur.execute(
             """
@@ -50,7 +206,38 @@ def _resolve_asset(cur, asset_id: str) -> dict | None:
         )
         row = cur.fetchone()
         if row:
-            return dict(row)
+            return {
+                "id": row["id"],
+                "name": row["name"],
+                "type": row["type"],
+                "schema_name": row.get("schema_name"),
+                "database_name": row.get("database_name"),
+                "source_system": row.get("source_system"),
+            }
+
+        # Catalog search returns column_record IDs. The lineage graph is
+        # currently dataset anchored, so resolve a column ID to its dataset.
+        cur.execute(
+            """
+            SELECT d.id::text, d.name, d.asset_type AS type,
+                   d.schema_name, d.database_name, d.source_system
+            FROM column_record cr
+            JOIN dataset d ON d.id = cr.dataset_id
+            WHERE cr.id = %s::uuid
+            LIMIT 1
+            """,
+            (asset_id,),
+        )
+        row = cur.fetchone()
+        if row:
+            return {
+                "id": row["id"],
+                "name": row["name"],
+                "type": row["type"],
+                "schema_name": row.get("schema_name"),
+                "database_name": row.get("database_name"),
+                "source_system": row.get("source_system"),
+            }
 
     cur.execute(
         """
@@ -64,7 +251,16 @@ def _resolve_asset(cur, asset_id: str) -> dict | None:
         (asset_id,),
     )
     row = cur.fetchone()
-    return dict(row) if row else None
+    if row:
+        return {
+            "id": row["id"],
+            "name": row["name"],
+            "type": row["type"],
+            "schema_name": row.get("schema_name"),
+            "database_name": row.get("database_name"),
+            "source_system": row.get("source_system"),
+        }
+    return None
 
 
 def _walk_lineage(
@@ -74,8 +270,15 @@ def _walk_lineage(
     depth: int,
     as_of: str,
     recorded_as_of: str,
+    direction: str = "both",
 ) -> tuple[dict[str, dict], list[dict]]:
-    """BFS over lineage_edge / edge_temporal_version with bitemporal filters."""
+    """BFS over lineage_edge / edge_temporal_version with bitemporal filters.
+
+    direction:
+      "both"       – follow edges in either direction (full neighbourhood).
+      "upstream"   – only predecessors (edges whose target is in the frontier).
+      "downstream" – only successors   (edges whose source is in the frontier).
+    """
     nodes: dict[str, dict] = {}
     edges: list[dict] = []
     seen_edges: set[tuple[str, str]] = set()
@@ -97,11 +300,30 @@ def _walk_lineage(
             (list(frontier),),
         )
         for r in cur.fetchall():
-            nodes[r["id"]] = dict(r)
+            # RealDictCursor returns dict-like objects
+            nodes[r["id"]] = {
+                "id": r["id"],
+                "name": r["name"],
+                "type": r["type"],
+                "schema_name": r.get("schema_name"),
+                "database_name": r.get("database_name"),
+                "source_system": r.get("source_system"),
+            }
+
+        # Restrict traversal to the requested direction
+        if direction == "upstream":
+            direction_sql = "le.target_id = ANY(%s::uuid[])"
+            direction_params: list = [list(frontier)]
+        elif direction == "downstream":
+            direction_sql = "le.source_id = ANY(%s::uuid[])"
+            direction_params = [list(frontier)]
+        else:
+            direction_sql = "(le.source_id = ANY(%s::uuid[]) OR le.target_id = ANY(%s::uuid[]))"
+            direction_params = [list(frontier), list(frontier)]
 
         # Find edges touching any frontier node, respecting bitemporal filters
         cur.execute(
-            """
+            f"""
             SELECT DISTINCT
                 le.id::text      AS le_id,
                 le.source_id::text AS source,
@@ -109,7 +331,7 @@ def _walk_lineage(
                 le.granularity
             FROM   lineage_edge le
             JOIN   edge_temporal_version etv ON etv.edge_id = le.id
-            WHERE  (le.source_id = ANY(%s::uuid[]) OR le.target_id = ANY(%s::uuid[]))
+            WHERE  {direction_sql}
               AND  le.granularity = %s
               AND  etv.valid_from        <= %s::timestamptz
               AND  (etv.valid_to         IS NULL OR etv.valid_to        > %s::timestamptz)
@@ -117,7 +339,7 @@ def _walk_lineage(
               AND  (etv.transaction_to   IS NULL OR etv.transaction_to  > %s::timestamptz)
             """,
             (
-                list(frontier), list(frontier),
+                *direction_params,
                 granularity,
                 as_of, as_of,
                 recorded_as_of, recorded_as_of,
@@ -134,7 +356,13 @@ def _walk_lineage(
                     "target": tgt,
                     "granularity": row["granularity"],
                 })
-            for nid in (src, tgt):
+            if direction == "upstream":
+                candidates = (src,)
+            elif direction == "downstream":
+                candidates = (tgt,)
+            else:
+                candidates = (src, tgt)
+            for nid in candidates:
                 if nid not in nodes:
                     next_frontier.add(nid)
 
@@ -157,7 +385,14 @@ def _walk_lineage(
             (unresolved,),
         )
         for r in cur.fetchall():
-            nodes[r["id"]] = dict(r)
+            nodes[r["id"]] = {
+                "id": r["id"],
+                "name": r["name"],
+                "type": r["type"],
+                "schema_name": r.get("schema_name"),
+                "database_name": r.get("database_name"),
+                "source_system": r.get("source_system"),
+            }
 
     return nodes, edges
 
@@ -218,3 +453,323 @@ def get_lineage(
     ]
 
     return LineageResponse(asset_id=root["id"], nodes=nodes, edges=lineage_edges)
+
+
+@router.get("/evidence-at-time")
+def evidence_at_time(
+    valid_as_of: str = Query(...),
+    recorded_as_of: str = Query(...),
+    user: dict = Depends(require_user),
+):
+    """Return evidence whose known bitemporal interval contains both instants."""
+    with get_conn() as conn:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute("""
+                SELECT e.id::text AS id, e.evidence_id, e.evidence_type,
+                       e.run_id, e.granularity, e.operator, e.coverage,
+                       e.source_system,
+                       sd.database_name || '.' || sd.schema_name || '.' || sd.name AS source_dataset,
+                       sc.column_name AS source_column,
+                       td.database_name || '.' || td.schema_name || '.' || td.name AS target_dataset,
+                       tc.column_name AS target_column,
+                       etv.valid_from, etv.valid_to,
+                       etv.transaction_from AS recorded_from,
+                       etv.transaction_to AS recorded_to,
+                       COALESCE((
+                           SELECT es.state FROM execution_state es
+                           WHERE es.run_id = e.run_id
+                             AND es.source_column_id = e.source_column_id
+                             AND es.target_column_id = e.target_column_id
+                           ORDER BY es.computed_at DESC LIMIT 1
+                       ), 'UNKNOWN') AS state
+                FROM evidence e
+                JOIN lineage_edge le ON (
+                    (le.source_id = e.source_column_id AND le.target_id = e.target_column_id AND e.source_column_id IS NOT NULL)
+                    OR (le.source_id = e.source_dataset_id AND le.target_id = e.target_dataset_id AND e.source_dataset_id IS NOT NULL)
+                )
+                JOIN edge_temporal_version etv ON etv.edge_id = le.id AND etv.evidence_id = e.id
+                LEFT JOIN column_record sc ON sc.id = e.source_column_id
+                LEFT JOIN dataset sd ON sd.id = COALESCE(sc.dataset_id, e.source_dataset_id)
+                LEFT JOIN column_record tc ON tc.id = e.target_column_id
+                LEFT JOIN dataset td ON td.id = COALESCE(tc.dataset_id, e.target_dataset_id)
+                WHERE etv.transaction_from <= %(recorded)s::timestamptz
+                  AND (etv.transaction_to IS NULL OR %(recorded)s::timestamptz < etv.transaction_to)
+                  AND etv.effective_time_status = 'KNOWN'
+                  AND etv.valid_from <= %(valid)s::timestamptz
+                  AND (etv.valid_to IS NULL OR %(valid)s::timestamptz < etv.valid_to)
+                ORDER BY e.ingestion_time DESC
+            """, {"valid": valid_as_of, "recorded": recorded_as_of})
+            rows = [dict(row) for row in cur.fetchall()]
+            cur.execute("""
+                SELECT COUNT(DISTINCT e.id)::int AS count
+                FROM evidence e
+                JOIN lineage_edge le ON (
+                    (le.source_id = e.source_column_id AND le.target_id = e.target_column_id AND e.source_column_id IS NOT NULL)
+                    OR (le.source_id = e.source_dataset_id AND le.target_id = e.target_dataset_id AND e.source_dataset_id IS NOT NULL)
+                )
+                JOIN edge_temporal_version etv ON etv.edge_id = le.id AND etv.evidence_id = e.id
+                WHERE etv.transaction_from <= %(recorded)s::timestamptz
+                  AND (etv.transaction_to IS NULL OR %(recorded)s::timestamptz < etv.transaction_to)
+                  AND etv.effective_time_status = 'UNKNOWN'
+            """, {"recorded": recorded_as_of})
+            undated_count = int(cur.fetchone()["count"])
+    evidence = []
+    for row in rows:
+        source_name = ".".join(part for part in (row.get("source_dataset"), row.get("source_column")) if part)
+        target_name = ".".join(part for part in (row.get("target_dataset"), row.get("target_column")) if part)
+        evidence.append({
+            "id": row["id"], "source_name": source_name or row.get("source_system") or "Unknown source",
+            "target_name": target_name or "Unknown target", "state": row.get("state") or "UNKNOWN",
+            "evidence_type": row.get("evidence_type"), "run_id": row.get("run_id"),
+            "valid_from": row["valid_from"].isoformat() if row.get("valid_from") else None,
+            "valid_to": row["valid_to"].isoformat() if row.get("valid_to") else None,
+            "recorded_from": row["recorded_from"].isoformat() if row.get("recorded_from") else None,
+            "recorded_to": row["recorded_to"].isoformat() if row.get("recorded_to") else None,
+            "coverage": row.get("coverage"), "rule_name": row.get("operator") or row.get("granularity"),
+        })
+    return {"ok": True, "counts": {"included": len(evidence), "undated_valid_time": undated_count}, "evidence": evidence}
+
+
+@router.get("/column-lineage")
+def get_column_lineage(
+    valid_as_of: Optional[str] = Query(default=None),
+    recorded_as_of: Optional[str] = Query(default=None),
+    user: dict = Depends(require_user),
+):
+    """Return explicit column relationships backed by stored evidence."""
+    ts_as_of = valid_as_of or _now_utc()
+    ts_recorded = recorded_as_of or _now_utc()
+    with get_conn() as conn:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute("""
+                SELECT e.id::text AS evidence_id,
+                       e.evidence_type,
+                       e.evidence_id AS evidence_ref,
+                       e.run_id,
+                       e.source_column_id::text AS source_column_id,
+                       e.target_column_id::text AS target_column_id,
+                       sd.database_name || '.' || sd.schema_name || '.' || sd.name AS source_asset,
+                       sc.column_name AS source_column,
+                       td.database_name || '.' || td.schema_name || '.' || td.name AS target_asset,
+                       tc.column_name AS target_column,
+                       le.id::text AS edge_id,
+                       etv.valid_from,
+                       etv.valid_to,
+                       etv.transaction_from,
+                       etv.transaction_to,
+                       e.diagnostics
+                FROM evidence e
+                JOIN column_record sc ON sc.id = e.source_column_id
+                JOIN dataset sd ON sd.id = sc.dataset_id
+                JOIN column_record tc ON tc.id = e.target_column_id
+                JOIN dataset td ON td.id = tc.dataset_id
+                WHERE e.source_column_id IS NOT NULL
+                  AND e.target_column_id IS NOT NULL
+                  AND EXISTS (
+                    SELECT 1
+                    FROM lineage_edge le
+                    JOIN edge_temporal_version etv
+                      ON etv.edge_id = le.id AND etv.evidence_id = e.id
+                    WHERE le.source_id = e.source_column_id
+                      AND le.target_id = e.target_column_id
+                      AND le.granularity = 'COLUMN'
+                      AND etv.valid_from <= %(valid)s::timestamptz
+                      AND (etv.valid_to IS NULL OR %(valid)s::timestamptz < etv.valid_to)
+                      AND etv.transaction_from <= %(recorded)s::timestamptz
+                      AND (etv.transaction_to IS NULL OR %(recorded)s::timestamptz < etv.transaction_to)
+                  )
+                ORDER BY sd.database_name, sd.schema_name, sd.name, sc.column_name
+            """, {"valid": ts_as_of, "recorded": ts_recorded})
+            rows = [dict(row) for row in cur.fetchall()]
+    mappings = []
+    for row in rows:
+        valid_from = row.get("valid_from")
+        transaction_from = row.get("transaction_from")
+        mappings.append({
+            "source_asset": row["source_asset"],
+            "source_column": row["source_column"],
+            "target_asset": row["target_asset"],
+            "target_column": row["target_column"],
+            "source_asset_id": row["source_column_id"],
+            "target_asset_id": row["target_column_id"],
+            "transformation": row["evidence_type"],
+            "mapping_type": row["evidence_type"],
+            "evidence_ref": row["evidence_ref"],
+            "run_id": row["run_id"],
+            "valid_from": valid_from.isoformat() if valid_from else None,
+            "recorded_from": transaction_from.isoformat() if transaction_from else None,
+            "metadata": row["diagnostics"] or {},
+        })
+    return {"ok": True, "mappings": mappings, "counts": {"total": len(mappings), "undated_valid_time": 0}}
+
+
+@router.get("/lineage/{asset_id}/{direction}", response_model=LineageResponse)
+def expand_lineage(
+    asset_id: str,
+    direction: str,
+    as_of: Optional[str] = Query(default=None),
+    recorded_as_of: Optional[str] = Query(default=None),
+    depth: int = Query(default=1, ge=1, le=10),
+    granularity: str = Query(default="DATASET", pattern="^(DATASET|COLUMN)$"),
+):
+    """Directional lineage expansion used by the UI's Upstream / Downstream arrows.
+
+    GET /api/v1/lineage/{asset_id}/upstream    → predecessors only
+    GET /api/v1/lineage/{asset_id}/downstream  → successors only
+    """
+    if direction not in ("upstream", "downstream"):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid direction '{direction}'. Use 'upstream' or 'downstream'.",
+        )
+
+    ts_as_of = as_of or _now_utc()
+    ts_rec   = recorded_as_of or _now_utc()
+
+    with get_conn() as conn:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            root = _resolve_asset(cur, asset_id)
+            if not root:
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"Asset '{asset_id}' not found.",
+                )
+
+            nodes_map, edges = _walk_lineage(
+                cur,
+                root_id=root["id"],
+                granularity=granularity,
+                depth=depth,
+                as_of=ts_as_of,
+                recorded_as_of=ts_rec,
+                direction=direction,
+            )
+
+    # Ensure root is always present
+    if root["id"] not in nodes_map:
+        nodes_map[root["id"]] = root
+
+    nodes = [
+        LineageNode(
+            id=v["id"],
+            name=v["name"],
+            type=v.get("type", "TABLE").lower(),
+            display_name=v["name"],
+            namespace=v.get("schema_name", ""),
+            schema_version="v1",
+        )
+        for v in nodes_map.values()
+    ]
+
+    lineage_edges = [
+        LineageEdge(
+            edge_id=e["edge_id"],
+            source=e["source"],
+            target=e["target"],
+            granularity=e["granularity"],
+        )
+        for e in edges
+    ]
+
+    return LineageResponse(asset_id=root["id"], nodes=nodes, edges=lineage_edges)
+
+
+def _dataset_labels(cur, ids: list[str]) -> dict[str, dict]:
+    """Fetch display labels for a set of dataset ids."""
+    if not ids:
+        return {}
+    cur.execute(
+        """
+        SELECT id::text AS id, name, asset_type AS type,
+               schema_name, database_name, source_system
+        FROM   dataset
+        WHERE  id = ANY(%s::uuid[])
+        """,
+        (ids,),
+    )
+    labels: dict[str, dict] = {}
+    for r in cur.fetchall():
+        labels[r["id"]] = {
+            "id": r["id"],
+            "name": r["name"],
+            "type": r["type"],
+            "schema_name": r.get("schema_name"),
+            "database_name": r.get("database_name"),
+            "source_system": r.get("source_system"),
+            "qualified_name": ".".join(
+                part for part in (r.get("database_name"), r.get("schema_name"), r["name"]) if part
+            ),
+        }
+    return labels
+
+
+@router.get("/assets/{asset_id}/downstream-impact")
+def get_downstream_impact(
+    asset_id: str,
+    as_of: Optional[str] = Query(default=None),
+    recorded_as_of: Optional[str] = Query(default=None),
+    depth: int = Query(default=3, ge=1, le=10),
+    granularity: str = Query(default="DATASET", pattern="^(DATASET|COLUMN)$"),
+):
+    """Group everything reachable downstream of an asset by propagation depth.
+
+    Unlike the flat lineage graph, this answers "if I change this asset, what
+    else is at risk, and how far away is it?" — one bucket per hop, with the
+    affected assets labelled for display.
+    """
+    ts_as_of = as_of or _now_utc()
+    ts_rec   = recorded_as_of or _now_utc()
+
+    with get_conn() as conn:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            root = _resolve_asset(cur, asset_id)
+            if not root:
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"Asset '{asset_id}' not found.",
+                )
+
+            visited = {root["id"]}
+            frontier = {root["id"]}
+            levels: list[dict] = []
+            total = 0
+
+            for hop in range(1, depth + 1):
+                if not frontier:
+                    break
+                cur.execute(
+                    """
+                    SELECT DISTINCT le.target_id::text AS target
+                    FROM   lineage_edge le
+                    JOIN   edge_temporal_version etv ON etv.edge_id = le.id
+                    WHERE  le.source_id = ANY(%s::uuid[])
+                      AND  le.granularity = %s
+                      AND  etv.valid_from        <= %s::timestamptz
+                      AND  (etv.valid_to         IS NULL OR etv.valid_to        > %s::timestamptz)
+                      AND  etv.transaction_from  <= %s::timestamptz
+                      AND  (etv.transaction_to   IS NULL OR etv.transaction_to  > %s::timestamptz)
+                    """,
+                    (list(frontier), granularity, ts_as_of, ts_as_of, ts_rec, ts_rec),
+                )
+                next_frontier = {
+                    row["target"] for row in cur.fetchall() if row["target"] not in visited
+                }
+                if not next_frontier:
+                    break
+
+                labels = _dataset_labels(cur, list(next_frontier))
+                assets = [labels[nid] for nid in sorted(next_frontier) if nid in labels]
+                total += len(assets)
+                levels.append({"depth": hop, "asset_count": len(assets), "assets": assets})
+
+                visited |= next_frontier
+                frontier = next_frontier
+
+    return {
+        "asset_id": root["id"],
+        "asset_name": root["name"],
+        "granularity": granularity,
+        "depth": len(levels),
+        "total_affected": total,
+        "levels": levels,
+    }

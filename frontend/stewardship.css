@@ -1,0 +1,112 @@
+/* ==========================================================================
+   Stewardship page styles.
+   Scoped to the page's own ids (#stewardshipStats, #accessRequestsContainer,
+   #glossaryProposalsContainer) so no other screen is affected. Built only from
+   the neo theme's variables, so light and dark both follow the theme.
+   Markup comes from stewardshipPage() / loadStewardshipQueues() in app.js.
+   ========================================================================== */
+
+/* 1. KPI colour follows meaning, not position.
+      Order is: Pending Requests, Approved Requests, Glossary Proposals, Pending Proposals.
+      The shared theme colours cards 1-4 green, red, yellow, blue, which made
+      "Approved" red and "Pending" green. */
+#stewardshipStats .stat-card:nth-child(1),
+#stewardshipStats .stat-card:nth-child(4){background:var(--hl)}
+#stewardshipStats .stat-card:nth-child(2){background:var(--tint-green)}
+#stewardshipStats .stat-card:nth-child(3){background:var(--tint-blue)}
+#stewardshipStats .stat-card:nth-child(1) .stat-top::after,
+#stewardshipStats .stat-card:nth-child(4) .stat-top::after{background:var(--yellow)}
+#stewardshipStats .stat-card:nth-child(2) .stat-top::after{background:var(--green)}
+#stewardshipStats .stat-card:nth-child(3) .stat-top::after{background:var(--blue)}
+
+/* 2. Queue tables. The shared theme sets td{white-space:nowrap} with 26px padding,
+      which pushed Reason, Status and Action off-screen. Let text wrap, tighten the
+      padding, and drop the container padding the table already provides. */
+#accessRequestsContainer,
+#glossaryProposalsContainer{padding:0}
+#accessRequestsContainer .table-wrap,
+#glossaryProposalsContainer .table-wrap{overflow-x:visible}
+#accessRequestsContainer th,
+#glossaryProposalsContainer th{padding:12px 14px}
+#accessRequestsContainer td,
+#glossaryProposalsContainer td{padding:16px 14px;white-space:normal;overflow-wrap:anywhere;vertical-align:top;line-height:1.45}
+#accessRequestsContainer th:first-child,
+#accessRequestsContainer td:first-child,
+#glossaryProposalsContainer th:first-child,
+#glossaryProposalsContainer td:first-child{padding-left:20px}
+#accessRequestsContainer th:last-child,
+#accessRequestsContainer td:last-child,
+#glossaryProposalsContainer th:last-child,
+#glossaryProposalsContainer td:last-child{padding-right:20px}
+#accessRequestsContainer .pill,
+#glossaryProposalsContainer .pill{text-transform:uppercase}
+/* the action cell: buttons sit side by side and wrap rather than overflow */
+#accessRequestsContainer td:last-child .btn,
+#glossaryProposalsContainer td:last-child .btn{margin:0 6px 6px 0}
+
+/* Column sizing: keep names on one line, keep Approve and Reject side by side */
+#accessRequestsContainer th:nth-child(2),#accessRequestsContainer td:nth-child(2),
+#glossaryProposalsContainer th:nth-child(3),#glossaryProposalsContainer td:nth-child(3){min-width:140px}
+#accessRequestsContainer th:nth-child(4),#accessRequestsContainer td:nth-child(4),
+#glossaryProposalsContainer th:nth-child(4),#glossaryProposalsContainer td:nth-child(4){min-width:110px}
+#accessRequestsContainer td:last-child,
+#glossaryProposalsContainer td:last-child{white-space:nowrap}
+
+/* 3. Row state rail. The status pill is neutral for every status, so the rail carries it:
+      yellow while a decision is waiting, grey once a decision is recorded. The text
+      (Approve/Reject buttons, or "Decision recorded") still states it for everyone. */
+#accessRequestsContainer tbody td:first-child,
+#glossaryProposalsContainer tbody td:first-child{box-shadow:inset 6px 0 0 var(--line)}
+#accessRequestsContainer tbody tr:has([data-action^="decide"]) td:first-child,
+#glossaryProposalsContainer tbody tr:has([data-action^="decide"]) td:first-child{box-shadow:inset 6px 0 0 var(--yellow)}
+
+/* 4. Empty and error states fill the panel */
+#accessRequestsContainer > .empty-state,
+#glossaryProposalsContainer > .empty-state{padding:40px 20px}
+
+/* 5. Layout: the two queue tables each need the full content width, and the shared theme's
+      two-column grid squeezes the glossary table to ~460px even on a 1440px screen
+      (the 240px sidebar stays open down to 900px). So the panels always stack here. */
+.grid-2:has(#accessRequestsContainer){grid-template-columns:minmax(0,1fr)}
+
+/* 6. Narrow content: each row becomes a stacked card with labelled fields.
+      The breakpoint is 1000px, not 720px, because the sidebar is still taking 240px
+      between 901px and 1000px. Labels are written here because the cells carry no
+      data-label attributes. */
+@media (max-width:1000px){
+  #accessRequestsContainer thead,
+  #glossaryProposalsContainer thead{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+  #accessRequestsContainer table,#accessRequestsContainer tbody,#accessRequestsContainer tr,#accessRequestsContainer td,
+  #glossaryProposalsContainer table,#glossaryProposalsContainer tbody,#glossaryProposalsContainer tr,#glossaryProposalsContainer td{display:block;width:100%}
+  #accessRequestsContainer tr,
+  #glossaryProposalsContainer tr{padding:16px 20px 12px;border-bottom:1px solid var(--line);box-shadow:inset 6px 0 0 var(--line)}
+  #accessRequestsContainer tr:has([data-action^="decide"]),
+  #glossaryProposalsContainer tr:has([data-action^="decide"]){box-shadow:inset 6px 0 0 var(--yellow)}
+  #accessRequestsContainer td,
+  #glossaryProposalsContainer td{padding:4px 0;border:0;box-shadow:none}
+  #accessRequestsContainer td:first-child,#accessRequestsContainer td:last-child,
+  #glossaryProposalsContainer td:first-child,#glossaryProposalsContainer td:last-child{padding-left:0;padding-right:0}
+  #accessRequestsContainer tbody td:first-child,
+  #glossaryProposalsContainer tbody td:first-child,
+  #accessRequestsContainer tbody tr:has([data-action^="decide"]) td:first-child,
+  #glossaryProposalsContainer tbody tr:has([data-action^="decide"]) td:first-child{box-shadow:none}
+  #accessRequestsContainer td::before,
+  #glossaryProposalsContainer td::before{display:block;margin-bottom:1px;font:500 .68rem var(--font-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+  #accessRequestsContainer td:nth-child(1)::before{content:"Asset"}
+  #accessRequestsContainer td:nth-child(2)::before{content:"Requester"}
+  #accessRequestsContainer td:nth-child(3)::before{content:"Reason"}
+  #accessRequestsContainer td:nth-child(4)::before{content:"Status"}
+  #glossaryProposalsContainer td:nth-child(1)::before{content:"Term"}
+  #glossaryProposalsContainer td:nth-child(2)::before{content:"Definition"}
+  #glossaryProposalsContainer td:nth-child(3)::before{content:"Proposer"}
+  #glossaryProposalsContainer td:nth-child(4)::before{content:"Status"}
+  #accessRequestsContainer td:last-child .btn,
+  #glossaryProposalsContainer td:last-child .btn{min-height:44px;margin:8px 8px 0 0}
+}
+
+/* 7. KPI cards on phones: two across, so the queue starts higher */
+@media (max-width:640px){
+  #stewardshipStats{grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+  #stewardshipStats .stat-card{padding:12px 14px}
+  #stewardshipStats .stat-value{font-size:1.55rem}
+}

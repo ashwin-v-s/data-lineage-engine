@@ -1,0 +1,136 @@
+/* ==========================================================================
+   KAIROS layout refinement (loads after styles.neo.css and assets.css)
+   Goals: one box language, tighter density, no duplicated chrome, columns
+   that behave, nothing taller than the screen that cannot be reached.
+   Box language: cards 18px radius + 0 4px 0 ink; tiles 12-16px, flat; modals 20px.
+   ========================================================================== */
+:root{--sidebar:240px;--topbar:56px;--gap:22px;--pad:28px;--card-r:18px;--card-shadow:0 4px 0 var(--ink)}
+@media(max-width:1180px){:root{--pad:22px}}
+@media(max-width:640px){:root{--pad:14px;--gap:18px}}
+
+/* assets.css ends in a stray literal "\n", which silently broke these rules */
+[hidden]{display:none!important}
+.nav-group[hidden],.nav-item[hidden]{display:none!important}
+
+/* ---- Shell: shorter sidebar, no duplicated mode badges ---- */
+.sidebar{padding:14px 12px 12px}
+.brand{padding:2px 4px 14px}
+.nav-label{display:none}
+.nav-item{min-height:38px;padding:6px 12px}
+.nav-item.nav-child{min-height:32px;padding:4px 12px;font-size:.86rem}
+.nav-sublist{margin-bottom:6px}
+.nav-group[data-nav-group="settings"] .nav-icon{background:var(--code-bg);color:var(--ink)}
+.nav-group[data-nav-group="settings"] .nav-sublist{border-left-color:var(--line)}
+.health-card{padding:10px 12px;margin-bottom:8px}
+.health-card p{margin:6px 0 8px;font-size:.78rem}
+@media(max-height:780px){.health-card p{display:none}}
+.topbar{height:var(--topbar);padding:0 var(--pad)}
+/* the mode is already shown by the data selector, the sidebar card and the footer */
+.environment{display:none}
+.content{padding:22px var(--pad) 44px}
+.footer{padding:12px var(--pad)}
+
+/* ---- Page title: smaller, so the first screen shows content ---- */
+.page-heading{margin-bottom:20px;gap:20px}
+.page-heading h1{margin-bottom:6px;font-size:clamp(1.6rem,2.4vw,2.1rem)}
+.page-heading h1::after{width:56px;height:5px;margin-top:10px}
+.page-heading p{max-width:68ch;font-size:.95rem}
+.heading-actions{gap:10px}
+
+/* ---- One box language ---- */
+.panel,.asset-hero,.asset-catalog-table{border-radius:var(--card-r);box-shadow:var(--card-shadow)}
+.stat-card,.room-card,.impact-scorecard,.asset-catalog-intro,.asset-overview-metric{border-radius:16px;box-shadow:0 4px 0 var(--ink)}
+.asset-catalog-controls{border-radius:16px;box-shadow:none}
+.modal{border-radius:20px;box-shadow:0 5px 0 var(--ink)}
+.panel-head{padding:16px 20px 10px}
+.panel-head h2{font-size:1.12rem}
+.panel-body{padding:16px 20px 20px}
+.panel>.panel-head+.panel-body{padding-top:6px}
+.content>.panel,.content>.notice,.content>.data-source-banner{margin-bottom:var(--gap)}
+.content>.panel:last-child{margin-bottom:0}
+.grid-2,.grid-equal,.lineage-layout,.two-col-layout,.observatory-layout,.stat-grid,.room-grid{gap:var(--gap)}
+
+/* ---- KPI cards ---- */
+.stat-grid{gap:var(--gap) 16px}
+.stat-card{padding:14px 18px}
+.stat-value{margin:8px 0 4px;font-size:1.75rem}
+.stat-card.lead .stat-value{font-size:2.2rem}
+.stat-foot{font-size:.8rem}
+.asset-overview-metric strong{font-size:1.7rem}
+
+/* ---- Tables: tighter cells so more columns fit without scrolling ---- */
+table{font-size:.9rem}
+th{padding:10px 16px}
+td{padding:11px 16px}
+.kairos-compact-tables th,.kairos-compact-tables td{padding:7px 14px}
+.table-wrap{max-width:100%}
+
+/* ---- Lineage: graph gets the room; the side column scrolls instead of being cut off ---- */
+.lineage-layout{grid-template-columns:minmax(0,1fr) 320px}
+.lineage-layout>.side-stack{position:sticky;top:calc(var(--topbar) + 16px);max-height:calc(100vh - var(--topbar) - 32px);overflow-y:auto;padding:0 4px 8px 0;scrollbar-width:thin}
+.graph-stage,.observatory-stage{height:clamp(420px,64vh,660px)}
+.graph-toolbar{gap:10px;padding:4px 20px 14px}
+.graph-control select{min-width:112px}
+.time-context-note{padding:0 20px 12px}
+
+/* ---- Full asset page ---- */
+.asset-hero{padding:18px 22px}
+.asset-hero h2{font-size:1.5rem}
+.asset-hero-main{margin-bottom:14px}
+.hero-stat{padding:8px 12px}
+.hero-stat strong{font-size:1.3rem}
+.impact-scorecard{padding:16px 20px}
+
+/* ---- Catalog tiles ---- */
+.room-grid{gap:var(--gap) 16px}
+.room-card{padding:16px 18px}
+
+/* ---- Responsive ---- */
+@media(max-width:900px){
+  .lineage-layout>.side-stack{position:static;max-height:none;overflow:visible;padding:0}
+  .graph-stage,.observatory-stage{height:clamp(360px,56vh,520px)}
+}
+@media(max-width:640px){
+  .page-heading h1{font-size:1.6rem}
+  .stat-card.lead .stat-value{font-size:2rem}
+  .panel-head{padding:14px 16px 8px}.panel-body{padding:14px 16px 18px}
+  th,td{padding-inline:12px}
+}
+
+/* ---- Asset profile page ---- */
+/* cards inside the profile card become flat sections (no double border or shadow) */
+.panel .panel{border:0;border-top:1px solid var(--line);border-radius:0;box-shadow:none;background:transparent;margin:0 0 4px}
+.panel .panel .panel-head{padding:16px 0 8px}
+.panel .panel .panel-body{padding:0 0 12px}
+.panel .panel.section-spacer{margin-top:18px}
+/* one scrollable row of tabs instead of several wrapped rows */
+.asset-tabs{flex-wrap:nowrap;gap:6px;margin:0 0 18px;padding:2px 2px 8px;overflow-x:auto;scrollbar-width:thin;-webkit-overflow-scrolling:touch}
+.asset-tab{flex:none;padding:6px 14px;white-space:nowrap}
+/* Overview: description and details left, ownership/tags/completeness right */
+.profile-cols{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(280px,1fr);gap:var(--gap);align-items:start}
+.profile-main,.profile-side{display:grid;gap:20px;min-width:0;align-content:start}
+.profile-block h3{margin:0 0 10px;font:800 1rem var(--font-display);letter-spacing:-.02em}
+.profile-desc{max-width:70ch;margin:0;line-height:1.65;color:var(--muted)}
+.profile-tags{display:flex;flex-wrap:wrap;gap:8px}
+.profile-main .modal-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+.modal-grid.one{grid-template-columns:minmax(0,1fr)}
+.modal-tile strong{overflow-wrap:anywhere}
+.profile-side>.panel{margin:0;border:2px solid var(--ink);border-radius:14px;background:var(--surface)}
+.profile-side>.panel .panel-body{padding:14px 16px}
+@media(max-width:1000px){.profile-cols{grid-template-columns:minmax(0,1fr)}}
+@media(max-width:640px){.profile-main .modal-grid{grid-template-columns:minmax(0,1fr)}}
+
+/* ---- Asset profile: padding inside the card, compact tabs, compact shortcuts ---- */
+.panel>.asset-tabs{flex-wrap:wrap;overflow:visible;margin:0;padding:4px 20px 14px;gap:6px}
+.panel>.asset-tab-content{padding:4px 20px 22px;margin:0;min-height:0}
+.panel>.node-actions{margin:0;padding:0 20px 20px}
+.asset-tab{padding:5px 12px;font-size:.86rem}
+.asset-tab-content .grid-equal{grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-bottom:0}
+.asset-tab-content .reasoning-item{padding:12px 14px}
+.asset-tab-content .reasoning-item p{margin:4px 0 0}
+.asset-tab-content .reasoning-item strong{font-size:.92rem}
+
+/* ---- Sidebar status card: fits its content ---- */
+.health-top strong{font-size:.86rem;white-space:nowrap}
+.health-foot{display:grid;grid-template-columns:auto 1fr;gap:2px 10px;font-size:.62rem;letter-spacing:.04em}
+.health-foot b{text-align:right}

@@ -12,10 +12,14 @@ from pathlib import Path
 
 import pytest
 
+# sqlglot is a declared runtime dependency, but a test environment that only
+# installs pytest (a stale CI recipe) must not abort the whole run at
+# collection time; skip this module instead.
+pytest.importorskip("sqlglot")
+
 from contracts.interfaces import SchemaSnapshot
 from contracts.types import Granularity, ParserStatus
 from ingestion.sql import SQLGlotLineageProvider
-
 
 CORPUS_DIR = Path(__file__).resolve().parent.parent / "ingestion" / "sql" / "corpus"
 

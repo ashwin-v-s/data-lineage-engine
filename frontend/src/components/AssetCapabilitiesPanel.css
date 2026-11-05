@@ -1,0 +1,73 @@
+/*
+ * View-specific styles for the asset capability panel.
+ * Only new `kv-caps-`-prefixed classes live here; every shared primitive comes
+ * from `liveViews.css` and is never redefined.
+ */
+
+.kv-caps {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.kv-caps-tablist {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.kv-caps-tab {
+  padding: 4px 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--muted);
+  font: 600 11px var(--font-mono);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.kv-caps-tab:hover {
+  border-color: var(--link);
+  color: var(--link);
+}
+
+.kv-caps-tab[aria-selected='true'] {
+  border-color: var(--link);
+  color: var(--link);
+}
+
+.kv-caps-panel {
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+}
+
+.kv-caps-panel-title {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.kv-caps-panel p {
+  margin: 4px 0 0;
+}
+
+.kv-caps-unavailable-block {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.kv-caps-unavailable {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.kv-caps-entry-key {
+  color: var(--ink);
+  font-weight: 600;
+}

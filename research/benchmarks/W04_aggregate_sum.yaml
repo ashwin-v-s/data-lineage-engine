@@ -1,0 +1,50 @@
+# W04 — Aggregate SUM (GROUP BY)
+# Split: development
+# SQL construct: AGGREGATE_SUM
+case_id: W04
+case_version: "1.0"
+split: development
+sql_construct: AGGREGATE_SUM
+description: >
+  SUM aggregation with GROUP BY. The source amount column contributes to the
+  target total via summation. The group-by key also propagates.
+
+sql: |
+  CREATE TABLE monthly_totals AS
+  SELECT region,
+         SUM(sale_amount) AS total_sales
+  FROM daily_sales
+  GROUP BY region;
+
+schema:
+  daily_sales:
+    columns: [region, sale_amount, sale_date]
+  monthly_totals:
+    columns: [region, total_sales]
+
+expected_static_candidates:
+  - source: daily_sales.region
+    target: monthly_totals.region
+    operator: PROJECTION
+    parser_status: SUPPORTED
+  - source: daily_sales.sale_amount
+    target: monthly_totals.total_sales
+    operator: AGGREGATE_SUM
+    parser_status: SUPPORTED
+
+ground_truth:
+  provider: ReferenceInterpreterProvider
+  provider_version: "reference-1.0"
+  labels:
+    - source: daily_sales.region
+      target: monthly_totals.region
+      label: PROPAGATED
+      rationale: GROUP BY key — always present in output.
+    - source: daily_sales.sale_amount
+      target: monthly_totals.total_sales
+      label: PROPAGATED
+      rationale: SUM aggregation — all source values contribute to the total.
+
+never_proves:
+  - Aggregate dependency does not prove the query executed in a specific run.
+  - sale_date is referenced in schema but not selected — it is NOT a dependency.

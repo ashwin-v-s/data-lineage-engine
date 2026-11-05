@@ -21,33 +21,23 @@ const queryClient = new QueryClient({
 
 const InvestigatorCockpit: React.FC = () => {
   // Bitemporal & Investigation State
-  const [activeEntity, setActiveEntity] = useState<string>('orders_fact');
-  const [runId, setRunId] = useState<string>('run_2026_09_23_093214');
-  const [validAt, setValidAt] = useState<string | null>('2026-08-15T00:00:00Z');
-  const [knownAsOf, setKnownAsOf] = useState<string | null>('2026-09-23T11:45:00Z');
+  const [activeEntity, setActiveEntity] = useState<string>('');
+  const [runId, setRunId] = useState<string>('');
+  const [validAt, setValidAt] = useState<string | null>(null);
+  const [knownAsOf, setKnownAsOf] = useState<string | null>(null);
   const [density, setDensity] = useState<'investigator' | 'research'>('investigator');
   const [granularity, setGranularity] = useState<'DATASET' | 'COLUMN'>('COLUMN');
   const [depth, setDepth] = useState<number>(3);
-  const [benchmarkMode, setBenchmarkMode] = useState<boolean>(true);
+  const [benchmarkMode, setBenchmarkMode] = useState<boolean>(false);
 
   // Panel layout toggles
   const [leftRailOpen, setLeftRailOpen] = useState<boolean>(true);
   const [rightInspectorOpen, setRightInspectorOpen] = useState<boolean>(true);
   const [popoverNode, setPopoverNode] = useState<string | null>(null);
 
-  // Selected graph items
+  // Selected graph items — start empty, populated when user clicks a node/edge
   const [selectedNode, setSelectedNode] = useState<any | null>(null);
-  const [selectedEdge, setSelectedEdge] = useState<any | null>({
-    id: 'edge_stg_to_fact',
-    source: 'stg_customer_orders',
-    target: 'orders_fact',
-    data: {
-      reasoning_state: 'OBSERVED',
-      relationship_type: 'DERIVED_FROM',
-      d14_warning: true,
-      evidence_ids: ['ev_stg_orders_01', 'ev_stg_orders_02'],
-    },
-  });
+  const [selectedEdge, setSelectedEdge] = useState<any | null>(null);
 
   // State filters
   const [selectedStates, setSelectedStates] = useState<Record<string, boolean>>({
@@ -69,8 +59,8 @@ const InvestigatorCockpit: React.FC = () => {
   } = useLineageQuery(activeEntity, validAt, knownAsOf, granularity, depth);
 
   // 2. Fetch Dependency Reasoning from /api/v1/runs/{run_id}/dependency/{source}/{target}
-  const depSource = selectedEdge?.source || 'stg_customer_orders';
-  const depTarget = selectedEdge?.target || 'orders_fact';
+  const depSource = selectedEdge?.source || '';
+  const depTarget = selectedEdge?.target || '';
   const { data: dependencyData } = useDependencyQuery(runId, depSource, depTarget, validAt, knownAsOf);
 
   // Filter edges based on reasoning state selection
