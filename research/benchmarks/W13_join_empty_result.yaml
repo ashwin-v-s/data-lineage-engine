@@ -1,0 +1,77 @@
+# W13 — INNER JOIN: NOT_PROPAGATED (no matching rows between tables)
+# Split: validation
+# SQL construct: JOIN_INNER
+# Ground truth: NOT_PROPAGATED for all columns (join produces empty result)
+case_id: W13
+case_version: "1.0"
+split: validation
+sql_construct: JOIN_INNER
+description: >
+  INNER JOIN where the join key has no matching rows between the two tables.
+  The run fixture has orders with customer_ids that do not exist in the
+  customers table. The JOIN produces an empty result — no columns propagate.
+  This tests the NOT_PROPAGATED case for JOIN dependencies.
+
+sql: |
+  CREATE TABLE matched_orders AS
+  SELECT o.order_id,
+         o.amount,
+         c.customer_name
+  FROM orders_unmatched o
+  INNER JOIN customers_empty c ON o.customer_id = c.customer_id;
+
+schema:
+  orders_unmatched:
+    columns: [order_id, customer_id, amount]
+    note: "customer_ids in orders do not exist in customers_empty"
+  customers_empty:
+    columns: [customer_id, customer_name]
+    note: "No matching customer_ids for the orders in this run"
+  matched_orders:
+    columns: [order_id, amount, customer_name]
+
+expected_static_candidates:
+  - source: orders_unmatched.order_id
+    target: matched_orders.order_id
+    operator: PROJECTION
+    parser_status: SUPPORTED
+  - source: orders_unmatched.amount
+    target: matched_orders.amount
+    operator: PROJECTION
+    parser_status: SUPPORTED
+  - source: customers_empty.customer_name
+    target: matched_orders.customer_name
+    operator: PROJECTION
+    parser_status: SUPPORTED
+
+ground_truth:
+  provider: ReferenceInterpreterProvider
+  provider_version: "reference-1.0"
+  labels:
+    - source: orders_unmatched.order_id
+      target: matched_orders.order_id
+      label: NOT_PROPAGATED
+      rationale: >
+        INNER JOIN produces empty result — no rows matched. No source values
+        contributed to any target output in this run.
+    - source: orders_unmatched.amount
+      target: matched_orders.amount
+      label: NOT_PROPAGATED
+      rationale: Empty join result — amount never written to output.
+    - source: customers_empty.customer_name
+      target: matched_orders.customer_name
+      label: NOT_PROPAGATED
+      rationale: Empty join result — customer_name never written to output.
+
+never_proves:
+  - Static JOIN dependency does not prove matching rows existed at runtime.
+  - An INNER JOIN with no matching rows produces an empty output.
+  - Without runtime evidence, all JOIN candidates return POSSIBLE (R4).
+  - Only a complete negative evaluation (all rows evaluated, no match found)
+    can yield REFUTED_FOR_RUN.
+
+research_note: >
+  This case is important because it shows that even a fully SUPPORTED static
+  dependency can be NOT_PROPAGATED at runtime. The proposed engine with
+  runtime evidence should return REFUTED_FOR_RUN; without evidence POSSIBLE.
+  B2 would incorrectly return REFUTED_FOR_RUN even without evidence.

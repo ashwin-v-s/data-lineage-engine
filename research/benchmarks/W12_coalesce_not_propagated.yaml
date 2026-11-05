@@ -1,0 +1,76 @@
+# W12 — COALESCE: mobile NOT_PROPAGATED (all customers have phone)
+# Split: validation
+# SQL construct: COALESCE
+# Ground truth: NOT_PROPAGATED for mobile (always skipped because phone is non-null)
+case_id: W12
+case_version: "1.0"
+split: validation
+sql_construct: COALESCE
+description: >
+  COALESCE(phone, mobile, email) picks the first non-null value.
+  The run fixture has all customers with non-null phone values.
+  Therefore mobile and email are NEVER selected — they are static
+  candidates but do NOT propagate in this run.
+
+sql: |
+  CREATE TABLE customer_contact AS
+  SELECT customer_id,
+         COALESCE(phone, mobile, email) AS primary_contact
+  FROM customers_with_phone;
+
+schema:
+  customers_with_phone:
+    columns: [customer_id, phone, mobile, email]
+    note: "All customers have non-null phone in this run fixture"
+  customer_contact:
+    columns: [customer_id, primary_contact]
+
+expected_static_candidates:
+  - source: customers_with_phone.customer_id
+    target: customer_contact.customer_id
+    operator: PROJECTION
+    parser_status: SUPPORTED
+  - source: customers_with_phone.phone
+    target: customer_contact.primary_contact
+    operator: COALESCE
+    parser_status: SUPPORTED
+  - source: customers_with_phone.mobile
+    target: customer_contact.primary_contact
+    operator: COALESCE
+    parser_status: SUPPORTED
+  - source: customers_with_phone.email
+    target: customer_contact.primary_contact
+    operator: COALESCE
+    parser_status: SUPPORTED
+
+ground_truth:
+  provider: ReferenceInterpreterProvider
+  provider_version: "reference-1.0"
+  labels:
+    - source: customers_with_phone.customer_id
+      target: customer_contact.customer_id
+      label: PROPAGATED
+      rationale: Direct projection.
+    - source: customers_with_phone.phone
+      target: customer_contact.primary_contact
+      label: PROPAGATED
+      rationale: >
+        All customers have non-null phone. COALESCE always picks phone first.
+    - source: customers_with_phone.mobile
+      target: customer_contact.primary_contact
+      label: NOT_PROPAGATED
+      rationale: >
+        mobile is only selected when phone IS NULL. In this run all
+        customers have non-null phone, so mobile is never reached.
+    - source: customers_with_phone.email
+      target: customer_contact.primary_contact
+      label: NOT_PROPAGATED
+      rationale: >
+        email is only selected when both phone and mobile are NULL.
+        In this run all customers have non-null phone, so email is
+        never reached.
+
+never_proves:
+  - COALESCE static dependency does not prove each column was selected.
+  - Without runtime evidence, all COALESCE args return POSSIBLE (R4).
+  - Only a complete negative evaluation can yield REFUTED_FOR_RUN for mobile/email.
