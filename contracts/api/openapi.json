@@ -1933,6 +1933,39 @@
       },
       "SearchResponse": {
         "properties": {
+          "mode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mode"
+          },
+          "page": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Page"
+          },
+          "page_size": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Page Size"
+          },
           "results": {
             "items": {
               "$ref": "#/components/schemas/SearchResult"
@@ -1992,6 +2025,17 @@
             ],
             "title": "Label"
           },
+          "match_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Match Type"
+          },
           "name": {
             "title": "Name",
             "type": "string"
@@ -2028,6 +2072,17 @@
               }
             ],
             "title": "Schema"
+          },
+          "score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score"
           },
           "steward": {
             "anyOf": [
@@ -5975,6 +6030,87 @@
           }
         ],
         "summary": "Search"
+      }
+    },
+    "/api/v1/search/hybrid": {
+      "get": {
+        "description": "Hybrid search endpoint combining keyword + semantic search.\n\nSecurity:\n- Enforces workspace isolation via user's workspace_id\n- RLS policies at DB level provide additional protection\n- No cross-workspace data leakage possible\n\nModes:\n- hybrid: 70% keyword + 30% semantic\n- keyword: Traditional ILIKE search only\n- semantic: Vector similarity only",
+        "operationId": "hybrid_search_api_v1_search_hybrid_get",
+        "parameters": [
+          {
+            "description": "Search query",
+            "in": "query",
+            "name": "q",
+            "required": true,
+            "schema": {
+              "description": "Search query",
+              "title": "Q",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "mode",
+            "required": false,
+            "schema": {
+              "default": "hybrid",
+              "pattern": "^(hybrid|keyword|semantic)$",
+              "title": "Mode",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "minimum": 1,
+              "title": "Page",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page_size",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Page Size",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Hybrid Search"
       }
     },
     "/api/v1/sources": {

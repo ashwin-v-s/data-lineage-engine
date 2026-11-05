@@ -180,7 +180,7 @@ def _hybrid_search(cur, query: str, query_embedding: list[float], workspace_id: 
 @router.get("/search/hybrid", response_model=SearchResponse)
 def hybrid_search(
     q: str = Query(..., description="Search query"),
-    mode: str = Query(default="hybrid", regex="^(hybrid|keyword|semantic)$"),
+    mode: str = Query(default="hybrid", pattern="^(hybrid|keyword|semantic)$"),
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=100),
     user: dict = Depends(require_user)
