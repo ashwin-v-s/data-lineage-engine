@@ -17,7 +17,7 @@ protocol_version: "1.0-partial"           # bumped from skeleton on 2026-11-02
 # ---------------------------------------------------------------------------
 # Benchmark
 # ---------------------------------------------------------------------------
-benchmark_version: "v0.1-dev"             # M5-DECIDED: dev version; frozen when all cases committed
+benchmark_version: "v0.2-dev"             # M5-DECIDED: updated 2026-11-03 with NOT_PROPAGATED cases W11-W13
 benchmark_path: "research/benchmarks/"
 sql_subset:                               # M5-DECIDED: from ingestion/sql/SUPPORT_MATRIX.md
   - PROJECTION
@@ -30,9 +30,9 @@ sql_subset:                               # M5-DECIDED: from ingestion/sql/SUPPO
   - WHERE_FILTER
   - COALESCE
 splits:
-  development: [W01, W02, W03, W04, W05]  # M5-DECIDED: first 5 cases for dev
-  validation: [W06, W07, W08]             # M5-DECIDED: next 3 for validation
-  held_out: [W09, W10]                    # M5-DECIDED: final 2 held out — DO NOT TUNE
+  development: [W01, W02, W03, W04, W05, W11]  # M5-DECIDED: W11 added (NOT_PROPAGATED CASE_WHEN)
+  validation: [W06, W07, W08, W12, W13]          # M5-DECIDED: W12/W13 added (NOT_PROPAGATED COALESCE, JOIN)
+  held_out: [W09, W10]                            # M5-DECIDED: unchanged — DO NOT TUNE
 
 # ---------------------------------------------------------------------------
 # Semantics and prediction unit

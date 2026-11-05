@@ -353,7 +353,7 @@ with this decision; the table will be corrected in the next architecture update.
 
 ---
 
-## Scheduler proposal — freshness and source pulls
+## Scheduler — freshness and source pulls
 
 **Status:** PROPOSED — 2026-11-05; M2 agreement required before implementation.
 **Owners:** M1 (runner authentication/deployment), M2 (batch evaluator and source-sync behavior).
@@ -361,3 +361,19 @@ with this decision; the table will be corrected in the next architecture update.
 M5's message calls this scheduler question “D12 Wave 4”, but D12 is already the database-runtime decision (Supabase PostgreSQL) in this log and in Architecture v2 §11. Keep the scheduler decision separate; do not reuse D12.
 
 **M1 proposal:** use a GitHub Actions scheduled workflow hourly for the MVP freshness sweep. M2 owns the idempotent, workspace-by-workspace evaluation/sync batch; M1 owns a narrowly scoped machine-auth path and its GitHub secret. The existing user-token-only evaluation route is not directly callable by a scheduler. The job must not accept a caller-selected workspace without server-side authorization. M2 must confirm that this runner and ownership split meet connector scheduling needs before this proposal becomes DECIDED.
+
+---
+
+## Scheduler-DECIDED — freshness and source pulls
+
+**Status:** DECIDED — 2026-11-03
+**Owners:** M1 (Jatin) owns runner auth + GitHub secret; M2 (Anushka) owns batch evaluator + source-sync.
+**Supersedes:** "Scheduler proposal" entry above (which was PROPOSED pending M2 confirmation).
+
+**Decision:** GitHub Actions scheduled workflow (hourly) for MVP freshness sweep.
+
+- M1 owns: machine-auth path + KAIROS_SCHEDULER_TOKEN GitHub Actions secret
+- M2 owns: idempotent workspace-by-workspace evaluation batch
+- M2 confirmation: PR #22 (feature/m2-ingestion-groundtruth-complete, merged 2026-11-03) ships the complete ingestion pipeline with idempotent workspace-scoped evaluation — ownership split is confirmed compatible
+- On-demand route /api/v1/governance/freshness available now; scheduled job pending M1 deployment
+- Demo must state: "scheduled freshness monitoring — on-demand only, no scheduler running yet"
