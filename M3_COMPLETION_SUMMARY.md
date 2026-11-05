@@ -44,7 +44,7 @@
 
 **Files Added:**
 - `backend/app/api/routes/vector_search.py` - Hybrid search endpoint
-- `backend/migrations/0011_pgvector_embeddings.sql` - Database migration
+- `backend/migrations/0012_m3_pgvector_embeddings.sql` - Database migration (per D13 naming)
 - `tests/test_vector_search_isolation.py` - Workspace isolation tests
 
 **Features:**
@@ -108,8 +108,9 @@ Per handout section 8 "Remaining work":
 
 ## Migration Status
 
-**Migration 0011:** `0011_pgvector_embeddings.sql`  
+**Migration 0012:** `0012_m3_pgvector_embeddings.sql`  
 **Status:** PROPOSAL (not applied to live DB)  
+**Naming:** Per D13 decision - `{number}_{owner_initials}_{feature}.sql`  
 **Requires:**
 - PostgreSQL with pgvector extension
 - `CREATE EXTENSION vector;` privilege
@@ -117,7 +118,7 @@ Per handout section 8 "Remaining work":
 
 **To apply:**
 ```sql
-psql <connection_string> -f backend/migrations/0011_pgvector_embeddings.sql
+psql <connection_string> -f backend/migrations/0012_m3_pgvector_embeddings.sql
 ```
 
 ---
@@ -156,7 +157,7 @@ Per handout section 4:
 ---
 
 **Next Steps:**
-1. Apply migration 0011 to Supabase
+1. Apply migration 0012_m3 to Supabase
 2. Generate embeddings for existing datasets
 3. Wire temporal-ui.js into main app.js
 4. Test with real authenticated user session
