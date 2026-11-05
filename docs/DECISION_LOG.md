@@ -337,3 +337,16 @@ candidate the column-level claim is unverifiable.
 The existing test `test_r1_unsupported_static_gives_unknown_even_with_positive_evidence`
 correctly locks this behavior. The architecture §14 expanded table is inconsistent
 with this decision; the table will be corrected in the next architecture update.
+
+---
+
+## M3 proposals — temporal queries and canonical routes
+
+**Status:** PROPOSED — 2026-11-05; requires M1/M5 review before becoming a contract decision.
+**Owner:** M3 implementation proposal; M1 owns shared API/data-model contract, M5 reviews evidence semantics.
+
+**D-13 proposal:** expose UUIDs as canonical asset/edge route identifiers. Accept qualified names only as lookup aliases resolved through stored workspace-visible identity; do not derive a UUID by reversing UUID v5. Whether aliases redirect to canonical URLs remains open.
+
+**D-14 proposal:** for an `as_of` lineage graph, include only edges with known valid-time bounds that contain the requested valid instant and whose recorded interval contains the requested recorded instant. Exclude unknown-valid-time edges from that graph and report their count separately; do not infer that an undated edge was absent. Evidence-at-time can show undated rows separately. The current implementation/UI does not yet re-query and render the historical lineage graph, so this proposal is not a claim of completed temporal UI.
+
+**React shell note:** keep the currently served dashboard shell until the frontend workstream chooses and delivers a complete React entry-point migration. The mounted vanilla asset profile may consume the capability API; the orphan React capability panel is not considered a working product screen. This is an implementation recommendation, not approval to delete the React source tree.

@@ -25,7 +25,7 @@ from __future__ import annotations
 
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Response
 from backend.app.auth import require_user
 from psycopg2.extras import RealDictCursor
 
@@ -61,6 +61,7 @@ def _qualified_name(asset: dict) -> str:
 
 @router.get("/search", response_model=SearchResponse)
 def search(
+    response: Response,
     q: Optional[str] = Query(default=None, description="Search term (substring match)"),
     asset_type: Optional[str] = Query(default=None, description="Filter by asset type, e.g. TABLE"),
     page: int = Query(default=1, ge=1),
@@ -161,14 +162,25 @@ def search(
         for r in rows
         if r["id"] is not None
     ]
+    response.headers["X-Total-Count"] = str(total)
+    response.headers["X-Result-Truncated"] = str(offset + len(results) < total).lower()
     return SearchResponse(results=results, total=total)
 
 
 @router.get("/catalog")
-def catalog_snapshot(user: dict = Depends(require_user)):
-    """Return catalog records backed by Kairos' PostgreSQL schema."""
+def catalog_snapshot(
+    response: Response,
+    limit: int = Query(default=100, ge=1, le=500),
+    offset: int = Query(default=0, ge=0),
+    user: dict = Depends(require_user),
+):
+    """Return bounded catalog pages and explicitly capped graph/evidence slices."""
+    edge_limit = 1_000
+    evidence_limit = 1_000
     with get_conn() as conn:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute("SELECT COUNT(*)::int AS count FROM dataset")
+            asset_total = int(cur.fetchone()["count"])
             cur.execute("""
                 SELECT d.id::text AS id, d.source_system, d.namespace,
                        d.database_name, d.schema_name, d.name,
@@ -178,7 +190,8 @@ def catalog_snapshot(user: dict = Depends(require_user)):
                 LEFT JOIN column_record cr ON cr.dataset_id = d.id
                 GROUP BY d.id
                 ORDER BY d.database_name, d.schema_name, d.name
-            """)
+                LIMIT %s OFFSET %s
+            """, (limit, offset))
             assets = [dict(row) for row in cur.fetchall()]
             cur.execute("""
                 SELECT le.id::text AS id,
@@ -194,7 +207,8 @@ def catalog_snapshot(user: dict = Depends(require_user)):
                     AND etv.transaction_to IS NULL
                 LEFT JOIN evidence ev ON ev.id = etv.evidence_id
                 ORDER BY le.created_at, etv.valid_from
-            """)
+                LIMIT %s
+            """, (edge_limit + 1,))
             edges = [dict(row) for row in cur.fetchall()]
             cur.execute("SELECT COUNT(*)::int AS count FROM execution_run")
             run_count = int(cur.fetchone()["count"])
@@ -236,10 +250,19 @@ def catalog_snapshot(user: dict = Depends(require_user)):
                 LEFT JOIN column_record tc ON tc.id = e.target_column_id
                 LEFT JOIN dataset td ON td.id = COALESCE(tc.dataset_id, e.target_dataset_id)
                 ORDER BY e.ingestion_time DESC
-            """)
+                LIMIT %s
+            """, (evidence_limit + 1,))
             evidence_rows = [dict(row) for row in cur.fetchall()]
             cur.execute("SELECT COUNT(*)::int AS count FROM raw_event")
             raw_event_count = int(cur.fetchone()["count"])
+
+    assets_truncated = offset + len(assets) < asset_total
+    edges_truncated = len(edges) > edge_limit
+    evidence_truncated = len(evidence_rows) > evidence_limit
+    edges = edges[:edge_limit]
+    evidence_rows = evidence_rows[:evidence_limit]
+    response.headers["X-Total-Count"] = str(asset_total)
+    response.headers["X-Result-Truncated"] = str(assets_truncated or edges_truncated or evidence_truncated).lower()
 
     for row in (*assets, *edges):
         for key, value in row.items():
@@ -299,6 +322,13 @@ def catalog_snapshot(user: dict = Depends(require_user)):
         ],
         "quality_checks": [],
         "column_classifications": [],
+        "pagination": {"limit": limit, "offset": offset, "total_assets": asset_total},
+        "truncated": {
+            "assets": assets_truncated,
+            "edges": edges_truncated,
+            "evidence": evidence_truncated,
+            "limits": {"assets_per_page": limit, "edges": edge_limit, "evidence": evidence_limit},
+        },
         "counts": {
             "assets": len(assets), "edges": len(edges),
             "evidence": evidence_count, "runs": run_count,

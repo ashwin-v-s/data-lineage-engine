@@ -146,24 +146,102 @@
     },
     "/api/v1/catalog": {
       "get": {
-        "summary": "Catalog Snapshot",
-        "description": "Return catalog records backed by Kairos' PostgreSQL schema.",
+        "description": "Return bounded catalog pages and explicitly capped graph/evidence slices.",
         "operationId": "catalog_snapshot_api_v1_catalog_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 100,
+              "maximum": 500,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "minimum": 0,
+              "title": "Offset",
+              "type": "integer"
+            }
+          }
+        ],
         "responses": {
           "200": {
-            "description": "Successful Response",
             "content": {
               "application/json": {
                 "schema": {}
               }
-            }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
           }
         },
         "security": [
           {
             "HTTPBearer": []
           }
-        ]
+        ],
+        "summary": "Catalog Snapshot"
+      }
+    },
+    "/api/v1/lineage/edges/{edge_id}/evidence": {
+      "get": {
+        "description": "Return stored provenance for one edge, including safe raw/normalized views.",
+        "operationId": "edge_evidence_api_v1_lineage_edges__edge_id__evidence_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "edge_id",
+            "required": true,
+            "schema": {
+              "title": "Edge Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Edge Evidence"
       }
     },
     "/api/v1/raw-events": {
@@ -492,7 +570,7 @@
     "/api/v1/lineage/{asset_id}/{direction}": {
       "get": {
         "summary": "Expand Lineage",
-        "description": "Directional lineage expansion used by the UI's Upstream / Downstream arrows.\n\nGET /api/v1/lineage/{asset_id}/upstream    \u2192 predecessors only\nGET /api/v1/lineage/{asset_id}/downstream  \u2192 successors only",
+        "description": "Directional lineage expansion used by the UI's Upstream / Downstream arrows.\n\nGET /api/v1/lineage/{asset_id}/upstream    → predecessors only\nGET /api/v1/lineage/{asset_id}/downstream  → successors only",
         "operationId": "expand_lineage_api_v1_lineage__asset_id___direction__get",
         "security": [
           {
@@ -601,7 +679,7 @@
     "/api/v1/assets/{asset_id}/downstream-impact": {
       "get": {
         "summary": "Get Downstream Impact",
-        "description": "Group everything reachable downstream of an asset by propagation depth.\n\nUnlike the flat lineage graph, this answers \"if I change this asset, what\nelse is at risk, and how far away is it?\" \u2014 one bucket per hop, with the\naffected assets labelled for display.",
+        "description": "Group everything reachable downstream of an asset by propagation depth.\n\nUnlike the flat lineage graph, this answers \"if I change this asset, what\nelse is at risk, and how far away is it?\" — one bucket per hop, with the\naffected assets labelled for display.",
         "operationId": "get_downstream_impact_api_v1_assets__asset_id__downstream_impact_get",
         "security": [
           {

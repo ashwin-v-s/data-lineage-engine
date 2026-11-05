@@ -8,8 +8,9 @@
     '/vendors/chart.umd.min.js',
     '/observatory.js?v=304',
     '/stewardship.js?v=304',
-    '/app.js?v=305',
-    '/pii-lineage-enhancements.js?v=304',
+    '/evidence-semantics.js?v=1',
+    '/lineage-investigation.js?v=1',
+    '/app.js?v=306',
   ];
   let config = null;
   let configLoaded = false;

@@ -241,17 +241,33 @@ def is_valid_uuid(value: str) -> bool:
         return False
 
 
-def parse_dataset_components(dataset_id_str: str) -> Optional[Tuple[str, ...]]:
+def parse_dataset_components(connection, dataset_id_str: str) -> Optional[Tuple[str, ...]]:
+    """Look up the stored identity tuple for a dataset UUID.
+
+    UUID v5 is intentionally not reversible. The supplied connection must be
+    a workspace-scoped Kairos connection so RLS limits this lookup to the
+    caller's catalog. Returns ``None`` for malformed or invisible IDs.
     """
-    Parse a dataset ID back to its components (if stored somewhere).
-    
-    Note: This is NOT reversible from UUID alone. 
-    Components must be stored in the dataset table.
-    
-    This function is a placeholder for lookup logic.
-    """
-    # In practice, you'd query the dataset table
-    raise NotImplementedError(
-        "Dataset components must be looked up from the dataset table, "
-        "not computed from UUID"
+    try:
+        canonical_id = uuid.UUID(str(dataset_id_str))
+    except (ValueError, TypeError, AttributeError):
+        return None
+    with connection.cursor() as cursor:
+        cursor.execute(
+            """
+            SELECT source_system, namespace, database_name, schema_name, name, asset_type
+            FROM dataset
+            WHERE id = %s
+            LIMIT 1
+            """,
+            (str(canonical_id),),
+        )
+        row = cursor.fetchone()
+    if row is None:
+        return None
+    fields = (
+        "source_system", "namespace", "database_name", "schema_name", "name", "asset_type"
     )
+    if hasattr(row, "keys"):
+        return tuple(row[field] for field in fields)
+    return tuple(row)
