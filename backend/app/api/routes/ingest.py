@@ -68,7 +68,7 @@ class OpenLineageIngestRequest(BaseModel):
 
 
 class SingleEventOrBatch(BaseModel):
-    """Union shape — caller may POST one event or {"events": [...]} ."""
+    """Union shape — caller may POST one event or {\"events\": [...]} ."""
     eventType: Optional[str] = None
     events: Optional[List[Any]] = None
 
