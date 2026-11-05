@@ -68,7 +68,7 @@ class OpenLineageIngestRequest(BaseModel):
 
 
 class SingleEventOrBatch(BaseModel):
-    """Union shape — caller may POST one event or {\"events\": [...]} ."""
+    """Union shape — caller may POST one event or {"events": [...]} ."""
     eventType: Optional[str] = None
     events: Optional[List[Any]] = None
 
@@ -550,7 +550,7 @@ def list_import_runs(
     offset: int = Query(default=0, ge=0),
     user: dict = Depends(require_user),
 ):
-    """List import runs visible to the caller's workspace, newest first."""
+    """List the import runs visible to the caller's workspace, newest first."""
     with get_conn() as conn:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
             cur.execute(
