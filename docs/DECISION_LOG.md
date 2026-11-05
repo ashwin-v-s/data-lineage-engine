@@ -350,3 +350,14 @@ with this decision; the table will be corrected in the next architecture update.
 **D-14 proposal:** for an `as_of` lineage graph, include only edges with known valid-time bounds that contain the requested valid instant and whose recorded interval contains the requested recorded instant. Exclude unknown-valid-time edges from that graph and report their count separately; do not infer that an undated edge was absent. Evidence-at-time can show undated rows separately. The current implementation/UI does not yet re-query and render the historical lineage graph, so this proposal is not a claim of completed temporal UI.
 
 **React shell note:** keep the currently served dashboard shell until the frontend workstream chooses and delivers a complete React entry-point migration. The mounted vanilla asset profile may consume the capability API; the orphan React capability panel is not considered a working product screen. This is an implementation recommendation, not approval to delete the React source tree.
+
+---
+
+## Scheduler proposal — freshness and source pulls
+
+**Status:** PROPOSED — 2026-11-05; M2 agreement required before implementation.
+**Owners:** M1 (runner authentication/deployment), M2 (batch evaluator and source-sync behavior).
+
+M5's message calls this scheduler question “D12 Wave 4”, but D12 is already the database-runtime decision (Supabase PostgreSQL) in this log and in Architecture v2 §11. Keep the scheduler decision separate; do not reuse D12.
+
+**M1 proposal:** use a GitHub Actions scheduled workflow hourly for the MVP freshness sweep. M2 owns the idempotent, workspace-by-workspace evaluation/sync batch; M1 owns a narrowly scoped machine-auth path and its GitHub secret. The existing user-token-only evaluation route is not directly callable by a scheduler. The job must not accept a caller-selected workspace without server-side authorization. M2 must confirm that this runner and ownership split meet connector scheduling needs before this proposal becomes DECIDED.
