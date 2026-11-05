@@ -175,5 +175,30 @@ or forward migration changes in a separate Supabase project/branch or isolated
 local database. Migrations are forward-only; production corrections require a
 reviewed follow-up migration and a backup/restore plan.
 
+---
 
+## M3 Migration Addition (2026-11-05)
 
+### 0012_m3_pgvector_embeddings.sql
+
+**Author:** M3 (Ashwin - ashwin-v-s)  
+**Status:** 📝 PROPOSAL (not yet applied)  
+**Naming:** Per D13 decision - `{number}_{owner_initials}_{feature}.sql`  
+
+Adds pgvector extension and vector embedding column to the `dataset` table for semantic search capability:
+- Adds `embedding vector(1536)` column to `dataset`
+- Creates ivfflat index for cosine similarity search
+- Uses OpenAI text-embedding-3-small model (1536 dimensions)
+- Enables hybrid search (keyword + semantic)
+
+**Requires:**
+- PostgreSQL with pgvector extension
+- `CREATE EXTENSION vector;` privilege
+- OpenAI API key for embedding generation (application layer)
+
+**To apply:**
+```sql
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f backend/migrations/0012_m3_pgvector_embeddings.sql
+```
+
+**Note:** This migration skips 0011 (reserved for M4 governance per D16). Migration 0010 (M2 source_connection_lifecycle) exists but awaits application.
