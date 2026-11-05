@@ -13,6 +13,7 @@ from backend.app.api.routes.assets import router as assets_router
 from backend.app.api.routes.audit import router as audit_router
 from backend.app.api.routes.capabilities import router as capabilities_router
 from backend.app.api.routes.dependency import router as dependency_router
+from backend.app.api.routes.ingest import router as ingest_router
 from backend.app.api.routes.governance import router as governance_router
 from backend.app.api.routes.health import router as health_router
 from backend.app.api.routes.ingest import router as ingest_router
@@ -136,6 +137,7 @@ app.include_router(search_router,     prefix="/api/v1")
 app.include_router(assets_router,     prefix="/api/v1")
 app.include_router(lineage_router,    prefix="/api/v1")
 app.include_router(dependency_router, prefix="/api/v1")
+app.include_router(ingest_router,     prefix="/api/v1")
 app.include_router(rea_router,        prefix="/api/v1")
 app.include_router(audit_router,      prefix="/api/v1")
 app.include_router(owner_router,      prefix="/api/v1")
