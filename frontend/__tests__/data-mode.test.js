@@ -10,8 +10,8 @@ import {
 } from '../src/components/dataMode.js';
 
 describe('DATA_MODES', () => {
-  it('exposes exactly the three canonical modes', () => {
-    expect(Object.values(DATA_MODES)).toEqual(['LIVE', 'IMPORTED', 'DEMO FIXTURE']);
+  it('exposes only connected and imported catalog modes', () => {
+    expect(Object.values(DATA_MODES)).toEqual(['LIVE', 'IMPORTED']);
   });
 });
 
@@ -19,28 +19,18 @@ describe('isDataMode / normalizeDataMode', () => {
   it('accepts only canonical modes', () => {
     expect(isDataMode(DATA_MODES.LIVE)).toBe(true);
     expect(isDataMode(DATA_MODES.IMPORTED)).toBe(true);
-    expect(isDataMode(DATA_MODES.DEMO_FIXTURE)).toBe(true);
     expect(isDataMode('live')).toBe(false);
     expect(isDataMode(undefined)).toBe(false);
   });
 
-  it('fails honest: anything unknown becomes DEMO FIXTURE, never LIVE', () => {
+  it('normalizes unknown values to the connected catalog mode', () => {
     for (const value of [undefined, null, '', 'connected', 'postgresql', 0, {}]) {
-      expect(normalizeDataMode(value)).toBe(DATA_MODES.DEMO_FIXTURE);
+      expect(normalizeDataMode(value)).toBe(DATA_MODES.LIVE);
     }
   });
 });
 
 describe('resolveDataMode', () => {
-  it('reports a demo preview as DEMO FIXTURE', () => {
-    expect(resolveDataMode({ dataMode: 'postgresql', demoPreview: true }))
-      .toBe(DATA_MODES.DEMO_FIXTURE);
-  });
-
-  it('reports the demo data mode as DEMO FIXTURE', () => {
-    expect(resolveDataMode({ dataMode: 'demo' })).toBe(DATA_MODES.DEMO_FIXTURE);
-  });
-
   it('reports a connected catalog as LIVE', () => {
     expect(resolveDataMode({ dataMode: 'postgresql' })).toBe(DATA_MODES.LIVE);
   });
@@ -50,10 +40,10 @@ describe('resolveDataMode', () => {
       .toBe(DATA_MODES.IMPORTED);
   });
 
-  it('never claims LIVE without a positive connected signal', () => {
-    expect(resolveDataMode()).toBe(DATA_MODES.DEMO_FIXTURE);
-    expect(resolveDataMode({})).toBe(DATA_MODES.DEMO_FIXTURE);
-    expect(resolveDataMode({ dataMode: 'unknown-mode' })).toBe(DATA_MODES.DEMO_FIXTURE);
+  it('defaults unknown modes to the connected catalog label', () => {
+    expect(resolveDataMode()).toBe(DATA_MODES.LIVE);
+    expect(resolveDataMode({})).toBe(DATA_MODES.LIVE);
+    expect(resolveDataMode({ dataMode: 'unknown-mode' })).toBe(DATA_MODES.LIVE);
   });
 });
 
@@ -61,14 +51,12 @@ describe('dataModeDescription / dataModeToken', () => {
   it('describes each mode honestly', () => {
     expect(dataModeDescription(DATA_MODES.LIVE)).toMatch(/live/i);
     expect(dataModeDescription(DATA_MODES.IMPORTED)).toMatch(/import/i);
-    expect(dataModeDescription(DATA_MODES.DEMO_FIXTURE)).toMatch(/demonstration/i);
   });
 
   it('returns a DOM-safe token and never throws on bad input', () => {
     expect(dataModeToken(DATA_MODES.LIVE)).toBe('live');
     expect(dataModeToken(DATA_MODES.IMPORTED)).toBe('imported');
-    expect(dataModeToken(DATA_MODES.DEMO_FIXTURE)).toBe('demo-fixture');
-    expect(dataModeToken(undefined)).toBe('demo-fixture');
-    expect(dataModeDescription(undefined)).toMatch(/demonstration/i);
+    expect(dataModeToken(undefined)).toBe('live');
+    expect(dataModeDescription(undefined)).toMatch(/live/i);
   });
 });

@@ -32,7 +32,6 @@ jobs:
             scripts/check_openapi_drift.py \
             scripts/db/check_migrations.py \
             scripts/db/verify_rls.py \
-            scripts/seed_demo_catalog.py \
             scripts/export_openapi.py \
             tests/test_github_app.py \
             tests/test_github_integrations.py \

@@ -1,8 +1,9 @@
+import logging
 import os
 import uuid
 from pathlib import Path
 
-from fastapi import Depends, FastAPI, Request
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
@@ -42,6 +43,24 @@ app = FastAPI(
 )
 
 
+@app.exception_handler(Exception)
+async def unexpected_error_handler(request: Request, exc: Exception):
+    """Keep API failures machine-readable while retaining server diagnostics."""
+    request_id = getattr(request.state, "request_id", None) or str(uuid.uuid4())
+    logging.getLogger("kairos.api").exception(
+        "Unhandled API error request_id=%s method=%s path=%s",
+        request_id,
+        request.method,
+        request.url.path,
+    )
+    return api_error(
+        request=request,
+        message="The server could not complete this request. Check the server log using the request ID.",
+        status_code=500,
+        code="INTERNAL_SERVER_ERROR",
+    )
+
+
 @app.exception_handler(401)
 async def unauthorized_handler(request: Request, exc):
     return api_error(request=request, message=str(exc.detail), status_code=401, code="UNAUTHENTICATED")
@@ -68,6 +87,7 @@ app.add_middleware(
 @app.middleware("http")
 async def add_request_id(request: Request, call_next):
     request_id = request.headers.get("X-Request-ID") or str(uuid.uuid4())
+    request.state.request_id = request_id
     response = await call_next(request)
     response.headers["X-Request-ID"] = request_id
     return response
