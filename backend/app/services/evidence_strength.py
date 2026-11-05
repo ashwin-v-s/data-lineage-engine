@@ -3,7 +3,6 @@ from __future__ import annotations
 
 from typing import Any
 
-
 STRENGTH_RULE_VERSION = "kairos.evidence-strength.v1"
 
 
