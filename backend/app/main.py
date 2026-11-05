@@ -8,6 +8,7 @@ from backend.app.api.routes.search import router as search_router
 from backend.app.api.routes.assets import router as assets_router
 from backend.app.api.routes.lineage import router as lineage_router
 from backend.app.api.routes.dependency import router as dependency_router
+from backend.app.api.routes.ingest import router as ingest_router
 
 
 app = FastAPI(
@@ -55,3 +56,4 @@ app.include_router(search_router,     prefix="/api/v1")
 app.include_router(assets_router,     prefix="/api/v1")
 app.include_router(lineage_router,    prefix="/api/v1")
 app.include_router(dependency_router, prefix="/api/v1")
+app.include_router(ingest_router,     prefix="/api/v1")
