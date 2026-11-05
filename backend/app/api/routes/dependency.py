@@ -285,34 +285,15 @@ def _fetch_runtime_evidence(cur, run_id: str, source_id: str, target_id: str,
     for r in rows:
         raw_cov = r["coverage"]
         if isinstance(raw_cov, str):
-            raw_cov = json.loads(raw_cov)
-
-        # Build a minimal CoverageVector from the stored JSON or defaults
-        if raw_cov and isinstance(raw_cov, dict):
-            cov = CoverageVector(
-                run_covered=raw_cov.get("run_covered", True),
-                operator_covered=raw_cov.get("operator_covered", True),
-                source_dataset_covered=raw_cov.get("source_dataset_covered", True),
-                target_dataset_covered=raw_cov.get("target_dataset_covered", True),
-                source_columns_covered=tuple(raw_cov.get("source_columns_covered", [source_id])),
-                target_columns_covered=tuple(raw_cov.get("target_columns_covered", [target_id])),
-                branches_covered=raw_cov.get("branches_covered", True),
-                coverage_mode=CoverageMode(raw_cov.get("coverage_mode", CoverageMode.RUNTIME)),
-                parser_status=ParserStatus(raw_cov.get("parser_status", ParserStatus.SUPPORTED)),
-            )
-        else:
-            # Runtime evidence without stored coverage: treat as structural-mode positive
-            cov = CoverageVector(
-                run_covered=True,
-                operator_covered=True,
-                source_dataset_covered=True,
-                target_dataset_covered=True,
-                source_columns_covered=(source_id,),
-                target_columns_covered=(target_id,),
-                branches_covered=True,
-                coverage_mode=CoverageMode.RUNTIME,
-                parser_status=ParserStatus.SUPPORTED,
-            )
+            try:
+                raw_cov = json.loads(raw_cov)
+            except (TypeError, ValueError):
+                raw_cov = None
+        cov = _coverage_from_payload(raw_cov)
+        # Missing or malformed coverage is not a fully covered runtime
+        # observation. Exclude it from inference so it contributes UNKNOWN.
+        if cov is None:
+            continue
 
         try:
             re_obj = RuntimeEvidence(
@@ -328,6 +309,38 @@ def _fetch_runtime_evidence(cur, run_id: str, source_id: str, target_id: str,
         except Exception:
             continue
     return results
+
+
+def _coverage_from_payload(raw_cov) -> CoverageVector | None:
+    """Parse an explicit coverage manifest without inventing covered fields."""
+    if not isinstance(raw_cov, dict):
+        return None
+    required_bool_fields = (
+        "run_covered", "operator_covered", "source_dataset_covered",
+        "target_dataset_covered", "branches_covered",
+    )
+    if any(type(raw_cov.get(field)) is not bool for field in required_bool_fields):
+        return None
+    source_columns = raw_cov.get("source_columns_covered")
+    target_columns = raw_cov.get("target_columns_covered")
+    if not isinstance(source_columns, (list, tuple)) or not isinstance(target_columns, (list, tuple)):
+        return None
+    if not isinstance(raw_cov.get("coverage_mode"), str) or not isinstance(raw_cov.get("parser_status"), str):
+        return None
+    try:
+        return CoverageVector(
+            run_covered=raw_cov["run_covered"],
+            operator_covered=raw_cov["operator_covered"],
+            source_dataset_covered=raw_cov["source_dataset_covered"],
+            target_dataset_covered=raw_cov["target_dataset_covered"],
+            source_columns_covered=tuple(source_columns),
+            target_columns_covered=tuple(target_columns),
+            branches_covered=raw_cov["branches_covered"],
+            coverage_mode=CoverageMode(raw_cov["coverage_mode"]),
+            parser_status=ParserStatus(raw_cov["parser_status"]),
+        )
+    except (TypeError, ValueError):
+        return None
 
 
 # ── Endpoint ──────────────────────────────────────────────────────────────────
