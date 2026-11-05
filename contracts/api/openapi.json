@@ -230,6 +230,7 @@
           "custom_properties": {
             "anyOf": [
               {
+                "additionalProperties": true,
                 "type": "object"
               },
               {
@@ -466,6 +467,7 @@
             "type": "string"
           },
           "source": {
+            "additionalProperties": true,
             "title": "Source",
             "type": "object"
           },
@@ -474,10 +476,12 @@
             "type": "string"
           },
           "target": {
+            "additionalProperties": true,
             "title": "Target",
             "type": "object"
           },
           "temporal_context": {
+            "additionalProperties": true,
             "title": "Temporal Context",
             "type": "object"
           }
@@ -551,6 +555,7 @@
           "validation_rules": {
             "anyOf": [
               {
+                "additionalProperties": true,
                 "type": "object"
               },
               {
@@ -587,6 +592,7 @@
             "type": "string"
           },
           "custom_properties": {
+            "additionalProperties": true,
             "default": {},
             "title": "Custom Properties",
             "type": "object"
@@ -803,6 +809,7 @@
           "permissions": {
             "anyOf": [
               {
+                "additionalProperties": true,
                 "type": "object"
               },
               {
@@ -1014,6 +1021,7 @@
             "title": "Kind"
           },
           "metadata": {
+            "additionalProperties": true,
             "title": "Metadata",
             "type": "object"
           },
@@ -1066,7 +1074,8 @@
           },
           "contract_version": {
             "const": "kairos.ingest.v1",
-            "title": "Contract Version"
+            "title": "Contract Version",
+            "type": "string"
           },
           "idempotency_key": {
             "maxLength": 256,
@@ -1185,7 +1194,8 @@
         "properties": {
           "kind": {
             "const": "upload",
-            "title": "Kind"
+            "title": "Kind",
+            "type": "string"
           },
           "ref": {
             "maxLength": 255,
@@ -1703,6 +1713,7 @@
             "type": "number"
           },
           "team_sizes": {
+            "additionalProperties": true,
             "default": {},
             "title": "Team Sizes",
             "type": "object"
@@ -1866,6 +1877,7 @@
             "type": "boolean"
           },
           "preview": {
+            "additionalProperties": true,
             "title": "Preview",
             "type": "object"
           }
@@ -2162,7 +2174,8 @@
           "source_kind": {
             "const": "postgresql",
             "default": "postgresql",
-            "title": "Source Kind"
+            "title": "Source Kind",
+            "type": "string"
           },
           "user": {
             "maxLength": 128,
@@ -5043,12 +5056,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "allOf": [
-                  {
-                    "$ref": "#/components/schemas/Body_update_tags_api_v1_metadata__asset_id__tags_put"
-                  }
-                ],
-                "title": "Body"
+                "$ref": "#/components/schemas/Body_update_tags_api_v1_metadata__asset_id__tags_put"
               }
             }
           }
