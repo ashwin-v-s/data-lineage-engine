@@ -1,0 +1,57 @@
+# W02 — Arithmetic expression (multiple sources → single target)
+# Split: development
+# SQL construct: PROJECTION_ARITHMETIC
+case_id: W02
+case_version: "1.0"
+split: development
+sql_construct: PROJECTION_ARITHMETIC
+description: >
+  Two source columns combined arithmetically into one target column.
+  Both source columns are dependencies of the target.
+
+sql: |
+  CREATE TABLE order_revenue AS
+  SELECT order_id,
+         gross_amount - discount AS net_revenue
+  FROM staging_orders;
+
+schema:
+  staging_orders:
+    columns: [order_id, gross_amount, discount]
+  order_revenue:
+    columns: [order_id, net_revenue]
+
+expected_static_candidates:
+  - source: staging_orders.order_id
+    target: order_revenue.order_id
+    operator: PROJECTION
+    parser_status: SUPPORTED
+  - source: staging_orders.gross_amount
+    target: order_revenue.net_revenue
+    operator: PROJECTION_ARITHMETIC
+    parser_status: SUPPORTED
+  - source: staging_orders.discount
+    target: order_revenue.net_revenue
+    operator: PROJECTION_ARITHMETIC
+    parser_status: SUPPORTED
+
+ground_truth:
+  provider: ReferenceInterpreterProvider
+  provider_version: "reference-1.0"
+  labels:
+    - source: staging_orders.gross_amount
+      target: order_revenue.net_revenue
+      label: PROPAGATED
+      rationale: gross_amount appears directly in the subtraction expression.
+    - source: staging_orders.discount
+      target: order_revenue.net_revenue
+      label: PROPAGATED
+      rationale: discount appears directly in the subtraction expression.
+    - source: staging_orders.order_id
+      target: order_revenue.order_id
+      label: PROPAGATED
+      rationale: Direct copy.
+
+never_proves:
+  - Static arithmetic dependency does not prove the subtraction executed in a specific run.
+  - Both columns contribute regardless of their values.

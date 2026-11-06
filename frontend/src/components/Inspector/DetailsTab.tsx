@@ -111,8 +111,8 @@ export const DetailsTab: React.FC<DetailsTabProps> = ({
       ? 'Static analysis permits this dependency, but available evidence is insufficient to establish whether propagation occurred in this run.'
       : 'There is insufficient evidence to safely evaluate this dependency.');
 
-  const sourceName = selectedEdge?.source || 'stg_customer_orders';
-  const targetName = selectedEdge?.target || 'orders_fact';
+  const sourceName = selectedEdge?.source || '';
+  const targetName = selectedEdge?.target || '';
 
   return (
     <div className="flex flex-col gap-3.5">

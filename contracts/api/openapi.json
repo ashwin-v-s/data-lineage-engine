@@ -1933,6 +1933,39 @@
       },
       "SearchResponse": {
         "properties": {
+          "mode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mode"
+          },
+          "page": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Page"
+          },
+          "page_size": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Page Size"
+          },
           "results": {
             "items": {
               "$ref": "#/components/schemas/SearchResult"
@@ -1992,6 +2025,17 @@
             ],
             "title": "Label"
           },
+          "match_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Match Type"
+          },
           "name": {
             "title": "Name",
             "type": "string"
@@ -2028,6 +2072,17 @@
               }
             ],
             "title": "Schema"
+          },
+          "score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score"
           },
           "steward": {
             "anyOf": [
@@ -3291,8 +3346,33 @@
     },
     "/api/v1/catalog": {
       "get": {
-        "description": "Return catalog records backed by Kairos' PostgreSQL schema.",
+        "description": "Return bounded catalog pages and explicitly capped graph/evidence slices.",
         "operationId": "catalog_snapshot_api_v1_catalog_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 100,
+              "maximum": 500,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "minimum": 0,
+              "title": "Offset",
+              "type": "integer"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "content": {
@@ -3301,6 +3381,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
           }
         },
         "security": [
@@ -3836,7 +3926,7 @@
     },
     "/api/v1/ingest/commit": {
       "post": {
-        "description": "Revalidate then atomically persist assets, declared edges, and provenance.",
+        "description": "Revalidate and atomically persist assets, declared edges, and provenance.",
         "operationId": "commit_import_api_v1_ingest_commit_post",
         "requestBody": {
           "content": {
@@ -3879,9 +3969,29 @@
         ]
       }
     },
+    "/api/v1/ingest/openlineage": {
+      "post": {
+        "description": "Stores events immutably and normalizes COMPLETE events into RUNTIME_POSITIVE evidence. Non-COMPLETE events do not produce evidence.",
+        "operationId": "ingest_openlineage_api_v1_ingest_openlineage_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Ingest one or more OpenLineage runtime events",
+        "tags": [
+          "ingestion"
+        ]
+      }
+    },
     "/api/v1/ingest/preview": {
       "post": {
-        "description": "Validate and normalize an import without performing database writes.",
+        "description": "Validate and normalize an import without database writes.",
         "operationId": "preview_import_api_v1_ingest_preview_post",
         "requestBody": {
           "content": {
@@ -4281,6 +4391,49 @@
         "summary": "Github Connector Status"
       }
     },
+    "/api/v1/lineage/edges/{edge_id}/evidence": {
+      "get": {
+        "description": "Return stored provenance for one edge, including safe raw/normalized views.",
+        "operationId": "edge_evidence_api_v1_lineage_edges__edge_id__evidence_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "edge_id",
+            "required": true,
+            "schema": {
+              "title": "Edge Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Edge Evidence"
+      }
+    },
     "/api/v1/lineage/{asset_id}/{direction}": {
       "get": {
         "description": "Directional lineage expansion used by the UI's Upstream / Downstream arrows.\n\nGET /api/v1/lineage/{asset_id}/upstream    \u2192 predecessors only\nGET /api/v1/lineage/{asset_id}/downstream  \u2192 successors only",
@@ -4527,6 +4680,28 @@
           }
         ],
         "summary": "List Starred Assets"
+      }
+    },
+    "/api/v1/me/workspace": {
+      "get": {
+        "description": "Return the current user's personal workspace.\n\nEach user gets a personal workspace created automatically on signup.\nThis endpoint returns that workspace's ID and metadata.",
+        "operationId": "get_my_workspace_api_v1_me_workspace_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get My Workspace"
       }
     },
     "/api/v1/members": {
@@ -5857,6 +6032,87 @@
         "summary": "Search"
       }
     },
+    "/api/v1/search/hybrid": {
+      "get": {
+        "description": "Hybrid search endpoint combining keyword + semantic search.\n\nSecurity:\n- Enforces workspace isolation via user's workspace_id\n- RLS policies at DB level provide additional protection\n- No cross-workspace data leakage possible\n\nModes:\n- hybrid: 70% keyword + 30% semantic\n- keyword: Traditional ILIKE search only\n- semantic: Vector similarity only",
+        "operationId": "hybrid_search_api_v1_search_hybrid_get",
+        "parameters": [
+          {
+            "description": "Search query",
+            "in": "query",
+            "name": "q",
+            "required": true,
+            "schema": {
+              "description": "Search query",
+              "title": "Q",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "mode",
+            "required": false,
+            "schema": {
+              "default": "hybrid",
+              "pattern": "^(hybrid|keyword|semantic)$",
+              "title": "Mode",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "minimum": 1,
+              "title": "Page",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page_size",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Page Size",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Hybrid Search"
+      }
+    },
     "/api/v1/sources": {
       "get": {
         "description": "List the caller's workspace sources, newest first (never ciphertext).",
@@ -6170,6 +6426,49 @@
         "tags": [
           "sources"
         ]
+      }
+    },
+    "/api/v1/workspaces/{workspace_id}": {
+      "get": {
+        "description": "Return workspace details by UUID.\n\nOnly accessible to workspace members (enforced by RLS policy).",
+        "operationId": "get_workspace_api_v1_workspaces__workspace_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "title": "Workspace Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Workspace"
       }
     },
     "/healthz": {

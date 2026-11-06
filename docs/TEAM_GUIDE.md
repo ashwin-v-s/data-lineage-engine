@@ -129,6 +129,17 @@ This downloads the Chromium engine needed for the smoke tests (e2e/shell.smoke.s
 
 **One-time setup per machine.** The binaries are stored in ~/.cache/ms-playwright/ and do not need to be re-downloaded unless you upgrade Playwright.
 
+## 4a. Stream Ownership and Branches
+
+| Stream | Owner | GitHub Handle | Branch | Responsibility |
+|--------|-------|---------------|--------|-----------------|
+| M1 | Jatin | Jat-in32006 | eature/platform-identity | Platform, identity, migrations, deployment |
+| M2 | Anushka | AnaaMorr | eature/ingestion-connectors | Connectors, ingestion, SQL lineage |
+| M3 | Ashwin | ashwin-v-s | eature/catalog-lineage | Catalog, lineage graph, evidence, search |
+| M4 | Gauree | gaureehatkar | eature/governance-freshness | Governance, freshness, incidents, frontend shell |
+| M5 | Pranav | pranav-samal | eature/research-integrity | Research, integrity, demo honesty |
+
+See CODEOWNERS for the definitive path-to-owner mapping.
 ## 5. How the Code Fits Together
 
 The pack's central idea, in code terms:
@@ -728,4 +739,5 @@ python scripts/make_fixtures.py
 | What are the open decisions? | Pack Section 46 (D-01 to D-20) |
 | Why was something decided this way? | Pack Section 47 (conflict table) and Section 48 (decision log) |
 | Who reviews my pull request? | Pack Section 29 (responsibility matrix) |
+
 

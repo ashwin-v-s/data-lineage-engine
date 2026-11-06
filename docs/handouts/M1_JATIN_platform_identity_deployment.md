@@ -156,3 +156,13 @@ Everything below is measured (report §3, §10, §14; schema audit). Fix items f
 | B6 | CI hardening with M5: false-green guard, coverage floor, authenticated browser test | CI fails when probes cannot fail |
 
 Order: wait out the DB circuit breaker → F1/F2 → B5 → the rest. Your ordered personal list is §5c.
+
+---
+
+## 7. M1 update — deployment and scheduler blockers (2026-11-05)
+
+- `vercel.json` contained a UTF-8 BOM and the installed Vercel CLI could not parse it. The BOM is removed; `python -m json.tool vercel.json` now parses the config.
+- A Vercel deployment is still **not verified**: this checkout has no `.vercel` project link and the CLI has no stored credentials. The CLI started its device-login flow during a read-only listing; it was canceled without authenticating or deploying. A Vercel account owner must sign in and link the intended team project before we can produce a URL.
+- `gh` is not installed here, so the presence of `KAIROS_DEPLOY_BASE_URL` in GitHub Actions secrets cannot be checked or set from this checkout. After deployment, set it in repository **Settings → Secrets and variables → Actions**, then run `python scripts/check_deployment.py --base-url https://<host>/api/v1` and dispatch `live-smoke`.
+- M5's scheduler request labels the choice D12, but D12 already denotes the Supabase database-runtime decision. A separate scheduler proposal is recorded in `DECISION_LOG.md`: GitHub Actions hourly, M1 owns machine authentication/deployment, M2 owns the workspace-safe idempotent batch. It remains proposed until M2 agrees. The current evaluator requires a Supabase user token and cannot yet be called directly by a scheduled job.
+- M2's OpenLineage zero-matching-row event format remains Anushka's input; it is outside M1's deployment authority.

@@ -21,14 +21,14 @@ const queryClient = new QueryClient({
 
 const InvestigatorCockpit: React.FC = () => {
   // Bitemporal & Investigation State
-  const [activeEntity, setActiveEntity] = useState<string>('orders_fact');
-  const [runId, setRunId] = useState<string>('run_2026_09_23_093214');
-  const [validAt, setValidAt] = useState<string | null>('2026-08-15T00:00:00Z');
-  const [knownAsOf, setKnownAsOf] = useState<string | null>('2026-09-23T11:45:00Z');
+  const [activeEntity, setActiveEntity] = useState<string>('');
+  const [runId, setRunId] = useState<string>('');
+  const [validAt, setValidAt] = useState<string | null>(null);
+  const [knownAsOf, setKnownAsOf] = useState<string | null>(null);
   const [density, setDensity] = useState<'investigator' | 'research'>('investigator');
   const [granularity, setGranularity] = useState<'DATASET' | 'COLUMN'>('COLUMN');
   const [depth, setDepth] = useState<number>(3);
-  const [benchmarkMode, setBenchmarkMode] = useState<boolean>(true);
+  const [benchmarkMode, setBenchmarkMode] = useState<boolean>(false);
 
   // Panel layout toggles
   const [leftRailOpen, setLeftRailOpen] = useState<boolean>(true);
@@ -59,8 +59,8 @@ const InvestigatorCockpit: React.FC = () => {
   } = useLineageQuery(activeEntity, validAt, knownAsOf, granularity, depth);
 
   // 2. Fetch Dependency Reasoning from /api/v1/runs/{run_id}/dependency/{source}/{target}
-  const depSource = selectedEdge?.source || 'stg_customer_orders';
-  const depTarget = selectedEdge?.target || 'orders_fact';
+  const depSource = selectedEdge?.source || '';
+  const depTarget = selectedEdge?.target || '';
   const { data: dependencyData } = useDependencyQuery(runId, depSource, depTarget, validAt, knownAsOf);
 
   // Filter edges based on reasoning state selection

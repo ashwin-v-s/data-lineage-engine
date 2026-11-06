@@ -1,0 +1,93 @@
+# W11 — CASE WHEN: salary NOT_PROPAGATED (no US employees in run)
+# Split: development
+# SQL construct: CASE_WHEN
+# Ground truth: NOT_PROPAGATED for salary (THEN branch never executes)
+# This is the core NOT_PROPAGATED motif for the research hypothesis.
+case_id: W11
+case_version: "1.0"
+split: development
+sql_construct: CASE_WHEN
+description: >
+  CASE WHEN with salary in the THEN branch only. The run contains ONLY
+  non-US employees (country != 'US'), so the THEN branch never executes.
+  salary does NOT propagate to adjusted_salary in this run.
+  country DOES propagate (it controls the CASE evaluation).
+  This is the key NOT_PROPAGATED case for testing false_refutation
+  and false_observation.
+
+sql: |
+  CREATE TABLE out_adjusted AS
+  SELECT employee_id,
+         country,
+         CASE
+           WHEN country = 'US' THEN salary
+           ELSE 0
+         END AS adjusted_salary
+  FROM employees_non_us;
+
+schema:
+  employees_non_us:
+    columns: [employee_id, country, salary]
+    note: "Run fixture contains only non-US employees (country IN ('UK','DE','FR'))"
+  out_adjusted:
+    columns: [employee_id, country, adjusted_salary]
+
+expected_static_candidates:
+  - source: employees_non_us.employee_id
+    target: out_adjusted.employee_id
+    operator: PROJECTION
+    parser_status: SUPPORTED
+  - source: employees_non_us.country
+    target: out_adjusted.country
+    operator: PROJECTION
+    parser_status: SUPPORTED
+  - source: employees_non_us.country
+    target: out_adjusted.adjusted_salary
+    operator: CASE_WHEN
+    parser_status: SUPPORTED
+  - source: employees_non_us.salary
+    target: out_adjusted.adjusted_salary
+    operator: CASE_WHEN
+    parser_status: SUPPORTED
+
+ground_truth:
+  provider: ReferenceInterpreterProvider
+  provider_version: "reference-1.0"
+  labels:
+    - source: employees_non_us.employee_id
+      target: out_adjusted.employee_id
+      label: PROPAGATED
+      rationale: Direct projection — always propagates regardless of country.
+    - source: employees_non_us.country
+      target: out_adjusted.country
+      label: PROPAGATED
+      rationale: Direct projection — always propagates.
+    - source: employees_non_us.country
+      target: out_adjusted.adjusted_salary
+      label: PROPAGATED
+      rationale: >
+        country controls the CASE evaluation — it is always read even when
+        the THEN branch does not execute.
+    - source: employees_non_us.salary
+      target: out_adjusted.adjusted_salary
+      label: NOT_PROPAGATED
+      rationale: >
+        The THEN branch (salary) only executes when country='US'.
+        This run contains only non-US employees, so the THEN branch
+        never executes. salary is a static candidate but did NOT propagate
+        in this specific run.
+
+never_proves:
+  - Static CASE_WHEN dependency does not prove the THEN branch executed.
+  - salary is POSSIBLE without runtime evidence, REFUTED_FOR_RUN only with
+    a complete negative evaluation confirming the THEN branch never ran.
+  - Without runtime evidence, the engine must return POSSIBLE (R4), not
+    REFUTED_FOR_RUN — absence of an event is not proof of non-propagation.
+
+research_note: >
+  This is the primary NOT_PROPAGATED test case. The expected engine behavior:
+    - With runtime evidence (complete negative evaluation): REFUTED_FOR_RUN
+    - Without runtime evidence (evidence lost): POSSIBLE
+    - Never: UNKNOWN (static candidate exists and is SUPPORTED)
+  B2 (negative assumption) would return REFUTED_FOR_RUN even without evidence.
+  The proposed engine returns POSSIBLE, which is correct.
