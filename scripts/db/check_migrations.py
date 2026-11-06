@@ -341,7 +341,7 @@ def build_parser() -> argparse.ArgumentParser:
 # inclusive, so a forgotten bump fails loudly and cannot silently loosen the
 # gate.
 EXPECTED_FIRST_MIGRATION = 1
-EXPECTED_LATEST_MIGRATION = 11
+EXPECTED_LATEST_MIGRATION = 12
 
 _MIGRATION_FILENAME_RE = re.compile(r"^(\d{4})_[A-Za-z0-9_]+\.sql$")
 
