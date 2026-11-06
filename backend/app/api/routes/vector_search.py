@@ -26,7 +26,6 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, Query, HTTPException
 from psycopg2.extras import RealDictCursor
-import openai
 
 from backend.app.auth import require_user
 from backend.app.db import get_conn
@@ -34,8 +33,6 @@ from backend.app.schemas.search import SearchResponse, SearchResult
 
 router = APIRouter(dependencies=[Depends(require_user)])
 
-# OpenAI client for embeddings (requires OPENAI_API_KEY env var)
-openai.api_key = os.getenv("OPENAI_API_KEY")
 EMBEDDING_MODEL = "text-embedding-3-small"
 EMBEDDING_DIM = 1536
 
@@ -45,14 +42,22 @@ def _get_embedding(text: str) -> list[float]:
     Generate embedding vector for search query.
     Uses OpenAI text-embedding-3-small (1536 dimensions).
     """
-    if not openai.api_key:
+    try:
+        import openai as _openai  # lazy import — not required at startup
+    except ImportError:
+        raise HTTPException(
+            status_code=503,
+            detail="Vector search unavailable: the openai package is not installed on this server"
+        )
+    api_key = os.getenv("OPENAI_API_KEY")
+    if not api_key:
         raise HTTPException(
             status_code=503,
             detail="Vector search unavailable: OPENAI_API_KEY not configured"
         )
-    
+    _openai.api_key = api_key
     try:
-        response = openai.embeddings.create(
+        response = _openai.embeddings.create(
             model=EMBEDDING_MODEL,
             input=text
         )
