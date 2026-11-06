@@ -45,6 +45,32 @@ def test_every_capability_key_is_present():
     assert set(result) == set(CAPABILITY_KEYS)
 
 
+def test_quality_lookup_uses_the_proposed_assertion_result_relationship():
+    class SchemaCursor:
+        def __init__(self):
+            self.query = ""
+            self.params = None
+            self._row = None
+
+        def execute(self, query, params=()):
+            self.query = " ".join(query.split())
+            self.params = params
+            if "to_regclass" in self.query:
+                self._row = {"reg": "public.quality_assertion" if "quality_assertion" in params[0] else "public.quality_result"}
+            else:
+                self._row = {"has_quality": True}
+
+        def fetchone(self):
+            return self._row
+
+    cur = SchemaCursor()
+    assert capabilities_module._quality_facts(cur, "11111111-1111-4111-8111-111111111111") == (True, True)
+    assert "JOIN quality_assertion qa ON qa.id = qr.assertion_id" in cur.query
+    assert "qa.dataset_id = %s::uuid" in cur.query
+    assert "quality_result WHERE dataset_id" not in cur.query
+    assert cur.params == ("11111111-1111-4111-8111-111111111111",)
+
+
 def test_every_entry_has_exactly_the_three_keys():
     for key, entry in _resolved().items():
         assert set(entry) == _ENTRY_KEYS, (key, entry)

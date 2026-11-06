@@ -119,6 +119,8 @@ export function normalizeIncident(raw) {
     resolvedAt: asText(source.resolved_at),
     ownerUserId: asText(source.owner_user_id),
     detail: source.detail ?? null,
+    resolutionDetail: source.resolution_detail ?? null,
+    relatedIncidents: Array.isArray(source.related_incidents) ? source.related_incidents : [],
     events: [],
   };
 }
@@ -370,9 +372,13 @@ export async function fetchIncident(id, { fetcher } = {}) {
  * @param {{fetcher?: Function}} [options]
  * @returns {Promise<{ok: true, incident: object} | {ok: false, error: string}>}
  */
-export async function applyIncidentAction(id, action, { fetcher } = {}) {
+export async function applyIncidentAction(id, action, { fetcher, body } = {}) {
   try {
-    const data = await requestJson(buildIncidentActionUrl(id, action), { method: 'POST', fetcher });
+    const data = await requestJson(buildIncidentActionUrl(id, action), {
+      method: 'POST',
+      body,
+      fetcher,
+    });
     return { ok: true, incident: normalizeIncidentDetail(data) };
   } catch (error) {
     return { ok: false, error: (error && error.message) || 'Could not apply the incident action.' };

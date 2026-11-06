@@ -20,6 +20,8 @@ const runtimeFiles = [
   'stewardship.js',
   'evidence-semantics.js',
   'lineage-investigation.js',
+  'personalization.js',
+  'personalization.css',
   'logo.png',
   'accent-bg.png',
   'empty-state.png',

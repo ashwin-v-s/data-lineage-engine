@@ -285,3 +285,81 @@
   font-size: 12.5px;
   text-align: center;
 }
+
+/* ───────────────── shared live-view layout helpers ─────────────────────── */
+/* Used by FreshnessView, GovernanceView, and any future governance screen.   */
+
+.kv-freshness-view {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.kv-freshness-section-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+.kv-freshness-section-head h2,
+.kv-freshness-form h3 {
+  margin: 0;
+}
+
+.kv-freshness-section-head p,
+.kv-freshness-placeholder {
+  margin: 5px 0 0;
+  color: var(--muted);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+.kv-freshness-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 12px;
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
+.kv-freshness-form h3,
+.kv-freshness-form .kv-note,
+.kv-freshness-form button {
+  grid-column: 1 / -1;
+}
+
+.kv-freshness-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.kv-freshness-form input,
+.kv-freshness-form select {
+  width: 100%;
+}
+
+/* preference row inside the settings governance panel */
+.kv-preference-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 12.5px;
+}
+
+.kv-preference-row:last-child {
+  border-bottom: none;
+}
+
+@media (max-width: 640px) {
+  .kv-freshness-section-head {
+    flex-direction: column;
+  }
+}

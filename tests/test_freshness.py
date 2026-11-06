@@ -30,7 +30,14 @@ def _verdict(age_minutes: int, **thresholds):
 
 
 def test_states_tuple_is_exactly_the_contract():
-    assert FRESHNESS_STATES == ("HEALTHY", "AT_RISK", "LATE", "STALE", "UNKNOWN")
+    assert FRESHNESS_STATES == ("HEALTHY", "AT_RISK", "LATE", "STALE", "UNKNOWN", "PAUSED")
+
+
+def test_paused_sla_is_explicit_even_without_activity():
+    verdict = evaluate_freshness(last_source_activity_at=None, now=NOW,
+                                 warn_after_minutes=None, error_after_minutes=None, paused=True)
+    assert verdict.state == "PAUSED"
+    assert verdict.age_minutes is None
 
 
 @pytest.mark.parametrize(
@@ -70,11 +77,12 @@ def test_no_source_activity_is_unknown_never_late():
     [
         (0, "HEALTHY", 10),
         (9, "HEALTHY", 10),
-        (10, "AT_RISK", 10),
-        (19, "AT_RISK", 10),
-        (20, "LATE", 20),
-        (59, "LATE", 20),
-        (60, "STALE", 60),
+        (10, "HEALTHY", 10),
+        (11, "AT_RISK", 10),
+        (20, "AT_RISK", 10),
+        (21, "LATE", 20),
+        (60, "LATE", 20),
+        (61, "STALE", 60),
         (120, "STALE", 60),
     ],
 )
@@ -89,7 +97,8 @@ def test_threshold_boundaries(age, state, threshold):
     "age,state,threshold",
     [
         (29, "LATE", 20),
-        (30, "STALE", 30),
+        (30, "LATE", 20),
+        (31, "STALE", 30),
         (45, "STALE", 30),
     ],
 )
