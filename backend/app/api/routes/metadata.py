@@ -48,6 +48,8 @@ def update_description(
         Confirmation of update
     """
     current_user = user.get("email") or user["id"]
+    if description is not None and len(description) > 500:
+        raise HTTPException(status_code=400, detail="Description must be 500 characters or less")
     conn = get_db_connection()
     try:
         cur = conn.cursor(row_factory=dict)
@@ -103,6 +105,9 @@ def update_description(
             updated_by=current_user
         )
     
+    except HTTPException:
+        conn.rollback()
+        raise
     except Exception as e:
         conn.rollback()
         logger.error(f"Error updating description: {e}")
@@ -135,6 +140,9 @@ def update_tags(
         Updated tags
     """
     current_user = user.get("email") or user["id"]
+    for tag in (add_tags or []) + (remove_tags or []) + (set_tags or []):
+        if not tag.strip() or len(tag.strip()) > 50:
+            raise HTTPException(status_code=422, detail="Tags must contain 1–50 non-whitespace characters.")
     conn = get_db_connection()
     try:
         cur = conn.cursor(row_factory=dict)
@@ -189,6 +197,9 @@ def update_tags(
         
         return {"asset_id": asset_id, "tags": new_tags, "updated_by": current_user}
     
+    except HTTPException:
+        conn.rollback()
+        raise
     except Exception as e:
         conn.rollback()
         logger.error(f"Error updating tags: {e}")
@@ -219,57 +230,55 @@ def bulk_update_metadata(
         Summary of bulk update
     """
     current_user = user.get("email") or user["id"]
+    if request.custom_properties is not None:
+        raise HTTPException(status_code=501, detail="Bulk custom properties are not supported by the current catalog schema.")
+    if request.description is None and not request.add_tags and not request.remove_tags:
+        raise HTTPException(status_code=422, detail="Provide a description or tag change.")
+    if len(request.asset_ids) > 100 or len(set(request.asset_ids)) != len(request.asset_ids):
+        raise HTTPException(status_code=422, detail="Provide at most 100 unique asset IDs.")
+    for tag in (request.add_tags or []) + (request.remove_tags or []):
+        if not tag.strip() or len(tag.strip()) > 50:
+            raise HTTPException(status_code=422, detail="Tags must contain 1–50 non-whitespace characters.")
     conn = get_db_connection()
     try:
         cur = conn.cursor()
         
-        successful = 0
-        failed = 0
-        errors = []
-        updated_assets = []
-        
+        if not request.asset_ids:
+            raise HTTPException(status_code=422, detail="At least one asset ID is required.")
+        cur.execute("SELECT id FROM dataset WHERE id = ANY(%s::uuid[])", ([str(asset_id) for asset_id in request.asset_ids],))
+        found = {row[0] if not isinstance(row, dict) else row["id"] for row in cur.fetchall()}
+        missing = [str(asset_id) for asset_id in request.asset_ids if str(asset_id) not in {str(value) for value in found}]
+        if missing:
+            raise HTTPException(status_code=404, detail="One or more assets were not found in the current workspace.")
         for asset_id in request.asset_ids:
-            try:
-                # Update description if provided
-                if request.description is not None:
-                    cur.execute(
-                        """
-                        UPDATE dataset 
-                        SET description = %s, last_modified_by = %s, last_modified_at = NOW()
-                        WHERE id = %s
-                        """,
-                        (request.description, current_user, str(asset_id))
-                    )
-                
-                # Handle tags (simplified)
-                if request.add_tags or request.remove_tags:
-                    # In real implementation, handle tag operations
-                    pass
-                
-                # Handle custom properties
-                if request.custom_properties:
-                    # Store in separate table or JSON field
-                    pass
-                
-                updated_assets.append(asset_id)
-                successful += 1
-                
-            except Exception as e:
-                failed += 1
-                errors.append(f"Asset {asset_id}: {str(e)}")
-        
+            cur.execute("SELECT tags FROM dataset WHERE id=%s::uuid", (str(asset_id),))
+            row = cur.fetchone()
+            current_tags = row["tags"] if isinstance(row, dict) else row[0]
+            tags = list(current_tags or [])
+            if request.add_tags:
+                tags.extend(tag.strip() for tag in request.add_tags if tag.strip() not in tags)
+            if request.remove_tags:
+                removals = {tag.strip() for tag in request.remove_tags}
+                tags = [tag for tag in tags if tag not in removals]
+            if len(tags) > 20:
+                raise HTTPException(status_code=422, detail="An asset would exceed the 20-tag limit.")
+            cur.execute("UPDATE dataset SET description=COALESCE(%s,description),tags=%s,last_modified_by=%s,last_modified_at=now() WHERE id=%s::uuid", (request.description,tags,current_user,str(asset_id)))
+            if request.description is not None:
+                cur.execute("INSERT INTO audit_log(asset_id,field_name,new_value,changed_by,change_type) VALUES (%s::uuid,'description',%s,%s,'UPDATE')", (str(asset_id),request.description,current_user))
+            if request.add_tags or request.remove_tags:
+                cur.execute("INSERT INTO audit_log(asset_id,field_name,new_value,changed_by,change_type) VALUES (%s::uuid,'tags',%s,%s,'UPDATE')", (str(asset_id),", ".join(tags),current_user))
         conn.commit()
-        
-        logger.info(f"Bulk update completed: {successful} successful, {failed} failed")
-        
+        updated_assets = list(request.asset_ids)
         return BulkUpdateResponse(
             total_updated=len(request.asset_ids),
-            successful=successful,
-            failed=failed,
+            successful=len(updated_assets),
+            failed=0,
             updated_assets=updated_assets,
-            errors=errors if errors else None
+            errors=None
         )
-    
+    except HTTPException:
+        conn.rollback()
+        raise
     except Exception as e:
         conn.rollback()
         logger.error(f"Error in bulk update: {e}")

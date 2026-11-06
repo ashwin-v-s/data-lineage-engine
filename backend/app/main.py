@@ -13,6 +13,9 @@ from backend.app.api.routes.audit import router as audit_router
 from backend.app.api.routes.capabilities import router as capabilities_router
 from backend.app.api.routes.dependency import router as dependency_router
 from backend.app.api.routes.governance import router as governance_router
+from backend.app.api.routes.governance_registry import router as governance_registry_router
+from backend.app.api.routes.quality import router as quality_router
+from backend.app.api.routes.notifications import router as notifications_router
 from backend.app.api.routes.health import router as health_router
 from backend.app.api.routes.ingest import router as ingest_router
 from backend.app.api.routes.ingestion import router as ingestion_router
@@ -126,6 +129,9 @@ app.include_router(ingestion_router, prefix="/api/v1")
 app.include_router(membership_router, prefix="/api/v1")
 app.include_router(sources_router, prefix="/api/v1")
 app.include_router(governance_router, prefix="/api/v1")
+app.include_router(governance_registry_router, prefix="/api/v1")
+app.include_router(quality_router, prefix="/api/v1")
+app.include_router(notifications_router, prefix="/api/v1")
 app.include_router(capabilities_router, prefix="/api/v1")
 
 

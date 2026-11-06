@@ -19,7 +19,7 @@ import './AssetCapabilitiesPanel.css';
  * fabricated; a selected tab states what the capability means and that its data
  * is served live.
  */
-export default function AssetCapabilitiesPanel({ assetId }) {
+export default function AssetCapabilitiesPanel({ assetId, demoPreview = false }) {
   const [state, setState] = useState({ status: 'loading', registry: null, error: null });
   const [selectedKey, setSelectedKey] = useState(null);
 
@@ -27,6 +27,10 @@ export default function AssetCapabilitiesPanel({ assetId }) {
     let cancelled = false;
     setState({ status: 'loading', registry: null, error: null });
     setSelectedKey(null);
+    if (demoPreview) {
+      setState({ status: 'error', registry: null, error: 'Asset capabilities are not included in the demo preview.' });
+      return () => { cancelled = true; };
+    }
     fetchCapabilities(assetId).then((result) => {
       if (cancelled) return;
       if (result.ok) {
@@ -38,7 +42,7 @@ export default function AssetCapabilitiesPanel({ assetId }) {
       }
     });
     return () => { cancelled = true; };
-  }, [assetId]);
+  }, [assetId, demoPreview]);
 
   if (state.status === 'loading') {
     return (

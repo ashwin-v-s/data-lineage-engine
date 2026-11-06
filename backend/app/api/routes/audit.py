@@ -355,7 +355,7 @@ def get_audit_trail(
                 status_code=400,
                 request_id=request_id
             )
-        
+
         conn = get_db_connection()
         cur = conn.cursor(row_factory=dict)
         
@@ -975,14 +975,8 @@ def get_compliance_report(
         cur.close()
         conn.close()
         
-        # Calculate compliance score
-        score = 100.0
-        score -= critical * 10  # Penalize critical events
-        score -= rollbacks * 5  # Penalize rollbacks
-        score = max(0, min(100, score))  # Clamp 0-100
-        
         duration_ms = (time.time() - start_time) * 1000
-        log_operation("GET_COMPLIANCE_REPORT", asset_id, "SUCCESS", duration_ms, f"score={score:.1f}")
+        log_operation("GET_COMPLIANCE_REPORT", asset_id, "SUCCESS", duration_ms, "counts_only")
         
         now = datetime.utcnow()
         response_data = {
@@ -994,12 +988,13 @@ def get_compliance_report(
             ),
             "total_changes": total_changes,
             "critical_events": critical,
-            "unapproved_changes": 0,
+            "unapproved_changes": None,
             "rollbacks": rollbacks,
             "data_lineage_changes": lineage_changes,
             "ownership_changes": ownership_changes,
-            "access_violations": 0,
-            "compliance_score": score
+            "access_violations": None,
+            "compliance_score": None,
+            "unsupported_metrics": ["unapproved_changes", "access_violations", "compliance_score"]
         }
         
         etag = generate_etag(response_data)
@@ -1039,123 +1034,26 @@ def request_rollback(
     rollback_request: RollbackRequest,
     user: dict = Depends(require_user),
 ):
-    """
-    Request rollback to previous version (with approval workflow)
-    
-    Parameters:
-        asset_id: Asset ID (must be valid UUID)
-        rollback_request: Rollback details
-        current_user: User requesting rollback
-    
-    Returns:
-        Rollback request with status
-        
-    Status Codes:
-        200: Success
-        400: Invalid input
-        404: Asset not found
-        429: Rate limit exceeded
-        500: Server error
-    """
-    current_user = user.get("email") or user["id"]
-    start_time = time.time()
+    """Return an explicit unsupported response until approval/execution exists."""
     client_ip = request.client.host if request.client else "unknown"
-    request_id = request.headers.get("X-Request-ID", "unknown")
-    
-    logger.debug(f"[{request_id}] POST rollback: asset_id={asset_id}")
-    
+    check_rate_limit(client_ip)
     try:
-        # Rate limiting
-        check_rate_limit(client_ip)
-        
-        # Input validation
-        try:
-            asset_uuid = validate_uuid(asset_id, "asset_id")
-            if rollback_request.from_version < 1 or rollback_request.to_version < 1:
-                raise ValueError("Version numbers must be >= 1")
-            if rollback_request.from_version == rollback_request.to_version:
-                raise ValueError("Versions must be different")
-            if not rollback_request.rollback_reason or len(rollback_request.rollback_reason) < 10:
-                raise ValueError("Rollback reason must be at least 10 characters")
-            logger.debug(f"[{request_id}] Input validation passed")
-        except ValueError as e:
-            logger.warning(f"[{request_id}] Input validation failed: {str(e)}")
-            return create_error_response(
-                message=str(e),
-                error_code="INVALID_INPUT",
-                status_code=400,
-                request_id=request_id
-            )
-        
-        conn = get_db_connection()
-        cur = conn.cursor(row_factory=dict)
-        
-        try:
-            cur.execute("""
-                INSERT INTO rollback_record
-                (asset_id, from_version, to_version, rollback_reason, requested_by)
-                VALUES (%s, %s, %s, %s, %s)
-                RETURNING id, created_at
-            """, (
-                str(asset_uuid),
-                rollback_request.from_version,
-                rollback_request.to_version,
-                rollback_request.rollback_reason,
-                current_user
-            ))
-            
-            result = cur.fetchone()
-            conn.commit()
-            
-            duration_ms = (time.time() - start_time) * 1000
-            log_operation(
-                "POST_ROLLBACK",
-                asset_id,
-                "SUCCESS",
-                duration_ms,
-                f"v{rollback_request.from_version}->v{rollback_request.to_version}"
-            )
-            
-            logger.info(f"[{request_id}] Rollback created: {result['id']}")
-            
-            response_data = {
-                "rollback_id": str(result["id"]),
-                "asset_id": str(asset_uuid),
-                "from_version": rollback_request.from_version,
-                "to_version": rollback_request.to_version,
-                "status": "PENDING",
-                "requested_by": current_user,
-                "created_at": result["created_at"].isoformat() if isinstance(result["created_at"], datetime) else result["created_at"],
-                "message": "Rollback request created. Awaiting approval."
-            }
-            
-            response = JSONResponse(content=jsonable_encoder(response_data), status_code=200)
-            response.headers["X-Request-ID"] = request_id
-            response.headers["X-Response-Time-Ms"] = str(duration_ms)
-            return response
-        
-        except Exception as e:
-            conn.rollback()
-            raise
-        finally:
-            cur.close()
-            conn.close()
-    
-    except HTTPException as e:
-        duration_ms = (time.time() - start_time) * 1000
-        log_operation("POST_ROLLBACK", asset_id, "FAILED", duration_ms, str(e.detail))
-        raise
-    
-    except Exception as e:
-        duration_ms = (time.time() - start_time) * 1000
-        logger.error(f"[{request_id}] Unexpected error in request_rollback: {str(e)}", exc_info=True)
-        log_operation("POST_ROLLBACK", asset_id, "FAILED", duration_ms, str(e))
+        validate_uuid(asset_id, "asset_id")
+        if rollback_request.from_version < 1 or rollback_request.to_version < 1:
+            raise ValueError("Version numbers must be >= 1")
+        if rollback_request.from_version == rollback_request.to_version:
+            raise ValueError("Versions must be different")
+        if not rollback_request.rollback_reason or len(rollback_request.rollback_reason) < 10:
+            raise ValueError("Rollback reason must be at least 10 characters")
+    except ValueError as exc:
         return create_error_response(
-            message="Failed to create rollback request",
-            error_code="ROLLBACK_ERROR",
-            status_code=500,
-            request_id=request_id
+            message=str(exc), error_code="INVALID_INPUT", status_code=400,
+            request_id=request.headers.get("X-Request-ID", "unknown"),
         )
+    raise HTTPException(
+        status_code=501,
+        detail="Rollback approval and execution are not implemented; no rollback request was created.",
+    )
 
 
 # ═══════════════════════════════════════════════════════════════════

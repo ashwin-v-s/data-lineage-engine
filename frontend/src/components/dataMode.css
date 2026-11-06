@@ -1,4 +1,4 @@
-/* Data-provenance badge: LIVE | IMPORTED | DEMO FIXTURE. */
+/* Data-provenance badge: LIVE | IMPORTED | DEMO FIXTURE | NOT CONNECTED | CATALOG ERROR. */
 .data-mode-badge {
   display: inline-block;
   padding: 2px 8px;
@@ -23,6 +23,16 @@
 .data-mode-badge--demo-fixture {
   border-color: #b45309;
   color: #b45309;
+}
+
+.data-mode-badge--not-connected {
+  border-color: #6b7280;
+  color: #6b7280;
+}
+
+.data-mode-badge--error {
+  border-color: #b91c1c;
+  color: #b91c1c;
 }
 
 .sidebar-data-mode {
