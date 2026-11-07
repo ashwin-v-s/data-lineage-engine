@@ -22,6 +22,7 @@ configured deployment.
 from __future__ import annotations
 
 import os
+import re
 from typing import Optional
 from urllib.parse import urlencode
 
@@ -100,16 +101,17 @@ def _caller_workspace_id(user: dict) -> str | None:
     return db._workspace_id.get()
 
 
-def _resolve_installation(client: github_app.GitHubAppClient, installation_id: Optional[int]) -> tuple[int, dict]:
-    """Return ``(installation_id, installation)`` for the callback.
-
-    Without an explicit id the app's single installation is used; an ambiguous
-    request is rejected rather than guessing.
-    """
+def _resolve_installation(
+    authorized_installations: list[dict], installation_id: Optional[int]
+) -> tuple[int, dict]:
+    """Select only an installation visible to the authorizing GitHub user."""
     if installation_id is not None:
         resolved_id = int(installation_id)
-        return resolved_id, client.resolve_installation(resolved_id)
-    installations = client.list_installations()
+        for installation in authorized_installations:
+            if int(installation.get("id", -1)) == resolved_id:
+                return resolved_id, installation
+        raise HTTPException(status_code=403, detail="The GitHub user cannot access this app installation")
+    installations = authorized_installations
     if len(installations) != 1:
         raise HTTPException(
             status_code=400,
@@ -171,9 +173,15 @@ def github_callback(payload: GitHubCallbackRequest, user: dict = Depends(require
     client = github_app.GitHubAppClient()
     try:
         user_token = client.exchange_user_code(payload.code)
-        installation_id, installation = _resolve_installation(client, payload.installation_id)
+        authorized_installations = client.list_user_installations(user_token)
+        installation_id, installation = _resolve_installation(authorized_installations, payload.installation_id)
     except github_app.GitHubAppError as exc:
+        client.close()
         raise HTTPException(status_code=502, detail="GitHub could not complete the connection") from exc
+    except HTTPException:
+        client.close()
+        raise
+    client.close()
 
     ciphertext = token_crypto.encrypt_token(user_token)
     account = installation.get("account") or {}
@@ -208,3 +216,104 @@ def github_disconnect(connection_id: str, user: dict = Depends(require_user)):
     if deleted == 0:
         raise HTTPException(status_code=404, detail="No such GitHub connection in this workspace")
     return GitHubDisconnectResult(ok=True, connection_id=connection_id, deleted=deleted)
+
+
+def _private_repo_context(connection_id: str, owner: str | None = None, repo: str | None = None):
+    """Mint a short-lived installation token only after workspace connection lookup."""
+    _require_configured()
+    connection = github_connection_store.get_connection(connection_id)
+    if not connection:
+        raise HTTPException(status_code=404, detail="No such GitHub connection in this workspace")
+    client = github_app.GitHubAppClient()
+    try:
+        token = client.create_installation_token(connection["installation_id"])
+        repositories = client.list_repositories(token.token)
+    except github_app.GitHubAppError as exc:
+        client.close()
+        status = getattr(exc, "status_code", 0)
+        code = status if status in {403, 404} else 502
+        message = "GitHub access was denied for this installation" if status == 403 else "GitHub could not list this installation's repositories"
+        raise HTTPException(status_code=code, detail=message) from exc
+    if owner is not None and repo is not None:
+        requested = f"{owner}/{repo}".casefold()
+        if not any(str(item.get("full_name", "")).casefold() == requested for item in repositories):
+            client.close()
+            raise HTTPException(status_code=404, detail="Repository is not available to this workspace connection")
+    return client, token.token, repositories
+
+
+def _repo_path_part(value: str) -> bool:
+    return bool(re.fullmatch(r"[A-Za-z0-9_.-]{1,100}", value)) and value not in {".", ".."}
+
+
+def _github_error(exc: github_app.GitHubAppError) -> HTTPException:
+    status = getattr(exc, "status_code", 0)
+    if status == 404:
+        return HTTPException(status_code=404, detail="The requested repository resource was not found")
+    if status == 403:
+        return HTTPException(status_code=403, detail="GitHub denied access to the requested resource")
+    return HTTPException(status_code=502, detail="GitHub could not return the requested resource")
+
+
+@router.get("/integrations/github/connections/{connection_id}/repositories")
+def github_repositories(connection_id: str, user: dict = Depends(require_user)):
+    client, _token, repositories = _private_repo_context(connection_id)
+    try:
+        items = [{key: repo.get(key) for key in ("id", "full_name", "private", "default_branch", "html_url", "description")} for repo in repositories]
+        return {"items": items, "count": len(items)}
+    finally:
+        client.close()
+
+
+@router.get("/integrations/github/connections/{connection_id}/repositories/{owner}/{repo}/branches")
+def github_repository_branches(connection_id: str, owner: str, repo: str, user: dict = Depends(require_user)):
+    if not _repo_path_part(owner) or not _repo_path_part(repo):
+        raise HTTPException(status_code=400, detail="Invalid repository owner or name")
+    client, token, _ = _private_repo_context(connection_id, owner, repo)
+    try:
+        branches = client.list_branches(owner, repo, token)
+        return {"items": [{"name": item.get("name"), "protected": item.get("protected", False), "commit_sha": (item.get("commit") or {}).get("sha")} for item in branches], "count": len(branches)}
+    except github_app.GitHubAppError as exc:
+        raise _github_error(exc) from exc
+    finally:
+        client.close()
+
+
+@router.get("/integrations/github/connections/{connection_id}/repositories/{owner}/{repo}/tree")
+def github_repository_tree(connection_id: str, owner: str, repo: str, ref: str, user: dict = Depends(require_user)):
+    if not _repo_path_part(owner) or not _repo_path_part(repo) or not ref.strip() or len(ref) > 256:
+        raise HTTPException(status_code=400, detail="Invalid repository, branch, or commit reference")
+    client, token, _ = _private_repo_context(connection_id, owner, repo)
+    try:
+        tree = client.get_tree(owner, repo, ref, installation_token=token, recursive=True)
+        items = tree.get("tree", []) if isinstance(tree, dict) else []
+        files = [{"path": item.get("path"), "type": item.get("type"), "size": item.get("size"), "sha": item.get("sha")} for item in items[:5000] if isinstance(item, dict)]
+        return {"items": files, "count": len(files), "truncated": bool(tree.get("truncated")) or len(items) > 5000, "commit_sha": tree.get("sha")}
+    except github_app.GitHubAppError as exc:
+        raise _github_error(exc) from exc
+    finally:
+        client.close()
+
+
+@router.get("/integrations/github/connections/{connection_id}/repositories/{owner}/{repo}/content")
+def github_repository_file(connection_id: str, owner: str, repo: str, ref: str, path: str, user: dict = Depends(require_user)):
+    if not _repo_path_part(owner) or not _repo_path_part(repo) or not ref.strip() or len(ref) > 256 or not path.strip() or len(path) > 1024 or path.startswith("/") or ".." in path.split("/"):
+        raise HTTPException(status_code=400, detail="Invalid repository, branch, or file path")
+    client, token, _ = _private_repo_context(connection_id, owner, repo)
+    try:
+        tree = client.get_tree(owner, repo, ref, installation_token=token, recursive=True)
+        items = tree.get("tree", []) if isinstance(tree, dict) else []
+        if tree.get("truncated") and not any(item.get("path") == path and item.get("type") == "blob" for item in items if isinstance(item, dict)):
+            raise HTTPException(status_code=409, detail="Repository tree was truncated; content path cannot be verified")
+        if not any(item.get("path") == path and item.get("type") == "blob" for item in items if isinstance(item, dict)):
+            raise HTTPException(status_code=404, detail="File is not present on this repository ref")
+        content = client.get_file_content(owner, repo, path, ref, installation_token=token)
+        if content.get("unsupported"):
+            raise HTTPException(status_code=415, detail="GitHub file is binary, too large, or cannot be decoded as UTF-8")
+        return content
+    except HTTPException:
+        raise
+    except github_app.GitHubAppError as exc:
+        raise _github_error(exc) from exc
+    finally:
+        client.close()

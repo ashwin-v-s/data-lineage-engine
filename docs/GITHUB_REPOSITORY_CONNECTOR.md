@@ -12,9 +12,9 @@ The longer-term private repository integration should use a GitHub App configure
 
 ## Current implementation
 
-The Integrations page includes a browser for **public repositories**. It lists files from a selected repository and branch, previews supported text formats, and downloads a selected file. It calls GitHub's public REST API directly from the browser and does not store credentials, repository contents, or catalog records.
+The Integrations page includes a browser for **public repositories** and an authenticated private GitHub App flow. When configured, a signed-in user can authorize the App, store a workspace-scoped encrypted connection, list authorized repositories and branches, inspect the file tree, preview a UTF-8 file, and disconnect. Installation tokens are minted on the server and never returned to the browser. Neither public nor private preview persists content or catalog records.
 
-Private repositories, saved source connections, automatic sync, dbt/SQL parsing of files from GitHub, and persistent catalog import are not implemented by this browser. GitHub sign-in to Kairos does not grant repository access. Do not label a public-file preview as a connected or imported catalog source.
+Automatic sync, parsing GitHub files through the dbt/SQL adapters, and persistent catalog import are not implemented. GitHub sign-in to Kairos does not grant repository access. Do not label a file preview as an imported catalog source.
 
 ## Security and implementation requirements for private repositories
 
@@ -41,9 +41,21 @@ Source of truth: `backend/app/services/github_app.py`,
 `backend/app/api/routes/integrations.py`, `.env.example`, and
 `docs/KAIROS_FINAL_ARCHITECTURE.md`.
 
-Scope note: the backend client, its token encryption, and a configuration-status
-endpoint are implemented and unit-tested. The install/callback routes and any UI
-wiring are **not** implemented yet, so the connector cannot be enabled end to end.
+Scope note: the backend client, token encryption, signed connect/callback routes,
+workspace-scoped connection store, repository/branch/tree/content routes and
+Integrations UI are implemented and unit-tested. Live end-to-end use still
+requires an externally configured GitHub App, its installation, a deployed
+callback URL and configured encryption key.
+
+### Callback configuration
+
+Set `GITHUB_APP_CALLBACK_URL` and the GitHub App's **Authorization callback URL**
+to the Kairos frontend origin with the Integrations route, for example
+`https://kairos.example.com/?view=integrations`. The browser receives GitHub's
+`code` and `state`, verifies the state matches the initiating browser session,
+then forwards them to the authenticated Kairos callback API. Do not register the
+backend `/api/v1/integrations/github/callback` as the OAuth redirect URI; that
+API is the server-side exchange endpoint, not the browser redirect target.
 
 ## 1. What the connector is and its read-only guarantee
 

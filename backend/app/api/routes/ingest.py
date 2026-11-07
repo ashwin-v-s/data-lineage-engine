@@ -16,14 +16,16 @@ Rules (from Architecture Pack §12 and handout G1/A1):
   5. Duplicate detection is by payload SHA-256 hash. Replaying the same
      event is safe and returns duplicate=True with no DB writes.
 
-The OpenLineage endpoint is intentionally unauthenticated during the initial
-integration phase. Static metadata import endpoints require an authenticated
-user.
+OpenLineage producers authenticate with the server-side
+``KAIROS_OPENLINEAGE_WEBHOOK_SECRET`` bearer secret. Static metadata import
+endpoints continue to require an authenticated user session.
 """
 from __future__ import annotations
 
 import hashlib
 import json
+import os
+import secrets
 import uuid
 from datetime import datetime
 from typing import Any, List, Literal, Optional
@@ -187,6 +189,13 @@ def _write_runtime_positive_evidence(
     ),
 )
 async def ingest_openlineage(request: Request) -> JSONResponse:
+    expected_secret = (os.getenv("KAIROS_OPENLINEAGE_WEBHOOK_SECRET") or "").strip()
+    if not expected_secret:
+        return api_error(request, "OpenLineage webhook authentication is not configured", 503, "WEBHOOK_AUTH_UNAVAILABLE")
+    authorization = request.headers.get("authorization", "")
+    supplied_secret = authorization[7:].strip() if authorization.lower().startswith("bearer ") else ""
+    if not supplied_secret or not secrets.compare_digest(supplied_secret, expected_secret):
+        return api_error(request, "A valid OpenLineage webhook bearer token is required", 401, "UNAUTHORIZED")
     try:
         body = await request.json()
     except Exception:

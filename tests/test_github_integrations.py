@@ -24,6 +24,7 @@ client = TestClient(app)
 _CONNECT_URL = "/api/v1/integrations/github/connect-url"
 _CALLBACK = "/api/v1/integrations/github/callback"
 _CONNECTIONS = "/api/v1/integrations/github/connections"
+_CONNECTION_ID = "11111111-1111-4111-8111-111111111111"
 
 _CALLER = {"id": "user-1", "workspace_id": "ws-1"}
 _PLAINTEXT_TOKEN = "gho_plaintext_secret_token"
@@ -59,6 +60,28 @@ class _FakeGitHubClient:
 
     def list_installations(self):
         return [{"id": 42, "account": {"login": "octo-org", "type": "Organization"}}]
+
+    def list_user_installations(self, user_token):
+        return [{"id": 42, "account": {"login": "octo-org", "type": "Organization"}, "permissions": {"contents": "read", "metadata": "read"}}]
+
+    def create_installation_token(self, installation_id):
+        from types import SimpleNamespace
+        return SimpleNamespace(token="ghs-short-lived-test-token")
+
+    def list_repositories(self, installation_token):
+        return [{"id": 9, "full_name": "octo-org/private-models", "private": True, "default_branch": "main", "html_url": "https://github.com/octo-org/private-models", "description": "private test repo"}]
+
+    def list_branches(self, owner, repo, installation_token):
+        return [{"name": "main", "protected": True, "commit": {"sha": "abc123"}}]
+
+    def get_tree(self, owner, repo, ref, *, installation_token, recursive=True):
+        return {"sha": "abc123", "truncated": False, "tree": [{"path": "models/orders.sql", "type": "blob", "size": 40, "sha": "file123"}]}
+
+    def get_file_content(self, owner, repo, path, ref, *, installation_token):
+        return {"path": path, "ref": ref, "sha": "file123", "encoding": "utf-8", "size": 40, "content": "select 1 as order_count"}
+
+    def close(self):
+        pass
 
 
 @pytest.fixture
@@ -122,6 +145,12 @@ def test_callback_rejects_an_expired_state(configured, authed):
     )
     res = client.post(_CALLBACK, json={"code": "abc", "state": expired, "installation_id": 42})
     assert res.status_code == 400, (res.status_code, res.text)
+
+
+def test_callback_rejects_installation_not_visible_to_authorizing_user(configured, authed):
+    state = token_crypto.sign_state(_CALLER["id"], _CALLER["workspace_id"])
+    res = client.post(_CALLBACK, json={"code": "abc", "state": state, "installation_id": 999})
+    assert res.status_code == 403, (res.status_code, res.text)
 
 
 def test_callback_stores_an_encrypted_token(configured, authed, monkeypatch):
@@ -207,3 +236,40 @@ def test_disconnect_reports_the_deleted_row(configured, authed, monkeypatch):
     assert res.status_code == 200, res.text
     body = res.json()
     assert body == {"ok": True, "connection_id": conn_id, "deleted": 1}
+
+
+def test_private_repository_list_reads_only_the_workspace_connection(configured, authed, monkeypatch):
+    monkeypatch.setattr(github_connection_store, "get_connection", lambda connection_id: {"id": connection_id, "installation_id": 42} if connection_id == _CONNECTION_ID else None)
+
+    res = client.get(f"{_CONNECTIONS}/{_CONNECTION_ID}/repositories")
+
+    assert res.status_code == 200, res.text
+    assert res.json()["items"][0]["full_name"] == "octo-org/private-models"
+    assert "ghs-short-lived-test-token" not in res.text
+
+
+def test_private_repository_browser_checks_repo_membership_and_returns_tree(configured, authed, monkeypatch):
+    monkeypatch.setattr(github_connection_store, "get_connection", lambda connection_id: {"id": connection_id, "installation_id": 42})
+
+    res = client.get(f"{_CONNECTIONS}/{_CONNECTION_ID}/repositories/octo-org/private-models/tree?ref=main")
+
+    assert res.status_code == 200, res.text
+    assert res.json()["items"][0]["path"] == "models/orders.sql"
+
+
+def test_private_repository_browser_refuses_repo_outside_installation(configured, authed, monkeypatch):
+    monkeypatch.setattr(github_connection_store, "get_connection", lambda connection_id: {"id": connection_id, "installation_id": 42})
+
+    res = client.get(f"{_CONNECTIONS}/{_CONNECTION_ID}/repositories/other-org/private-models/branches")
+
+    assert res.status_code == 404
+
+
+def test_private_repository_file_requires_a_tree_blob_and_returns_utf8_content(configured, authed, monkeypatch):
+    monkeypatch.setattr(github_connection_store, "get_connection", lambda connection_id: {"id": connection_id, "installation_id": 42})
+
+    res = client.get(f"{_CONNECTIONS}/{_CONNECTION_ID}/repositories/octo-org/private-models/content?ref=main&path=models%2Forders.sql")
+
+    assert res.status_code == 200, res.text
+    assert res.json()["content"] == "select 1 as order_count"
+    assert "ghs-short-lived-test-token" not in res.text

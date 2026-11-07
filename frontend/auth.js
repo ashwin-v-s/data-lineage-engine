@@ -117,7 +117,7 @@
     const response = await fetch(`${config.url}/auth/v1/user`, {
       method: 'PUT',
       headers: { apikey: config.publishable_key, Authorization: `Bearer ${activeSession.access_token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ data: profile }),
+      body: JSON.stringify({ data: { ...(activeSession.user?.user_metadata || {}), ...profile } }),
     });
     const result = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(result.msg || result.message || result.error_description || result.error || `Could not save the Supabase profile (${response.status}).`);
