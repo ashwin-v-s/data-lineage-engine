@@ -27,6 +27,8 @@ shared **Supabase Postgres** project.
 | 0009_governance | freshness_sla, freshness_evaluation, incident, incident_event | âš ï¸ CLAIMED Applied in header â€” run verify_applied.py to confirm |
 | 0010_m2_source_connection_lifecycle | sync_job + source lifecycle/sync columns | Applied — verified 2026-11-07 |
 | 0011_m4_governance | Governance, quality, contracts, notifications and freshness/incident extensions | Applied — verified 2026-11-07 |
+| 0013_membership_lifecycle | Repair owner membership for existing and newly provisioned workspaces; secure workspace listing and invitation acceptance functions | Applied — live functions and owner backfill verified 2026-11-07 |
+| 0014_welcome_email_delivery | Workspace-scoped login welcome email idempotency and delivery status | Applied — table/RLS verified 2026-11-07 |
 
 
 

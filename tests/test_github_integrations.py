@@ -273,3 +273,45 @@ def test_private_repository_file_requires_a_tree_blob_and_returns_utf8_content(c
     assert res.status_code == 200, res.text
     assert res.json()["content"] == "select 1 as order_count"
     assert "ghs-short-lived-test-token" not in res.text
+
+
+def test_private_github_import_preview_uses_verified_file_and_standard_adapter(configured, authed, monkeypatch):
+    monkeypatch.setattr(github_connection_store, "get_connection", lambda connection_id: {"id": connection_id, "installation_id": 42})
+    captured = {}
+
+    def preview(request, user):
+        captured.update(request=request, user=user)
+        return {"ok": True, "preview": {"assets": 1, "relationships": 0, "columns": 0}}
+
+    from backend.app.api.routes import ingest
+    monkeypatch.setattr(ingest, "preview_import", preview)
+    res = client.post(
+        f"{_CONNECTIONS}/{_CONNECTION_ID}/repositories/octo-org/private-models/preview-import",
+        json={"ref": "main", "path": "models/orders.sql", "kind": "sql_file"},
+    )
+
+    assert res.status_code == 200, res.text
+    assert captured["request"].filename == "orders.sql"
+    assert captured["request"].content == "select 1 as order_count"
+    assert captured["request"].source_revision == "file123"
+
+
+def test_private_github_commit_records_server_verified_origin(configured, authed, monkeypatch):
+    monkeypatch.setattr(github_connection_store, "get_connection", lambda connection_id: {"id": connection_id, "installation_id": 42})
+    captured = {}
+
+    def commit(request, user, **kwargs):
+        captured.update(request=request, user=user, kwargs=kwargs)
+        return {"ok": True, "replayed": False}
+
+    from backend.app.api.routes import ingest
+    monkeypatch.setattr(ingest, "_commit_import", commit)
+    res = client.post(
+        f"{_CONNECTIONS}/{_CONNECTION_ID}/repositories/octo-org/private-models/commit-import",
+        json={"ref": "main", "path": "models/orders.sql", "kind": "sql_file", "idempotency_key": "github:test-file123"},
+    )
+
+    assert res.status_code == 200, res.text
+    assert captured["kwargs"]["source_kind"] == "github"
+    assert captured["kwargs"]["trusted_source_ref"] == "github:octo-org/private-models@main:models/orders.sql#file123"
+    assert captured["request"].idempotency_key == "github:test-file123"

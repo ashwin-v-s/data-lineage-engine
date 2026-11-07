@@ -114,6 +114,7 @@ MIGRATION_TABLES: dict[str, list[str]] = {
         "notification",
         "notification_preference",
     ],
+    "0014_welcome_email_delivery": ["kairos_welcome_email_delivery"],
 }
 
 # Migrations whose header says PROPOSAL ONLY / NOT APPLIED.  Their tables are
@@ -121,6 +122,15 @@ MIGRATION_TABLES: dict[str, list[str]] = {
 # to be unapplied until the migration owner approves it.  Once such a migration
 # is approved and applied, remove it from this set so its absence fails again.
 PROPOSAL_ONLY_MIGRATIONS: frozenset[str] = frozenset()
+
+# Function-only migrations are verified separately from table presence.
+MIGRATION_ROUTINES: dict[str, list[str]] = {
+    "0013_membership_lifecycle": [
+        "public.kairos_ensure_personal_workspace(uuid)",
+        "public.kairos_list_user_workspaces(uuid)",
+        "public.kairos_accept_workspace_invite(text,uuid,text)",
+    ],
+}
 
 
 def main(argv=None) -> int:
@@ -146,6 +156,7 @@ def main(argv=None) -> int:
         )
         return EXIT_FAILED
 
+    live_routines: dict[str, bool] = {}
     try:
         with conn.cursor() as cur:
             cur.execute(
@@ -153,6 +164,10 @@ def main(argv=None) -> int:
                 "WHERE table_schema = 'public'"
             )
             live_tables: set[str] = {row[0] for row in cur.fetchall()}
+            for migration, routines in MIGRATION_ROUTINES.items():
+                for routine in routines:
+                    cur.execute("SELECT to_regprocedure(%s) IS NOT NULL", (routine,))
+                    live_routines[routine] = bool(cur.fetchone()[0])
     except Exception as exc:
         print(f"ERROR: query failed — {exc}", file=sys.stderr)
         return EXIT_FAILED
@@ -193,6 +208,16 @@ def main(argv=None) -> int:
         else:
             print(f"[PASS] {migration}  ({len(tables)} table(s))")
 
+    missing_routines = [routine for routine, present in live_routines.items() if not present]
+    for migration, routines in MIGRATION_ROUTINES.items():
+        missing = [routine for routine in routines if not live_routines.get(routine, False)]
+        if missing:
+            print(f"[FAIL] {migration}  (database routine(s) missing)")
+            for routine in missing:
+                print(f"       MISSING : {routine}")
+        else:
+            print(f"[PASS] {migration}  ({len(routines)} routine(s))")
+
     print("-" * width)
     total_missing = sum(len(v) for v in missing_by_migration.values())
     total_pending = sum(len(v) for v in pending_proposals.values())
@@ -201,11 +226,14 @@ def main(argv=None) -> int:
     if total_pending:
         print(f"Tables absent from proposal-only migrations : {total_pending}")
 
-    if missing_by_migration:
+    if missing_by_migration or missing_routines:
         print("")
         print("Migrations that need to be applied:")
         for m in missing_by_migration:
             print(f"  backend/migrations/{m}.sql")
+        for m in MIGRATION_ROUTINES:
+            if any(not live_routines.get(routine, False) for routine in MIGRATION_ROUTINES[m]):
+                print(f"  backend/migrations/{m}.sql")
         print("")
         print("RESULT: FAIL — expected tables are missing; apply the listed "
               "migrations before marking them Applied")
@@ -213,9 +241,8 @@ def main(argv=None) -> int:
 
     print("")
     print("RESULT: PASS — every table this script tracks exists in the live database")
-    print("Scope: table existence only. This does not prove a migration file was "
-          "executed, nor that its columns, constraints, indexes or RLS state are "
-          "present.")
+    print("Scope: this checks listed table presence and named routine presence. It does not "
+          "prove every migration statement, column, constraint, index or RLS policy is present.")
     if pending_proposals:
         print("Not counted as applied (proposal only, awaiting migration-owner "
               "approval): " + ", ".join(sorted(pending_proposals)))

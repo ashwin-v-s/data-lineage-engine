@@ -450,10 +450,20 @@ def _insert_asset(cur, asset: dict[str, Any], source_kind: str, source_ref: str)
 @router.post("/commit")
 def commit_import(request: CommitInput, user: dict = Depends(require_user)):
     """Revalidate and atomically persist assets, declared edges, and provenance."""
+    return _commit_import(request, user, source_kind="upload")
+
+
+def _commit_import(
+    request: CommitInput,
+    user: dict,
+    *,
+    source_kind: Literal["upload", "github"] = "upload",
+    trusted_source_ref: str | None = None,
+):
+    """Shared persistence implementation; non-upload origins are server-verified."""
     payload, warnings = _parse(request)
     content_hash = payload["provenance"]["content_sha256"]
-    source_ref = payload["source"].get("ref") or payload["provenance"].get("original_filename") or ""
-    source_kind = "upload"
+    source_ref = trusted_source_ref or payload["source"].get("ref") or payload["provenance"].get("original_filename") or ""
     summary = _summary(payload, warnings)
 
     with get_conn() as conn:

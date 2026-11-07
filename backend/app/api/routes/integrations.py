@@ -23,11 +23,11 @@ from __future__ import annotations
 
 import os
 import re
-from typing import Optional
+from typing import Literal, Optional
 from urllib.parse import urlencode
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from backend.app import db
 from backend.app.auth import require_user
@@ -78,6 +78,16 @@ class GitHubDisconnectResult(BaseModel):
     ok: bool
     connection_id: str
     deleted: int
+
+
+class GitHubImportRequest(BaseModel):
+    ref: str
+    path: str
+    kind: Literal["metadata_graph", "sql_file", "dbt_manifest", "csv_headers"]
+
+
+class GitHubImportCommitRequest(GitHubImportRequest):
+    idempotency_key: str = Field(min_length=1, max_length=256)
 
 
 def _require_configured() -> None:
@@ -317,3 +327,48 @@ def github_repository_file(connection_id: str, owner: str, repo: str, ref: str, 
         raise _github_error(exc) from exc
     finally:
         client.close()
+
+
+def _trusted_github_import_input(connection_id: str, owner: str, repo: str, request: GitHubImportRequest, user: dict):
+    """Fetch a file through its authorized installation and prepare a Kairos import."""
+    content = github_repository_file(connection_id, owner, repo, request.ref, request.path, user)
+    from backend.app.api.routes.ingest import ImportInput
+
+    source_ref = f"github:{owner}/{repo}@{request.ref}:{content['path']}#{content.get('sha') or ''}"
+    return ImportInput(
+        kind=request.kind,
+        filename=request.path.rsplit("/", 1)[-1],
+        content=content["content"],
+        source_revision=content.get("sha") or request.ref,
+    ), source_ref
+
+
+@router.post("/integrations/github/connections/{connection_id}/repositories/{owner}/{repo}/preview-import")
+def preview_github_import(
+    connection_id: str,
+    owner: str,
+    repo: str,
+    request: GitHubImportRequest,
+    user: dict = Depends(require_user),
+):
+    """Preview a verified private GitHub file through the standard static adapters."""
+    import_request, _source_ref = _trusted_github_import_input(connection_id, owner, repo, request, user)
+    from backend.app.api.routes.ingest import preview_import
+
+    return preview_import(import_request, user)
+
+
+@router.post("/integrations/github/connections/{connection_id}/repositories/{owner}/{repo}/commit-import")
+def commit_github_import(
+    connection_id: str,
+    owner: str,
+    repo: str,
+    request: GitHubImportCommitRequest,
+    user: dict = Depends(require_user),
+):
+    """Fetch, validate and persist private repository metadata with trusted origin."""
+    import_request, source_ref = _trusted_github_import_input(connection_id, owner, repo, request, user)
+    from backend.app.api.routes.ingest import CommitInput, _commit_import
+
+    commit_request = CommitInput(**import_request.model_dump(), idempotency_key=request.idempotency_key)
+    return _commit_import(commit_request, user, source_kind="github", trusted_source_ref=source_ref)

@@ -29,7 +29,7 @@ Automatic sync, parsing GitHub files through the dbt/SQL adapters, and persisten
 
 ## Repository reference
 
-The technical research report discusses GitHub repo/file metadata, branches, trees, SQL/dbt artifacts, read-only permissions, and commit/branch refresh cursors. It leaves the integration method as an open decision. For this product flow, a repository-scoped GitHub App is the preferred target; the current public browser is a demo-ready first slice.
+The technical research report discusses GitHub repo/file metadata, branches, trees, SQL/dbt artifacts, read-only permissions, and commit/branch refresh cursors. A repository-scoped GitHub App is implemented for authorized browse, preview, and explicit catalog import. Automatic background synchronization and refresh cursors are not implemented; commits are user initiated and idempotent.
 
 ---
 

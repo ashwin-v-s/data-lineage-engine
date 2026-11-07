@@ -16,8 +16,9 @@ from fastapi import Depends
 from fastapi.responses import JSONResponse
 from fastapi.encoders import jsonable_encoder
 from sqlalchemy import text
+from psycopg2.extras import RealDictCursor
 
-from backend.app.db import get_db_connection
+from backend.app.db import get_db_connection, get_conn
 from backend.app.auth import require_user
 from backend.app.api.errors import api_error
 from backend.app.schemas.audit import (
@@ -34,6 +35,29 @@ from backend.app.schemas.audit import (
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/audit", tags=["audit"], dependencies=[Depends(require_user)])
+
+
+@router.get("/workspace")
+def get_workspace_audit(limit: int = Query(50, ge=1, le=100), offset: int = Query(0, ge=0)):
+    """Return a workspace-scoped change feed without old/new field values."""
+    with get_conn() as conn:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(
+                """
+                SELECT al.id::text AS id, al.asset_id::text AS asset_id,
+                       d.name AS asset_name, al.field_name, al.changed_by,
+                       al.change_type, al.change_reason,
+                       to_char(al.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS.US\"Z\"') AS created_at
+                FROM audit_log AS al
+                JOIN dataset AS d ON d.id = al.asset_id
+                WHERE al.workspace_id = current_setting('kairos.workspace_id', true)::uuid
+                ORDER BY al.created_at DESC, al.id DESC
+                LIMIT %s OFFSET %s
+                """,
+                (limit, offset),
+            )
+            entries = [dict(row) for row in cur.fetchall()]
+    return {"ok": True, "entries": entries, "limit": limit, "offset": offset}
 
 # ═══════════════════════════════════════════════════════════════════
 # Constants & Configuration

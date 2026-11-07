@@ -66,6 +66,43 @@ function AuthScreen() {
   );
 }
 
+function WorkspaceSwitcher() {
+  const [workspaces, setWorkspaces] = useState([]);
+  const [error, setError] = useState('');
+  const load = async () => {
+    try {
+      const response = await fetch('/api/v1/me/workspaces', { credentials: 'same-origin', headers: { Accept: 'application/json' } });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data?.error?.message || data?.detail || 'Workspace list is unavailable.');
+      const rows = Array.isArray(data.workspaces) ? data.workspaces : [];
+      setWorkspaces(rows);
+      setError('');
+      const active = rows.find((row) => row.current) || rows[0];
+      if (active) localStorage.setItem('kairos_workspaceLabel', active.name || 'Workspace');
+    } catch (err) { setError(err.message || 'Workspace list is unavailable.'); }
+  };
+  useEffect(() => {
+    window.addEventListener('kairos:auth-ready', load);
+    if (window.kairosUser?.id) load();
+    return () => window.removeEventListener('kairos:auth-ready', load);
+  }, []);
+  if (workspaces.length < 2) return null;
+  const stored = localStorage.getItem('kairos_activeWorkspaceId');
+  const selected = workspaces.some((row) => row.id === stored) ? stored : workspaces.find((row) => row.current)?.id || workspaces[0]?.id;
+  return <label className="workspace-picker" style={{ display: 'grid', gap: 5, padding: '8px 14px', fontSize: 12 }}>
+    <span>Active workspace{error ? ` · ${error}` : ''}</span>
+    <select aria-label="Active workspace" value={selected} onChange={(event) => {
+      const next = workspaces.find((row) => row.id === event.target.value);
+      if (!next) return;
+      localStorage.setItem('kairos_activeWorkspaceId', next.id);
+      localStorage.setItem('kairos_workspaceLabel', next.name || 'Workspace');
+      location.reload();
+    }}>
+      {workspaces.map((row) => <option key={row.id} value={row.id}>{row.name} · {row.role}</option>)}
+    </select>
+  </label>;
+}
+
 function Sidebar() {
   const dataMode = useDataMode();
   return (
@@ -76,6 +113,7 @@ function Sidebar() {
         <button aria-label="Close navigation" className="icon-btn mobile-close" id="closeNav">×</button>
         <button aria-label="Toggle sidebar" className="icon-btn" id="sidebarToggleBtn" style={{ marginLeft: 'auto', width: 28, height: 28, fontSize: 12 }} title="Collapse sidebar">◀</button>
       </div>
+      <WorkspaceSwitcher />
       <nav aria-label="Main navigation" className="nav-list nav-groups">
         <button className="nav-item nav-primary active" data-view="overview"><span className="nav-icon">▫</span>Home</button>
         <div className="nav-group" data-nav-group="catalog">
@@ -211,7 +249,7 @@ function DashboardShell() {
 function App() {
   useEffect(() => {
     const script = document.createElement('script');
-    script.src = '/auth.js?v=2';
+    script.src = '/auth.js?v=4';
     script.async = true;
     script.onerror = () => console.error('Kairos authentication bootstrap could not be loaded.');
     document.body.appendChild(script);

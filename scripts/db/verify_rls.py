@@ -100,6 +100,8 @@ WORKSPACE_SCOPED_TABLES = (
     "quality_contract_link",
     "notification",
     "notification_preference",
+    # 0014_welcome_email_delivery.sql
+    "kairos_welcome_email_delivery",
 )
 
 # Exit codes.
