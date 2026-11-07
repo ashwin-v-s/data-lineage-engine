@@ -1,7 +1,7 @@
 -- Migration 0012: M3 pgvector embeddings for hybrid search
 -- Author: M3 (Ashwin) - ashwin-v-s
 -- Date: 2026-11-05
--- Status: PROPOSAL (not yet applied)
+-- Status: PROPOSAL ONLY / NOT APPLIED
 -- Naming: Per D13 decision - {number}_{owner_initials}_{feature}.sql
 --
 -- Adds pgvector extension and embedding column to dataset table

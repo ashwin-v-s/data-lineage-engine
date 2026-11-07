@@ -32,6 +32,13 @@ export default function GovernanceView({ view, demoPreview = false }) {
   const [connected, setConnected] = useState(false);
   const [preferences, setPreferences] = useState([]);
   const [preferencesError, setPreferencesError] = useState('');
+  const [assetChoices, setAssetChoices] = useState([]);
+  const [assetChoicesError, setAssetChoicesError] = useState('');
+  const [domainChoices, setDomainChoices] = useState([]);
+  const [contractChoices, setContractChoices] = useState([]);
+  const [qualityChoices, setQualityChoices] = useState([]);
+  const [columnChoices, setColumnChoices] = useState([]);
+  const [selectedDatasetId, setSelectedDatasetId] = useState('');
 
   const load = useCallback(async () => {
     setLoading(true); setError('');
@@ -39,6 +46,28 @@ export default function GovernanceView({ view, demoPreview = false }) {
     try {
       const data = await request(config.endpoint);
       setRows(config.key === '__array' ? (Array.isArray(data) ? data : []) : Array.isArray(data[config.key]) ? data[config.key] : []);
+      if (['glossary', 'pii', 'products', 'quality'].includes(view)) {
+        try {
+          const catalog = await request('/catalog?limit=500');
+          setAssetChoices(Array.isArray(catalog.assets) ? catalog.assets : []);
+          setAssetChoicesError(catalog.truncated?.assets ? 'Showing the first 500 catalog assets.' : '');
+        } catch (assetErr) { setAssetChoices([]); setAssetChoicesError(assetErr.message || 'Catalog assets could not be loaded.'); }
+      } else { setAssetChoices([]); setAssetChoicesError(''); }
+      if (view === 'products') {
+        const [domains, assertions] = await Promise.all([
+          request('/governance/domains').catch(() => ({ domains: [] })),
+          request('/quality/assertions').catch(() => ({ assertions: [] })),
+        ]);
+        setDomainChoices(Array.isArray(domains.domains) ? domains.domains : []);
+        setQualityChoices(Array.isArray(assertions.assertions) ? assertions.assertions : []);
+        const contracts = await Promise.all((Array.isArray(data.products) ? data.products : []).map(async (product) => {
+          try {
+            const result = await request(`/governance/products/${encodeURIComponent(product.id)}/contracts`);
+            return (result.contracts || []).map((contract) => ({ ...contract, product_name: product.name }));
+          } catch (_) { return []; }
+        }));
+        setContractChoices(contracts.flat());
+      }
       if (view === 'settings') {
         try {
           const prefData = await request('/notifications/preferences');
@@ -52,6 +81,16 @@ export default function GovernanceView({ view, demoPreview = false }) {
   }, [config, demoPreview, view]);
 
   useEffect(() => { load(); }, [load]);
+
+  useEffect(() => {
+    let active = true;
+    setColumnChoices([]);
+    if (view !== 'pii' || !selectedDatasetId) return () => { active = false; };
+    request(`/governance/datasets/${encodeURIComponent(selectedDatasetId)}/columns`)
+      .then((data) => { if (active) setColumnChoices(Array.isArray(data.columns) ? data.columns : []); })
+      .catch((err) => { if (active) setAssetChoicesError(err.message || 'Asset columns could not be loaded.'); });
+    return () => { active = false; };
+  }, [view, selectedDatasetId]);
 
   const submit = async (event) => {
     event.preventDefault();
@@ -67,7 +106,7 @@ export default function GovernanceView({ view, demoPreview = false }) {
         body = { dataset_id: String(form.get('dataset_id') || '').trim(), column_id: String(form.get('column_id') || '').trim() || null, classification, evidence_state: String(form.get('evidence_state') || 'OBSERVED'), provenance: { origin, note: String(form.get('provenance_note') || '').trim() } };
       }
       else if (view === 'domains') body = { name: String(form.get('name') || '').trim(), description: String(form.get('description') || '').trim() };
-      else if (view === 'products') body = { name: String(form.get('name') || '').trim(), description: String(form.get('description') || '').trim(), status: 'DRAFT', asset_ids: String(form.get('asset_ids') || '').split(',').map((value) => value.trim()).filter(Boolean) };
+      else if (view === 'products') body = { name: String(form.get('name') || '').trim(), description: String(form.get('description') || '').trim(), status: 'DRAFT', domain_id: String(form.get('domain_id') || '').trim() || null, asset_ids: form.getAll('asset_ids').map((value) => String(value).trim()).filter(Boolean) };
       else if (view === 'quality') body = { dataset_id: String(form.get('dataset_id') || '').trim(), name: String(form.get('name') || '').trim(), assertion_type: String(form.get('assertion_type') || 'completeness'), definition: {}, severity: String(form.get('severity') || 'MEDIUM'), schedule: 'manual' };
       else if (view === 'settings') { path = '/members/invites'; body = { email: String(form.get('email') || '').trim(), role: String(form.get('role') || 'viewer') }; }
       else if (view === 'sources') body = { name: String(form.get('name') || '').trim(), source_kind: 'postgresql', host: String(form.get('host') || '').trim(), port: Number(form.get('port') || 5432), dbname: String(form.get('dbname') || '').trim(), user: String(form.get('user') || '').trim(), password: String(form.get('password') || ''), schema_name: String(form.get('schema_name') || 'public').trim() };
@@ -168,24 +207,25 @@ export default function GovernanceView({ view, demoPreview = false }) {
       <h2>{view === 'settings' ? 'Invite a workspace member' : view === 'glossary' ? 'Propose a glossary term' : view === 'pii' ? 'Record an evidence-backed classification' : view === 'domains' ? 'Create a domain' : view === 'products' ? 'Create a data product' : view === 'sources' ? 'Register a PostgreSQL source' : 'Create a quality assertion'}</h2>
       {view === 'settings' && <><label>Member email<input name="email" type="email" autoComplete="off" maxLength={320} required /></label><label>Workspace role<select name="role"><option value="viewer">Viewer</option><option value="editor">Editor</option><option value="admin">Admin</option></select></label><p>Invitation and role assignment are enforced by the authenticated M1 membership API. Owners cannot be granted through invitations.</p></>}
       {view !== 'pii' && <label>Name<input name="name" maxLength={160} required /></label>}
-      {view === 'pii' && <><label>Dataset UUID<input name="dataset_id" required /></label><label>Column UUID (optional)<input name="column_id" /></label><label>Classification<select name="classification"><option>PII_SOURCE</option><option disabled title="Requires lineage evidence propagation, which is not configured yet.">PII_INHERITED (lineage evidence required)</option><option>PII_MASKED</option><option disabled title="Requires a persisted SQLGlot evidence reference.">PII_POTENTIAL (analysis evidence required)</option><option>PII_CLEARED</option><option>UNKNOWN</option></select></label><label>Evidence state<select name="evidence_state"><option>OBSERVED</option><option>POSSIBLE</option><option>UNKNOWN</option></select></label><label>Evidence/provenance note<input name="provenance_note" maxLength={1000} required /></label><p>Inherited and potential classes are disabled until their evidence pipeline is available. PII_CLEARED requires an active owner/admin reviewer. Classification metadata does not grant access to source data.</p></>}
+      {view === 'pii' && <><label>Dataset<select name="dataset_id" value={selectedDatasetId} onChange={(event) => setSelectedDatasetId(event.target.value)} required><option value="">Choose a catalog asset</option>{assetChoices.map((asset) => <option key={asset.id} value={asset.id}>{asset.qualified_name || `${asset.schema_name || asset.schema || ''}.${asset.name}`} · {asset.asset_type || asset.type}</option>)}</select></label><label>Column (optional)<select name="column_id" disabled={!selectedDatasetId}><option value="">Whole dataset</option>{columnChoices.map((column) => <option key={column.id} value={column.id}>{column.column_name}{column.data_type ? ` · ${column.data_type}` : ''}</option>)}</select></label><label>Classification<select name="classification"><option>PII_SOURCE</option><option disabled title="Requires lineage evidence propagation, which is not configured yet.">PII_INHERITED (lineage evidence required)</option><option>PII_MASKED</option><option disabled title="Requires a persisted SQLGlot evidence reference.">PII_POTENTIAL (analysis evidence required)</option><option>PII_CLEARED</option><option>UNKNOWN</option></select></label><label>Evidence state<select name="evidence_state"><option>OBSERVED</option><option>POSSIBLE</option><option>UNKNOWN</option></select></label><label>Evidence/provenance note<input name="provenance_note" maxLength={1000} required /></label><p>Inherited and potential classes are disabled until their evidence pipeline is available. PII_CLEARED requires an active owner/admin reviewer. Classification metadata does not grant access to source data.</p></>}
       {view !== 'glossary' && view !== 'pii' && <label>Description<textarea name="description" maxLength={4000} /></label>}
       {view === 'glossary' && <label>Definition<textarea name="definition" maxLength={4000} required /></label>}
-      {view === 'products' && <label>Catalog asset UUIDs (comma-separated)<input name="asset_ids" /></label>}
-      {view === 'quality' && <><label>Dataset UUID<input name="dataset_id" required /></label><label>Assertion type<select name="assertion_type"><option value="freshness">Freshness</option><option value="completeness">Metadata completeness</option><option value="uniqueness">Canonical asset identity uniqueness</option><option value="validity">Schema metadata validity</option><option value="schema">Expected columns</option></select></label><label>Severity<select name="severity"><option>LOW</option><option>MEDIUM</option><option>HIGH</option><option>CRITICAL</option></select></label><p>Custom SQL is unavailable until a reviewed read-only source-query runner exists.</p></>}
+      {view === 'products' && <><label>Domain<select name="domain_id"><option value="">No domain assigned</option>{domainChoices.map((domain) => <option key={domain.id} value={domain.id}>{domain.name}</option>)}</select></label><label>Catalog assets (select one or more)<select name="asset_ids" multiple size={Math.min(6, Math.max(3, assetChoices.length))}>{assetChoices.map((asset) => <option key={asset.id} value={asset.id}>{asset.qualified_name || `${asset.schema_name || ''}.${asset.name}`}</option>)}</select></label></>}
+      {view === 'quality' && <><label>Dataset<select name="dataset_id" required><option value="">Choose a catalog asset</option>{assetChoices.map((asset) => <option key={asset.id} value={asset.id}>{asset.qualified_name || `${asset.schema_name || ''}.${asset.name}`}</option>)}</select></label><label>Assertion type<select name="assertion_type"><option value="freshness">Freshness</option><option value="completeness">Metadata completeness</option><option value="uniqueness">Canonical asset identity uniqueness</option><option value="validity">Schema metadata validity</option><option value="schema">Expected columns</option></select></label><label>Severity<select name="severity"><option>LOW</option><option>MEDIUM</option><option>HIGH</option><option>CRITICAL</option></select></label><p>Custom SQL is unavailable until a reviewed read-only source-query runner exists.</p></>}
       {view === 'sources' && <><label>Host<input name="host" autoComplete="off" maxLength={255} required /></label><label>Port<input name="port" type="number" min="1" max="65535" defaultValue="5432" required /></label><label>Database<input name="dbname" autoComplete="off" maxLength={128} required /></label><label>Username<input name="user" autoComplete="off" maxLength={128} required /></label><label>Password<input name="password" autoComplete="new-password" maxLength={512} required type="password" /></label><label>Schema<input name="schema_name" defaultValue="public" maxLength={128} required /></label><p>Credentials are sent only to the authenticated API, stored encrypted by the server, and never returned to this screen. Only PostgreSQL is currently supported; sync schedules and credential rotation are not implemented by the source API.</p></>}
       <p className="kv-freshness-placeholder">Saved records are workspace-scoped. Product health is shown only when source evaluation rows exist.</p>
+      {assetChoicesError && ['glossary', 'pii', 'products', 'quality'].includes(view) && <p role="status" className="kv-freshness-placeholder">Asset selector: {assetChoicesError}</p>}
       <button className="btn primary" disabled={busy} type="submit">{busy ? 'Saving…' : view === 'settings' ? 'Send invitation' : view === 'quality' ? 'Create assertion' : view === 'sources' ? 'Save encrypted source' : 'Save'}</button>
     </form>}
     {view === 'glossary' && <form className="kv-card kv-freshness-form" onSubmit={assignTerm}>
-      <h2>Link a term to an asset</h2><label>Glossary term UUID<input name="term_id" required /></label><label>Dataset UUID<input name="dataset_id" required /></label><button className="btn" disabled={busy} type="submit">Link term</button>
+      <h2>Link a term to an asset</h2><label>Glossary term<select name="term_id" required><option value="">Choose a term</option>{rows.map((term) => <option key={term.id} value={term.id}>{term.name}</option>)}</select></label><label>Catalog asset<select name="dataset_id" required><option value="">Choose an asset</option>{assetChoices.map((asset) => <option key={asset.id} value={asset.id}>{asset.qualified_name || `${asset.schema_name || ''}.${asset.name}`}</option>)}</select></label><button className="btn" disabled={busy} type="submit">Link term</button>
     </form>}
     {view === 'products' && <>
       <form className="kv-card kv-freshness-form" onSubmit={createContract}>
-        <h2>Create a versioned data contract</h2><label>Product UUID<input name="product_id" required /></label><label>Next version number<input name="version" type="number" min="1" required /></label><label>Enforcement mode<select name="enforcement_mode"><option>MONITOR</option><option>WARN</option><option>BLOCK</option></select></label><label>Clauses (JSON array)<textarea name="clauses" defaultValue="[]" maxLength={20000} required /></label><button className="btn" disabled={busy} type="submit">Save contract version</button>
+        <h2>Create a versioned data contract</h2><label>Data product<select name="product_id" required><option value="">Choose a product</option>{rows.map((product) => <option key={product.id} value={product.id}>{product.name}</option>)}</select></label><label>Version number<input name="version" type="number" min="1" required /></label><label>Enforcement mode<select name="enforcement_mode"><option>MONITOR</option><option>WARN</option><option>BLOCK</option></select></label><label>Clauses (JSON array)<textarea name="clauses" defaultValue="[]" maxLength={20000} required /></label><button className="btn" disabled={busy} type="submit">Save contract version</button>
       </form>
       <form className="kv-card kv-freshness-form" onSubmit={linkAssertion}>
-        <h2>Bind a quality assertion to a contract clause</h2><label>Contract UUID<input name="contract_id" required /></label><label>Assertion UUID<input name="assertion_id" required /></label><label>Clause key<input name="clause_key" maxLength={120} required /></label><button className="btn" disabled={busy} type="submit">Link assertion</button>
+        <h2>Bind a quality assertion to a contract clause</h2><label>Product contract<select name="contract_id" required><option value="">Choose a contract</option>{contractChoices.map((contract) => <option key={contract.id} value={contract.id}>{contract.product_name} · v{contract.version} · {contract.enforcement_mode}</option>)}</select></label><label>Quality assertion<select name="assertion_id" required><option value="">Choose an assertion</option>{qualityChoices.map((assertion) => <option key={assertion.id} value={assertion.id}>{assertion.name}</option>)}</select></label><label>Clause key<input name="clause_key" maxLength={120} required /></label><button className="btn" disabled={busy} type="submit">Link assertion</button>
       </form>
     </>}
     <section className="kv-card"><h2>{view === 'notifications' ? 'Notification history' : `${config.title} records`}</h2>

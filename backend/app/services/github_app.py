@@ -31,6 +31,7 @@ import os
 import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from urllib.parse import quote
 
 import httpx
 from cryptography.hazmat.primitives import hashes, serialization
@@ -285,6 +286,14 @@ class GitHubAppClient:
             raise GitHubAppApiError(404, f"installation {installation_id} is not accessible to the authorizing user")
         return self.get_installation(installation_id)
 
+    def list_user_installations(self, user_token: str) -> list[dict]:
+        """Return installations the OAuth-authorizing GitHub user can access."""
+        data = self._json(
+            self._api_request("GET", "/user/installations", token=user_token, params={"per_page": 100})
+        )
+        installations = data.get("installations", []) if isinstance(data, dict) else list(data)
+        return list(installations)
+
     # ── installation-scoped reads ────────────────────────────────────────────
     def list_repositories(self, installation_token: str) -> list[dict]:
         """GET /installation/repositories — repositories the installation can read."""
@@ -294,13 +303,23 @@ class GitHubAppClient:
         repositories = data.get("repositories", []) if isinstance(data, dict) else list(data)
         return list(repositories)
 
+    def list_branches(self, owner: str, repo: str, installation_token: str) -> list[dict]:
+        """List branches from a repository the installation can access."""
+        data = self._json(
+            self._api_request(
+                "GET", f"/repos/{owner}/{repo}/branches", token=installation_token,
+                params={"per_page": 100},
+            )
+        )
+        return list(data) if isinstance(data, list) else []
+
     def get_tree(self, owner: str, repo: str, ref: str, *, installation_token: str, recursive: bool = True) -> dict:
         """GET /repos/{owner}/{repo}/git/trees/{ref} — the repository tree."""
         params = {"recursive": "1"} if recursive else None
         return self._json(
             self._api_request(
                 "GET",
-                f"/repos/{owner}/{repo}/git/trees/{ref}",
+                f"/repos/{owner}/{repo}/git/trees/{quote(ref, safe='')}",
                 token=installation_token,
                 params=params,
             )
@@ -314,7 +333,7 @@ class GitHubAppClient:
         """
         response = self._api_request(
             "GET",
-            f"/repos/{owner}/{repo}/contents/{path}",
+            f"/repos/{owner}/{repo}/contents/{quote(path, safe='/')}",
             token=installation_token,
             params={"ref": ref},
         )

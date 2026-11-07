@@ -69,6 +69,12 @@ class _Conn:
         pass
 
 
+class _PgError(Exception):
+    def __init__(self, pgcode, message):
+        super().__init__(message)
+        self.pgcode = pgcode
+
+
 def _regclass(table: str):
     def handler(stmts, params):
         return [(table,)]
@@ -161,6 +167,9 @@ def test_viewer_cannot_create_invite(client, monkeypatch):
 
 
 def test_admin_can_create_invite(client, monkeypatch):
+    # Keep this API unit test offline even when the developer has local Gmail
+    # SMTP credentials configured in .env.
+    monkeypatch.setattr("backend.app.api.routes.membership.EmailSettings.from_env", lambda: None)
     def insert(stmts, params):
         # Route inserts (email, role, invited_by, token, expires_at)
         assert params[0] == "x@y.com"
@@ -181,6 +190,9 @@ def test_admin_can_create_invite(client, monkeypatch):
     assert response.status_code == 201
     body = response.json()
     assert body["id"] == "invite-1"
+    assert len(body["token"]) >= 32
+    assert body["email_sent"] is False
+    assert body["delivery_error"]
     assert "expires_at" in body
 
 
@@ -195,7 +207,9 @@ def test_invite_cannot_grant_ownership(client, monkeypatch):
 
 def _open_invite(expires_in: timedelta):
     def invite(stmts, params):
-        return [("ws-1", "editor", datetime.now(timezone.utc) + expires_in, None)]
+        if expires_in.total_seconds() < 0:
+            raise psycopg2.errors.RaiseException("Invitation expired")
+        return [("ws-1", "editor")]
 
     return ("SELECT workspace_id", invite)
 
@@ -218,9 +232,10 @@ def test_accept_invite_joins_workspace(client, monkeypatch):
 
 
 def test_accept_expired_invite_returns_410(client, monkeypatch):
+    monkeypatch.setattr(m, "PostgresError", _PgError)
     conn = _Conn(
         _regclass("workspace_invite"),
-        _open_invite(timedelta(days=-1)),
+        ("SELECT workspace_id", lambda stmts, params: (_ for _ in ()).throw(_PgError("P0001", "expired"))),
     )
     _use(monkeypatch, conn)
     response = client.post("/api/v1/members/invites/tok123/accept")
@@ -228,7 +243,23 @@ def test_accept_expired_invite_returns_410(client, monkeypatch):
 
 
 def test_accept_unknown_invite_returns_404(client, monkeypatch):
-    conn = _Conn(_regclass("workspace_invite"), ("SELECT workspace_id", lambda stmts, params: []))
+    monkeypatch.setattr(m, "PostgresError", _PgError)
+    conn = _Conn(
+        _regclass("workspace_invite"),
+        ("SELECT workspace_id", lambda stmts, params: (_ for _ in ()).throw(_PgError("P0002", "missing"))),
+    )
     _use(monkeypatch, conn)
     response = client.post("/api/v1/members/invites/tok999/accept")
     assert response.status_code == 404
+
+
+def test_invite_acceptance_requires_invited_email(client, monkeypatch):
+    monkeypatch.setattr(m, "PostgresError", _PgError)
+    conn = _Conn(
+        _regclass("workspace_invite"),
+        ("SELECT workspace_id", lambda stmts, params: (_ for _ in ()).throw(_PgError("42501", "wrong email"))),
+    )
+    _use(monkeypatch, conn)
+    response = client.post("/api/v1/members/invites/tok123/accept")
+    assert response.status_code == 403
+    assert "invitation" in response.json().get("detail", "").lower() or "email" in response.text.lower()

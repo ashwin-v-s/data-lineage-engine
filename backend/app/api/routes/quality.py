@@ -40,7 +40,7 @@ def _require_tables(cur, *tables: str) -> None:
         if cur.fetchone()["relation"] is None:
             missing.append(table)
     if missing:
-        raise HTTPException(status_code=503, detail="M4 quality storage is not installed; apply migration 0011_m4_governance.sql after owner review.")
+        raise HTTPException(status_code=503, detail="M4 quality storage is unavailable; verify migration 0011_m4_governance.sql is applied.")
 
 
 def _result_for_assertion(cur, assertion: dict) -> dict:

@@ -16,14 +16,16 @@ Rules (from Architecture Pack §12 and handout G1/A1):
   5. Duplicate detection is by payload SHA-256 hash. Replaying the same
      event is safe and returns duplicate=True with no DB writes.
 
-The OpenLineage endpoint is intentionally unauthenticated during the initial
-integration phase. Static metadata import endpoints require an authenticated
-user.
+OpenLineage producers authenticate with the server-side
+``KAIROS_OPENLINEAGE_WEBHOOK_SECRET`` bearer secret. Static metadata import
+endpoints continue to require an authenticated user session.
 """
 from __future__ import annotations
 
 import hashlib
 import json
+import os
+import secrets
 import uuid
 from datetime import datetime
 from typing import Any, List, Literal, Optional
@@ -187,6 +189,13 @@ def _write_runtime_positive_evidence(
     ),
 )
 async def ingest_openlineage(request: Request) -> JSONResponse:
+    expected_secret = (os.getenv("KAIROS_OPENLINEAGE_WEBHOOK_SECRET") or "").strip()
+    if not expected_secret:
+        return api_error(request, "OpenLineage webhook authentication is not configured", 503, "WEBHOOK_AUTH_UNAVAILABLE")
+    authorization = request.headers.get("authorization", "")
+    supplied_secret = authorization[7:].strip() if authorization.lower().startswith("bearer ") else ""
+    if not supplied_secret or not secrets.compare_digest(supplied_secret, expected_secret):
+        return api_error(request, "A valid OpenLineage webhook bearer token is required", 401, "UNAUTHORIZED")
     try:
         body = await request.json()
     except Exception:
@@ -205,6 +214,26 @@ async def ingest_openlineage(request: Request) -> JSONResponse:
             400,
             "INVALID_PAYLOAD",
         )
+    workspace_id = (os.getenv("KAIROS_OPENLINEAGE_WORKSPACE_ID") or "").strip()
+    try:
+        workspace_id = str(uuid.UUID(workspace_id))
+    except (ValueError, AttributeError):
+        return api_error(
+            request,
+            "OpenLineage webhook workspace is not configured",
+            503,
+            "WEBHOOK_WORKSPACE_UNAVAILABLE",
+        )
+    from backend.app.db import reset_workspace_id, set_workspace_id
+
+    scope_token = set_workspace_id(workspace_id)
+    try:
+        return _ingest_openlineage_events(request, raw_events)
+    finally:
+        reset_workspace_id(scope_token)
+
+
+def _ingest_openlineage_events(request: Request, raw_events: list) -> JSONResponse:
     if not raw_events:
         return JSONResponse(IngestResult(
             accepted=0, duplicate=0, skipped=0, evidence_created=0,
@@ -316,6 +345,7 @@ async def ingest_openlineage(request: Request) -> JSONResponse:
     )
 
 
+
 # Authenticated preview and explicit commit for static metadata imports.
 _RUN_COLUMNS = """
     id::text AS id,
@@ -420,10 +450,20 @@ def _insert_asset(cur, asset: dict[str, Any], source_kind: str, source_ref: str)
 @router.post("/commit")
 def commit_import(request: CommitInput, user: dict = Depends(require_user)):
     """Revalidate and atomically persist assets, declared edges, and provenance."""
+    return _commit_import(request, user, source_kind="upload")
+
+
+def _commit_import(
+    request: CommitInput,
+    user: dict,
+    *,
+    source_kind: Literal["upload", "github"] = "upload",
+    trusted_source_ref: str | None = None,
+):
+    """Shared persistence implementation; non-upload origins are server-verified."""
     payload, warnings = _parse(request)
     content_hash = payload["provenance"]["content_sha256"]
-    source_ref = payload["source"].get("ref") or payload["provenance"].get("original_filename") or ""
-    source_kind = "upload"
+    source_ref = trusted_source_ref or payload["source"].get("ref") or payload["provenance"].get("original_filename") or ""
     summary = _summary(payload, warnings)
 
     with get_conn() as conn:

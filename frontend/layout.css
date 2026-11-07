@@ -8,6 +8,32 @@
 @media(max-width:1180px){:root{--pad:22px}}
 @media(max-width:640px){:root{--pad:14px;--gap:18px}}
 
+/* Header source switch: compact, non-wrapping controls across tablet widths. */
+.data-mode-control{flex:0 0 auto;min-width:0}
+.data-mode-control>strong{flex:none;white-space:nowrap}
+.data-mode-switch{display:inline-flex;flex:0 0 auto;align-items:center;justify-content:center;min-height:34px;padding:6px 10px;border:1px solid var(--ink);border-radius:999px;background:var(--surface);color:var(--ink);font:600 .74rem/1.1 var(--font-body);white-space:nowrap;cursor:pointer;transition:background-color .12s,color .12s}
+.data-mode-switch:hover,.data-mode-switch[aria-pressed="true"]{background:var(--yellow);color:var(--on-yellow)}
+.data-mode-switch:disabled{opacity:.55;cursor:not-allowed}
+.sidebar-bottom .btn.small.sidebar-signout{width:100%;min-height:42px;margin:8px 0 0;padding:8px 12px;justify-content:flex-start;border-width:1px;box-shadow:none;background:transparent;color:var(--muted);font-size:.84rem}
+.sidebar-bottom .btn.small.sidebar-signout:hover{background:var(--hl);color:var(--ink);box-shadow:none;transform:none}
+
+@media(max-width:900px){
+  .topbar{gap:8px;padding-inline:14px}
+  .breadcrumbs{min-width:0;white-space:nowrap}
+  .breadcrumbs span,.breadcrumbs b{display:none}
+  .top-actions{min-width:0;flex:0 1 auto;gap:6px}
+  .data-mode-control{gap:4px;padding-inline:4px;border-width:1px}
+  .data-mode-control>span,.data-mode-control>strong{display:none}
+  .data-mode-switch{padding-inline:9px;font-size:.72rem}
+}
+@media(max-width:760px){
+  .top-actions #helpButton,.top-actions .top-avatar{display:none}
+}
+@media(max-width:640px){
+  .data-mode-control{gap:3px}
+  .data-mode-switch{min-height:42px;padding-inline:8px;font-size:.7rem}
+}
+
 /* assets.css ends in a stray literal "\n", which silently broke these rules */
 [hidden]{display:none!important}
 .nav-group[hidden],.nav-item[hidden]{display:none!important}

@@ -64,22 +64,11 @@ DEFAULT_MIGRATIONS_DIR = ROOT / "backend" / "migrations"
 VERIFY_RLS_PATH = ROOT / "scripts" / "db" / "verify_rls.py"
 
 # Workspace-scoped tables that a migration creates but that are *deliberately*
-# absent from verify_rls.py's WORKSPACE_SCOPED_TABLES list, mapped to the
-# reason.  Every other workspace-scoped table missing from that list is a gap.
+# absent from verify_rls.py's core table list, mapped to the reason. Every
+# other workspace-scoped table missing from that list is a gap.
 # Keep this in step with the matching comment in scripts/db/verify_rls.py and
 # the runbook in backend/migrations/README.md.
-VERIFY_LIST_EXCLUSIONS: dict[str, str] = {
-    # Proposal-only M4 schema is statically checked for RLS but is not expected
-    # to exist in the live project before M1 approves/applies migration 0011.
-    **{
-        table: "0011_m4_governance.sql is proposal-only pending migration-owner approval"
-        for table in (
-            "freshness_confirmation", "quality_assertion", "quality_result", "glossary_term", "term_assignment",
-            "pii_classification", "domain", "data_product", "product_asset",
-            "data_contract", "quality_contract_link", "notification", "notification_preference",
-        )
-    },
-}
+VERIFY_LIST_EXCLUSIONS: dict[str, str] = {}
 
 # Supabase built-in role names that appear in GRANT/REVOKE statements inside
 # migrations (e.g. "REVOKE ALL ON TABLE x FROM anon, authenticated, service_role").

@@ -1,0 +1,16 @@
+{
+  "metadata": {"dbt_schema_version": "https://schemas.getdbt.com/dbt/manifest/v12.json", "project_name": "kairos_demo", "adapter_type": "postgres"},
+  "nodes": {
+    "model.kairos_demo.demo_order_revenue": {
+      "unique_id": "model.kairos_demo.demo_order_revenue", "resource_type": "model", "name": "demo_order_revenue", "package_name": "kairos_demo", "schema": "analytics", "database": "demo",
+      "description": "Revenue model for the Kairos demo; declarations are static metadata, not runtime evidence.", "config": {"materialized": "table"}, "tags": ["demo"],
+      "columns": {"order_id": {"name": "order_id", "data_type": "integer", "description": "Source order identifier."}, "amount": {"name": "amount", "data_type": "numeric", "description": "Payment amount."}},
+      "depends_on": {"nodes": ["source.kairos_demo.raw.orders", "source.kairos_demo.raw.payments"]}
+    }
+  },
+  "sources": {
+    "source.kairos_demo.raw.orders": {"unique_id": "source.kairos_demo.raw.orders", "name": "orders", "source_name": "raw", "package_name": "kairos_demo", "resource_type": "source", "schema": "raw", "database": "demo", "description": "Synthetic demo orders."},
+    "source.kairos_demo.raw.payments": {"unique_id": "source.kairos_demo.raw.payments", "name": "payments", "source_name": "raw", "package_name": "kairos_demo", "resource_type": "source", "schema": "raw", "database": "demo", "description": "Synthetic demo payments."}
+  },
+  "exposures": {}
+}

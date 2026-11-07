@@ -118,6 +118,18 @@ def list_connections() -> list[dict]:
     return [_serialize(row) for row in rows]
 
 
+def get_connection(connection_id: str) -> dict | None:
+    """Load one connection within the active workspace without credential data."""
+    with get_conn() as conn:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(
+                f"SELECT {_PUBLIC_COLUMNS} FROM github_connection WHERE id=%s::uuid LIMIT 1",
+                (connection_id,),
+            )
+            row = cur.fetchone()
+    return _serialize(row) if row else None
+
+
 def delete_connection(connection_id: str) -> int:
     """Delete a connection in the caller's workspace; return the deleted count.
 

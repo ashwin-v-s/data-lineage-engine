@@ -1,7 +1,6 @@
--- PROPOSAL ONLY / NOT APPLIED.
 -- Migration 0011: M4 governance and evaluation storage.
--- Forward-only extension of 0009. Do not apply to the shared project until the
--- M1 migration owner reviews and approves it. No applied migration is changed.
+-- Forward-only extension of 0009. Approved by the M1 migration owner and
+-- applied to shared Supabase on 2026-11-07. No applied migration is changed.
 -- All records are private to the transaction-local workspace and are granted
 -- only to the restricted FastAPI role.
 

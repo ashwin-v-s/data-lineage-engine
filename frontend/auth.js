@@ -10,10 +10,11 @@
     '/stewardship.js?v=304',
     '/evidence-semantics.js?v=1',
     '/lineage-investigation.js?v=1',
-    '/app.js?v=310',
+    '/app.js?v=311',
   ];
   let config = null;
   let configLoaded = false;
+  let configPromise = null;
   let activeSession = null;
   let refreshTimer = null;
   let appStarted = false;
@@ -99,6 +100,7 @@
     localStorage.removeItem('kairos_profileName');
     localStorage.removeItem('kairos_profilePicture');
     localStorage.removeItem('kairos_workspaceLabel');
+    localStorage.removeItem('kairos_activeWorkspaceId');
     clearTimeout(refreshTimer);
     activeSession = null;
   };
@@ -112,6 +114,34 @@
     if (!response.ok) throw new Error(result.msg || result.message || result.error_description || result.error || `Authentication failed (${response.status}).`);
     return result;
   }
+  function loadAuthConfig() {
+    if (!configPromise) {
+      configPromise = (async () => {
+        const response = await fetch('/api/v1/auth/config', { headers: { Accept: 'application/json' } });
+        if (!response.ok) throw new Error('Could not read authentication configuration.');
+        config = await response.json();
+        configLoaded = true;
+        return config;
+      })();
+    }
+    return configPromise;
+  }
+  async function updateProfileMetadata(profile) {
+    if (!hasActiveSession() || !config?.url || !config?.publishable_key) throw new Error('Sign in again before saving your account profile.');
+    const response = await fetch(`${config.url}/auth/v1/user`, {
+      method: 'PUT',
+      headers: { apikey: config.publishable_key, Authorization: `Bearer ${activeSession.access_token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ data: { ...(activeSession.user?.user_metadata || {}), ...profile } }),
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(result.msg || result.message || result.error_description || result.error || `Could not save the Supabase profile (${response.status}).`);
+    activeSession.user = result;
+    const remember = Boolean(localStorage.getItem(sessionKey));
+    saveSession(activeSession, remember);
+    window.kairosUser = { id: result.id || '', email: result.email || '', user_metadata: result.user_metadata || {} };
+    return result.user_metadata || {};
+  }
+  window.kairosUpdateProfile = updateProfileMetadata;
   function frameStatus(form, ok, message, mode) {
     frame?.contentWindow?.postMessage({ source: 'kairos-auth-host', form, ok, message, mode }, location.origin);
   }
@@ -137,6 +167,8 @@
     const next = await authRequest('token?grant_type=refresh_token', { refresh_token: session.refresh_token });
     if (session.user && !next.user) next.user = session.user;
     if (session.kairos_remember_until) next.kairos_remember_until = session.kairos_remember_until;
+    if (session.kairos_welcome_email_event_id) next.kairos_welcome_email_event_id = session.kairos_welcome_email_event_id;
+    if (session.kairos_welcome_email_sent) next.kairos_welcome_email_sent = true;
     return saveSession(next, remember);
   }
   function scheduleRefresh(session) {
@@ -160,6 +192,8 @@
       }
       const headers = new Headers(init.headers || (input instanceof Request ? input.headers : undefined));
       if (session?.access_token) headers.set('Authorization', `Bearer ${session.access_token}`);
+      const workspaceId = localStorage.getItem('kairos_activeWorkspaceId');
+      if (workspaceId && url.startsWith('/api/v1/')) headers.set('X-Kairos-Workspace-ID', workspaceId);
       const response = await originalFetch(input, { ...init, headers });
       if (response.status === 401 && session?.access_token) {
         clearSession();
@@ -203,17 +237,16 @@
     if (!row || document.getElementById('kairosSignOut')) return;
     const button = document.createElement('button');
     button.id = 'kairosSignOut';
-    button.className = 'auth-link';
+    button.className = 'btn small sidebar-signout';
     button.type = 'button';
     button.textContent = 'Sign out';
-    button.style.margin = '10px 18px';
     button.addEventListener('click', signOut);
     row.insertAdjacentElement('afterend', button);
     if (session?.user?.email) {
       document.querySelectorAll('.profile-display-name').forEach(el => {
         if (el.textContent === 'Jatin Shende' || el.textContent === 'Workspace user') el.textContent = session.user.email;
       });
-      window.kairosUser = { id: session.user.id || '', email: session.user.email || '' };
+      window.kairosUser = { id: session.user.id || '', email: session.user.email || '', user_metadata: session.user.user_metadata || {} };
     }
   }
   async function signOut() {
@@ -221,13 +254,36 @@
     clearSession();
     location.replace('/');
   }
+  async function sendLoginWelcomeEmail(session) {
+    if (!session?.user?.email || session.kairos_welcome_email_sent) return;
+    session.kairos_welcome_email_event_id ||= crypto.randomUUID();
+    saveSession(session, Boolean(localStorage.getItem(sessionKey)));
+    try {
+      const response = await fetch('/api/v1/me/welcome-email', {
+        method: 'POST',
+        headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+        body: JSON.stringify({ event_id: session.kairos_welcome_email_event_id }),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result?.error?.message || result?.detail || 'Welcome email delivery failed.');
+      session.kairos_welcome_email_sent = Boolean(result.sent);
+      saveSession(session, Boolean(localStorage.getItem(sessionKey)));
+      const detail = { ok: Boolean(result.sent), duplicate: Boolean(result.duplicate), message: result.sent ? 'Welcome email sent to ' + session.user.email + '.' : 'No welcome email was delivered. Check the backend mail configuration.' };
+      window.kairosPendingEmailStatus = detail;
+      window.dispatchEvent(new CustomEvent('kairos:email-status', { detail }));
+    } catch (error) {
+      const detail = { ok: false, message: error.message || 'Welcome email delivery failed.' };
+      window.kairosPendingEmailStatus = detail;
+      window.dispatchEvent(new CustomEvent('kairos:email-status', { detail }));
+    }
+  }
   async function startApp(session) {
     if (session?.access_token) {
       activeSession = session;
       scheduleRefresh(session);
     }
     const authUser = session?.user;
-    window.kairosUser = authUser ? { id: authUser.id || '', email: authUser.email || '' } : null;
+    window.kairosUser = authUser ? { id: authUser.id || '', email: authUser.email || '', user_metadata: authUser.user_metadata || {} } : null;
     if (authUser) {
       const metadata = authUser.user_metadata || {};
       const accountName = String(metadata.full_name || metadata.name || authUser.email || 'Workspace user').trim();
@@ -241,6 +297,10 @@
       }
     }
     installApiAuthorization();
+    window.dispatchEvent(new CustomEvent('kairos:auth-ready'));
+    // Start delivery as soon as Supabase has authenticated the user. A slow or
+    // broken dashboard script must not suppress the login email.
+    sendLoginWelcomeEmail(session);
     authScreen.hidden = true;
     appShell.hidden = false;
     if (appStarted) return;
@@ -281,6 +341,7 @@
       return;
     }
     try {
+      await loadAuthConfig();
       if (!config?.url || !config?.publishable_key) throw new Error('Supabase sign-in is not configured on this server.');
       if (message.type === 'signin') {
         const session = await authRequest('token?grant_type=password', { email: message.email, password: message.password });
@@ -374,10 +435,7 @@
   async function boot() {
     window.addEventListener('message', handleFrameMessage);
     try {
-      const response = await fetch('/api/v1/auth/config', { headers: { Accept: 'application/json' } });
-      if (!response.ok) throw new Error('Could not read authentication configuration.');
-      config = await response.json();
-      configLoaded = true;
+      await loadAuthConfig();
       if (!config?.url || !config?.publishable_key) {
         authScreen.hidden = false;
         setTimeout(() => showAuthError('Supabase sign-in is not configured. Add the project URL and publishable key to the server environment.'), 250);

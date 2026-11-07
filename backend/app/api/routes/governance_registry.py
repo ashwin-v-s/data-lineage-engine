@@ -8,9 +8,9 @@ from fastapi import APIRouter, Depends, HTTPException
 from psycopg2.extras import Json, RealDictCursor
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from backend.app.api.routes.membership import require_role
 from backend.app.auth import require_user
 from backend.app.db import get_conn
-from backend.app.api.routes.membership import require_role
 
 router = APIRouter(prefix="/governance", tags=["governance-registry"], dependencies=[Depends(require_user)])
 WRITE = [Depends(require_role("owner", "admin", "editor"))]
@@ -23,7 +23,7 @@ def _tables(cur, *names: str) -> None:
         if cur.fetchone()["relation"] is None:
             missing.append(name)
     if missing:
-        raise HTTPException(status_code=503, detail=f"Governance storage unavailable: {', '.join(missing)}. Migration 0011 requires migration-owner approval and application.")
+        raise HTTPException(status_code=503, detail=f"Governance storage unavailable: {', '.join(missing)}. Verify that migration 0011 is applied.")
 
 
 class TermInput(BaseModel):
@@ -187,6 +187,23 @@ def list_classifications(dataset_id: uuid.UUID | None = None, user: dict = Depen
     return {"classifications": rows, "count": len(rows)}
 
 
+@router.get("/datasets/{dataset_id}/columns")
+def list_dataset_columns(dataset_id: uuid.UUID, user: dict = Depends(require_user)):
+    """Return columns for a dataset already visible in the current workspace."""
+    with get_conn() as conn:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            _tables(cur, "dataset", "column_record")
+            cur.execute("SELECT id::text FROM dataset WHERE id=%s::uuid", (str(dataset_id),))
+            if not cur.fetchone():
+                raise HTTPException(status_code=404, detail="Asset not found")
+            cur.execute(
+                "SELECT id::text,column_name,data_type FROM column_record WHERE dataset_id=%s::uuid ORDER BY column_name",
+                (str(dataset_id),),
+            )
+            rows = [dict(row) for row in cur.fetchall()]
+    return {"columns": rows, "count": len(rows)}
+
+
 @router.get("/domains")
 def list_domains(user: dict = Depends(require_user)):
     with get_conn() as conn:
@@ -223,7 +240,8 @@ def list_products(user: dict = Depends(require_user)):
                 LEFT JOIN product_asset pa ON pa.product_id=p.id
                 LEFT JOIN LATERAL (SELECT state FROM freshness_evaluation WHERE dataset_id=pa.dataset_id ORDER BY evaluated_at DESC LIMIT 1) fe ON true
                 LEFT JOIN LATERAL (SELECT status FROM quality_result WHERE assertion_id IN (SELECT id FROM quality_assertion WHERE dataset_id=pa.dataset_id) ORDER BY evaluated_at DESC LIMIT 1) qr ON true
-                LEFT JOIN incident i ON i.dataset_id=pa.dataset_id GROUP BY p.id,d.name ORDER BY lower(p.name)""")
+                LEFT JOIN incident i ON i.dataset_id=pa.dataset_id
+                GROUP BY p.id,d.name,dc.version,dc.enforcement_mode ORDER BY lower(p.name)""")
             rows = [dict(row) for row in cur.fetchall()]
     return {"products": rows, "count": len(rows)}
 

@@ -35,9 +35,9 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from psycopg2.extras import Json, RealDictCursor
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from backend.app.api.routes.membership import require_role
 from backend.app.auth import require_user
 from backend.app.db import get_conn
-from backend.app.api.routes.membership import require_role
 from backend.app.services.freshness import (
     evaluate_freshness,
     incident_dedupe_key,
@@ -143,7 +143,7 @@ def _require_governance(cur, *tables: str) -> None:
             status_code=503,
             detail=(
                 "The required governance storage is not installed in this project "
-                f"(missing: {', '.join(missing)}). Migration 0011 is proposal-only and requires migration-owner approval."
+                f"(missing: {', '.join(missing)}). Verify that migration 0011 is applied."
             ),
         )
 

@@ -1,0 +1,25 @@
+{
+  "contract_version": "kairos.ingest.v1",
+  "source": {"kind": "upload", "ref": "fixture:orders"},
+  "assets": [
+    {
+      "id": "raw-orders",
+      "name": "orders",
+      "namespace": "warehouse.raw",
+      "type": "table",
+      "kind": "source",
+      "metadata": {"description": "Raw order records"}
+    },
+    {
+      "id": "orders-model",
+      "name": "orders_model",
+      "namespace": "analytics",
+      "type": "model",
+      "kind": "transform",
+      "metadata": {"owner": "data-team", "tags": ["demo", "orders"]}
+    }
+  ],
+  "relationships": [
+    {"source_id": "raw-orders", "target_id": "orders-model", "edge_type": "declared_dependency", "provenance": "dbt manifest declaration"}
+  ]
+}

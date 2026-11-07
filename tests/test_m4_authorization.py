@@ -32,6 +32,7 @@ OWNER = "44444444-4444-4444-8444-444444444444"
 STRANGER = "55555555-5555-4555-8555-555555555555"
 
 TERM_ID = "66666666-6666-4666-8666-666666666666"
+DATASET_ID = "77777777-7777-4777-8777-777777777777"
 
 
 class _MembershipStore:
@@ -96,6 +97,7 @@ class _RouteCursor:
     def __init__(self):
         self.rowcount = 0
         self._one = None
+        self._many = []
 
     def __enter__(self):
         return self
@@ -106,7 +108,11 @@ class _RouteCursor:
     def execute(self, query, params=()):
         sql = " ".join(query.split())
         if "to_regclass" in sql:
-            self._one = _Row(relation="public.glossary_term")
+            self._one = _Row(relation=f"public.{params[0].split('.')[-1]}")
+        elif sql.startswith("SELECT id::text FROM dataset WHERE id="):
+            self._one = _Row(id=DATASET_ID)
+        elif sql.startswith("SELECT id::text,column_name,data_type FROM column_record"):
+            self._many = [_Row(id="88888888-8888-4888-8888-888888888888", column_name="email", data_type="text")]
         elif sql.startswith("INSERT INTO glossary_term"):
             self._one = _Row(
                 id=TERM_ID,
@@ -124,7 +130,7 @@ class _RouteCursor:
         return self._one
 
     def fetchall(self):
-        return []
+        return self._many
 
 
 class _RouteConnection:
@@ -210,6 +216,23 @@ def test_unauthenticated_request_is_rejected_before_any_workspace_lookup(client,
 def test_unauthenticated_write_is_rejected(client):
     response = client.post("/api/v1/governance/terms", json=_term_payload())
     assert response.status_code == 401
+
+
+def test_dataset_column_lookup_requires_authentication(client):
+    response = client.get(f"/api/v1/governance/datasets/{DATASET_ID}/columns")
+    assert response.status_code == 401
+
+
+def test_dataset_column_lookup_returns_columns_for_visible_asset(client, monkeypatch):
+    _authenticate(monkeypatch, EDITOR, role="editor")
+
+    response = client.get(f"/api/v1/governance/datasets/{DATASET_ID}/columns")
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "columns": [{"id": "88888888-8888-4888-8888-888888888888", "column_name": "email", "data_type": "text"}],
+        "count": 1,
+    }
 
 
 # -- editor-level writes ---------------------------------------------------------
