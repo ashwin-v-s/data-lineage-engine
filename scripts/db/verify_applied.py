@@ -120,7 +120,7 @@ MIGRATION_TABLES: dict[str, list[str]] = {
 # reported when absent but do not fail the run, because a proposal is *expected*
 # to be unapplied until the migration owner approves it.  Once such a migration
 # is approved and applied, remove it from this set so its absence fails again.
-PROPOSAL_ONLY_MIGRATIONS: frozenset[str] = frozenset({"0011_m4_governance"})
+PROPOSAL_ONLY_MIGRATIONS: frozenset[str] = frozenset()
 
 
 def main(argv=None) -> int:

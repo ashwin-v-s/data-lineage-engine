@@ -16,7 +16,7 @@ EVENT_TYPES = ("FRESHNESS_BREACH", "QUALITY_FAILURE", "INCIDENT_CREATED", "SYNC_
 def _require_table(cur):
     cur.execute("SELECT to_regclass('public.notification') AS relation")
     if cur.fetchone()["relation"] is None:
-        raise HTTPException(status_code=503, detail="Notification storage is unavailable until approved migration 0011 is applied.")
+        raise HTTPException(status_code=503, detail="Notification storage is unavailable; verify migration 0011_m4_governance.sql is applied.")
 
 
 @router.get("")

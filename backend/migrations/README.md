@@ -12,7 +12,7 @@ shared **Supabase Postgres** project.
 >
 > See `docs/DECISION_LOG.md` D12 for the DB runtime decision.
 
-## Apply status (last verified 2026-11-03 — all 9 migrations applied to shared Supabase)
+## Apply status (last verified 2026-11-07 — migrations 0001–0011 applied to shared Supabase)
 
 | Migration | Tables | Status |
 |---|---|---|
@@ -25,6 +25,8 @@ shared **Supabase Postgres** project.
 | 0007_membership_roles | workspace_member, workspace_invite | âš ï¸ NOT VERIFIED â€” run verify_applied.py |
 | 0008_source_connections | source_connection | âš ï¸ NOT VERIFIED â€” run verify_applied.py |
 | 0009_governance | freshness_sla, freshness_evaluation, incident, incident_event | âš ï¸ CLAIMED Applied in header â€” run verify_applied.py to confirm |
+| 0010_m2_source_connection_lifecycle | sync_job + source lifecycle/sync columns | Applied — verified 2026-11-07 |
+| 0011_m4_governance | Governance, quality, contracts, notifications and freshness/incident extensions | Applied — verified 2026-11-07 |
 
 
 

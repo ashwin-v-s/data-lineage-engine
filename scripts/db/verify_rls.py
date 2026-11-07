@@ -43,7 +43,7 @@ from dotenv import load_dotenv
 #   * 0006_github_connections.sql  - github_connection.
 #   * 0007_membership_roles.sql    - workspace_member, workspace_invite.
 #
-# 0003-0009 are applied to the shared Supabase project.  Every workspace-scoped
+# 0003-0011 are applied to the shared Supabase project. Every workspace-scoped
 # table created by a migration is listed here so the live RLS gate covers it.
 # See backend/migrations/README.md for per-migration apply status, and
 # scripts/db/check_migrations.py for the static cross-check that keeps this list
@@ -86,6 +86,20 @@ WORKSPACE_SCOPED_TABLES = (
     "incident_event",
     # 0010_source_connection_lifecycle.sql
     "sync_job",
+    # 0011_m4_governance.sql
+    "freshness_confirmation",
+    "quality_assertion",
+    "quality_result",
+    "glossary_term",
+    "term_assignment",
+    "pii_classification",
+    "domain",
+    "data_product",
+    "product_asset",
+    "data_contract",
+    "quality_contract_link",
+    "notification",
+    "notification_preference",
 )
 
 # Exit codes.
@@ -256,6 +270,10 @@ def main(argv=None) -> int:
     role_failures = []
     try:
         with conn.cursor() as cur:
+            # DATABASE_URL commonly uses Supabase's privileged postgres login.
+            # The application must SET ROLE to the restricted account before
+            # workspace RLS can protect reads and writes. Verify that exact role.
+            cur.execute("SET LOCAL ROLE kairos_app")
             role_row = check_connecting_role(cur)
             if role_row is None:
                 role_failures.append(

@@ -67,6 +67,7 @@ client = TestClient(app)
 def _authenticated_openlineage_test_client(monkeypatch):
     """Provide the configured service bearer token to the normal route cases."""
     monkeypatch.setenv("KAIROS_OPENLINEAGE_WEBHOOK_SECRET", "test-openlineage-secret")
+    monkeypatch.setenv("KAIROS_OPENLINEAGE_WORKSPACE_ID", "11111111-1111-4111-8111-111111111111")
     client.headers["Authorization"] = "Bearer test-openlineage-secret"
     yield
     client.headers.pop("Authorization", None)
@@ -187,6 +188,13 @@ def test_openlineage_fails_closed_when_webhook_auth_is_unconfigured(monkeypatch)
     resp = client.post("/api/v1/ingest/openlineage", json=_complete_event())
     assert resp.status_code == 503
     assert resp.json()["error"]["code"] == "WEBHOOK_AUTH_UNAVAILABLE"
+
+
+def test_openlineage_fails_closed_when_workspace_binding_is_missing(monkeypatch):
+    monkeypatch.delenv("KAIROS_OPENLINEAGE_WORKSPACE_ID")
+    resp = client.post("/api/v1/ingest/openlineage", json=_complete_event())
+    assert resp.status_code == 503
+    assert resp.json()["error"]["code"] == "WEBHOOK_WORKSPACE_UNAVAILABLE"
 
 
 # ---------------------------------------------------------------------------

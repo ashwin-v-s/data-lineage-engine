@@ -23,7 +23,7 @@ def _tables(cur, *names: str) -> None:
         if cur.fetchone()["relation"] is None:
             missing.append(name)
     if missing:
-        raise HTTPException(status_code=503, detail=f"Governance storage unavailable: {', '.join(missing)}. Migration 0011 requires migration-owner approval and application.")
+        raise HTTPException(status_code=503, detail=f"Governance storage unavailable: {', '.join(missing)}. Verify that migration 0011 is applied.")
 
 
 class TermInput(BaseModel):
@@ -240,7 +240,8 @@ def list_products(user: dict = Depends(require_user)):
                 LEFT JOIN product_asset pa ON pa.product_id=p.id
                 LEFT JOIN LATERAL (SELECT state FROM freshness_evaluation WHERE dataset_id=pa.dataset_id ORDER BY evaluated_at DESC LIMIT 1) fe ON true
                 LEFT JOIN LATERAL (SELECT status FROM quality_result WHERE assertion_id IN (SELECT id FROM quality_assertion WHERE dataset_id=pa.dataset_id) ORDER BY evaluated_at DESC LIMIT 1) qr ON true
-                LEFT JOIN incident i ON i.dataset_id=pa.dataset_id GROUP BY p.id,d.name ORDER BY lower(p.name)""")
+                LEFT JOIN incident i ON i.dataset_id=pa.dataset_id
+                GROUP BY p.id,d.name,dc.version,dc.enforcement_mode ORDER BY lower(p.name)""")
             rows = [dict(row) for row in cur.fetchall()]
     return {"products": rows, "count": len(rows)}
 

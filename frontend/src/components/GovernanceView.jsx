@@ -35,6 +35,8 @@ export default function GovernanceView({ view, demoPreview = false }) {
   const [assetChoices, setAssetChoices] = useState([]);
   const [assetChoicesError, setAssetChoicesError] = useState('');
   const [domainChoices, setDomainChoices] = useState([]);
+  const [contractChoices, setContractChoices] = useState([]);
+  const [qualityChoices, setQualityChoices] = useState([]);
   const [columnChoices, setColumnChoices] = useState([]);
   const [selectedDatasetId, setSelectedDatasetId] = useState('');
 
@@ -52,8 +54,19 @@ export default function GovernanceView({ view, demoPreview = false }) {
         } catch (assetErr) { setAssetChoices([]); setAssetChoicesError(assetErr.message || 'Catalog assets could not be loaded.'); }
       } else { setAssetChoices([]); setAssetChoicesError(''); }
       if (view === 'products') {
-        try { const domains = await request('/governance/domains'); setDomainChoices(Array.isArray(domains.domains) ? domains.domains : []); }
-        catch (_) { setDomainChoices([]); }
+        const [domains, assertions] = await Promise.all([
+          request('/governance/domains').catch(() => ({ domains: [] })),
+          request('/quality/assertions').catch(() => ({ assertions: [] })),
+        ]);
+        setDomainChoices(Array.isArray(domains.domains) ? domains.domains : []);
+        setQualityChoices(Array.isArray(assertions.assertions) ? assertions.assertions : []);
+        const contracts = await Promise.all((Array.isArray(data.products) ? data.products : []).map(async (product) => {
+          try {
+            const result = await request(`/governance/products/${encodeURIComponent(product.id)}/contracts`);
+            return (result.contracts || []).map((contract) => ({ ...contract, product_name: product.name }));
+          } catch (_) { return []; }
+        }));
+        setContractChoices(contracts.flat());
       }
       if (view === 'settings') {
         try {
@@ -209,10 +222,10 @@ export default function GovernanceView({ view, demoPreview = false }) {
     </form>}
     {view === 'products' && <>
       <form className="kv-card kv-freshness-form" onSubmit={createContract}>
-        <h2>Create a versioned data contract</h2><label>Product UUID<input name="product_id" required /></label><label>Next version number<input name="version" type="number" min="1" required /></label><label>Enforcement mode<select name="enforcement_mode"><option>MONITOR</option><option>WARN</option><option>BLOCK</option></select></label><label>Clauses (JSON array)<textarea name="clauses" defaultValue="[]" maxLength={20000} required /></label><button className="btn" disabled={busy} type="submit">Save contract version</button>
+        <h2>Create a versioned data contract</h2><label>Data product<select name="product_id" required><option value="">Choose a product</option>{rows.map((product) => <option key={product.id} value={product.id}>{product.name}</option>)}</select></label><label>Version number<input name="version" type="number" min="1" required /></label><label>Enforcement mode<select name="enforcement_mode"><option>MONITOR</option><option>WARN</option><option>BLOCK</option></select></label><label>Clauses (JSON array)<textarea name="clauses" defaultValue="[]" maxLength={20000} required /></label><button className="btn" disabled={busy} type="submit">Save contract version</button>
       </form>
       <form className="kv-card kv-freshness-form" onSubmit={linkAssertion}>
-        <h2>Bind a quality assertion to a contract clause</h2><label>Contract UUID<input name="contract_id" required /></label><label>Assertion UUID<input name="assertion_id" required /></label><label>Clause key<input name="clause_key" maxLength={120} required /></label><button className="btn" disabled={busy} type="submit">Link assertion</button>
+        <h2>Bind a quality assertion to a contract clause</h2><label>Product contract<select name="contract_id" required><option value="">Choose a contract</option>{contractChoices.map((contract) => <option key={contract.id} value={contract.id}>{contract.product_name} · v{contract.version} · {contract.enforcement_mode}</option>)}</select></label><label>Quality assertion<select name="assertion_id" required><option value="">Choose an assertion</option>{qualityChoices.map((assertion) => <option key={assertion.id} value={assertion.id}>{assertion.name}</option>)}</select></label><label>Clause key<input name="clause_key" maxLength={120} required /></label><button className="btn" disabled={busy} type="submit">Link assertion</button>
       </form>
     </>}
     <section className="kv-card"><h2>{view === 'notifications' ? 'Notification history' : `${config.title} records`}</h2>

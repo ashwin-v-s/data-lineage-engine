@@ -425,7 +425,7 @@ Pattern: {number}_{owner_initials}_{feature}.sql
 
 ## D15: M2 0010_m2_source_connection_lifecycle Approval Gate
 
-**Status:** FILE APPROVED, NOT APPLIED
+**Status:** APPROVED BY M1 AND APPLIED 2026-11-07
 
 **Review completed by M1:**
   ✅ Migration syntax valid
@@ -433,16 +433,15 @@ Pattern: {number}_{owner_initials}_{feature}.sql
   ✅ Table schema aligns with architecture
   ✅ No modifications to existing 0001-0009 tables
 
-**Awaiting:**
-  • M2 confirmation of intended application date
-  • M1 final approval to apply to shared Supabase
-  • Once approved: psql "\" -f backend/migrations/0010_m2_source_connection_lifecycle.sql
+**Application evidence:** `python scripts/db/verify_applied.py` reports the
+`sync_job` table present in the shared Supabase project. The migration was
+applied transactionally from `backend/migrations/0010_m2_source_connection_lifecycle.sql`.
 
 ---
 
 ## D16: M4 0011_m4_governance Authorship & Review
 
-**Status:** NOT YET AUTHORED
+**Status:** AUTHORED, REVIEWED, APPROVED BY M1 AND APPLIED 2026-11-07
 
 **Requirements for M4 (Gauree):**
   1. Author 0011_m4_governance.sql (use this number, not 0010)
@@ -459,5 +458,10 @@ Pattern: {number}_{owner_initials}_{feature}.sql
   ✅ No modifications to 0001-0010 tables
   ✅ Aligns with architecture & handout requirements
 
-**Approval gate:** M1 (Jatin) must approve before application to Supabase.
+**Application evidence:** M1 reviewed the migration's workspace RLS policies,
+forced RLS, `kairos_app` grants, and additive changes to the existing 0009
+freshness/incident tables, then approved application for demo readiness.
+`python scripts/db/verify_applied.py` reports all 13 governance tables present;
+live catalog inspection confirmed RLS enabled and forced, one workspace policy,
+and SELECT privilege for `kairos_app` on every new table.
 

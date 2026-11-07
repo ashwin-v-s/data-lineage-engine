@@ -214,6 +214,26 @@ async def ingest_openlineage(request: Request) -> JSONResponse:
             400,
             "INVALID_PAYLOAD",
         )
+    workspace_id = (os.getenv("KAIROS_OPENLINEAGE_WORKSPACE_ID") or "").strip()
+    try:
+        workspace_id = str(uuid.UUID(workspace_id))
+    except (ValueError, AttributeError):
+        return api_error(
+            request,
+            "OpenLineage webhook workspace is not configured",
+            503,
+            "WEBHOOK_WORKSPACE_UNAVAILABLE",
+        )
+    from backend.app.db import reset_workspace_id, set_workspace_id
+
+    scope_token = set_workspace_id(workspace_id)
+    try:
+        return _ingest_openlineage_events(request, raw_events)
+    finally:
+        reset_workspace_id(scope_token)
+
+
+def _ingest_openlineage_events(request: Request, raw_events: list) -> JSONResponse:
     if not raw_events:
         return JSONResponse(IngestResult(
             accepted=0, duplicate=0, skipped=0, evidence_created=0,
@@ -323,6 +343,7 @@ async def ingest_openlineage(request: Request) -> JSONResponse:
             evidence_created=total_evidence, diagnostics=all_diagnostics,
         ).model_dump(),
     )
+
 
 
 # Authenticated preview and explicit commit for static metadata imports.
