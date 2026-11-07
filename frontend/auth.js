@@ -112,6 +112,22 @@
     if (!response.ok) throw new Error(result.msg || result.message || result.error_description || result.error || `Authentication failed (${response.status}).`);
     return result;
   }
+  async function updateProfileMetadata(profile) {
+    if (!hasActiveSession() || !config?.url || !config?.publishable_key) throw new Error('Sign in again before saving your account profile.');
+    const response = await fetch(`${config.url}/auth/v1/user`, {
+      method: 'PUT',
+      headers: { apikey: config.publishable_key, Authorization: `Bearer ${activeSession.access_token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ data: profile }),
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(result.msg || result.message || result.error_description || result.error || `Could not save the Supabase profile (${response.status}).`);
+    activeSession.user = result;
+    const remember = Boolean(localStorage.getItem(sessionKey));
+    saveSession(activeSession, remember);
+    window.kairosUser = { id: result.id || '', email: result.email || '', user_metadata: result.user_metadata || {} };
+    return result.user_metadata || {};
+  }
+  window.kairosUpdateProfile = updateProfileMetadata;
   function frameStatus(form, ok, message, mode) {
     frame?.contentWindow?.postMessage({ source: 'kairos-auth-host', form, ok, message, mode }, location.origin);
   }
@@ -213,7 +229,7 @@
       document.querySelectorAll('.profile-display-name').forEach(el => {
         if (el.textContent === 'Jatin Shende' || el.textContent === 'Workspace user') el.textContent = session.user.email;
       });
-      window.kairosUser = { id: session.user.id || '', email: session.user.email || '' };
+      window.kairosUser = { id: session.user.id || '', email: session.user.email || '', user_metadata: session.user.user_metadata || {} };
     }
   }
   async function signOut() {
@@ -227,7 +243,7 @@
       scheduleRefresh(session);
     }
     const authUser = session?.user;
-    window.kairosUser = authUser ? { id: authUser.id || '', email: authUser.email || '' } : null;
+    window.kairosUser = authUser ? { id: authUser.id || '', email: authUser.email || '', user_metadata: authUser.user_metadata || {} } : null;
     if (authUser) {
       const metadata = authUser.user_metadata || {};
       const accountName = String(metadata.full_name || metadata.name || authUser.email || 'Workspace user').trim();

@@ -8,9 +8,9 @@ from fastapi import APIRouter, Depends, HTTPException
 from psycopg2.extras import Json, RealDictCursor
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from backend.app.api.routes.membership import require_role
 from backend.app.auth import require_user
 from backend.app.db import get_conn
-from backend.app.api.routes.membership import require_role
 
 router = APIRouter(prefix="/governance", tags=["governance-registry"], dependencies=[Depends(require_user)])
 WRITE = [Depends(require_role("owner", "admin", "editor"))]
@@ -185,6 +185,23 @@ def list_classifications(dataset_id: uuid.UUID | None = None, user: dict = Depen
             cur.execute("SELECT id::text,dataset_id::text,column_id::text,classification,evidence_state,provenance,classified_by::text,reviewed_by::text,reviewed_at,created_at FROM pii_classification WHERE (%s::uuid IS NULL OR dataset_id=%s::uuid) ORDER BY created_at DESC", (str(dataset_id) if dataset_id else None,str(dataset_id) if dataset_id else None))
             rows = [dict(row) for row in cur.fetchall()]
     return {"classifications": rows, "count": len(rows)}
+
+
+@router.get("/datasets/{dataset_id}/columns")
+def list_dataset_columns(dataset_id: uuid.UUID, user: dict = Depends(require_user)):
+    """Return columns for a dataset already visible in the current workspace."""
+    with get_conn() as conn:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            _tables(cur, "dataset", "column_record")
+            cur.execute("SELECT id::text FROM dataset WHERE id=%s::uuid", (str(dataset_id),))
+            if not cur.fetchone():
+                raise HTTPException(status_code=404, detail="Asset not found")
+            cur.execute(
+                "SELECT id::text,column_name,data_type FROM column_record WHERE dataset_id=%s::uuid ORDER BY column_name",
+                (str(dataset_id),),
+            )
+            rows = [dict(row) for row in cur.fetchall()]
+    return {"columns": rows, "count": len(rows)}
 
 
 @router.get("/domains")
