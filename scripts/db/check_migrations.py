@@ -15,7 +15,11 @@ It reports, at minimum:
    and the reverse: any table in the verified list that no migration creates;
 3. whether a migration that adds a workspace-scoped table (one carrying a
    ``workspace_id`` column) also ENABLEs row-level security, FORCEs it, and
-   defines a policy for that table.
+   defines a policy for that table;
+4. whether the migration *numbers* form the expected unbroken chain: every
+   number in ``EXPECTED_FIRST_MIGRATION``..``EXPECTED_LATEST_MIGRATION`` must
+   be present exactly once.  A gap is a hard failure, because the chain is
+   positional — a later migration may assume an earlier one ran.
 
 Migrations whose header marks them "PROPOSAL ONLY / NOT APPLIED" are still
 reported and are still subject to check (3).  They are *not* automatically
@@ -30,7 +34,8 @@ shared project and listed in the live RLS gate.
 Exit codes mirror ``scripts/db/verify_rls.py``:
 
     0  schema is consistent (no gap)
-    1  a gap was found
+    1  a gap was found (missing/duplicate migration number, verify-list drift,
+       or a missing RLS declaration)
     2  setup/parse error (missing file, unreadable/invalid ``verify_rls.py``)
 
 Usage
@@ -64,9 +69,16 @@ VERIFY_RLS_PATH = ROOT / "scripts" / "db" / "verify_rls.py"
 # Keep this in step with the matching comment in scripts/db/verify_rls.py and
 # the runbook in backend/migrations/README.md.
 VERIFY_LIST_EXCLUSIONS: dict[str, str] = {
-    # Empty: every workspace-scoped table a migration creates is now applied to
-    # the shared project and listed in verify_rls.py.  Add an entry here only if
-    # a table is intentionally kept out of the live RLS gate.
+    # Proposal-only M4 schema is statically checked for RLS but is not expected
+    # to exist in the live project before M1 approves/applies migration 0011.
+    **{
+        table: "0011_m4_governance.sql is proposal-only pending migration-owner approval"
+        for table in (
+            "freshness_confirmation", "quality_assertion", "quality_result", "glossary_term", "term_assignment",
+            "pii_classification", "domain", "data_product", "product_asset",
+            "data_contract", "quality_contract_link", "notification", "notification_preference",
+        )
+    },
 }
 
 # Supabase built-in role names that appear in GRANT/REVOKE statements inside
@@ -315,6 +327,72 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+# ---------------------------------------------------------------------------
+# Migration numbering continuity
+# ---------------------------------------------------------------------------
+# The chain is forward-only and positional: a later file may assume every
+# earlier one ran (0011 builds on 0009's tables; 0010's M2 lifecycle columns
+# build on 0008's source_connection).  A *missing* number is therefore a hard
+# failure, not a formatting nit — it is exactly the state where a migration
+# exists locally but its predecessor was never restored from origin/main.
+#
+# Bump EXPECTED_LATEST_MIGRATION in the same commit that adds a new migration;
+# the range is checked from EXPECTED_FIRST_MIGRATION to EXPECTED_LATEST_MIGRATION
+# inclusive, so a forgotten bump fails loudly and cannot silently loosen the
+# gate.
+EXPECTED_FIRST_MIGRATION = 1
+EXPECTED_LATEST_MIGRATION = 12
+
+_MIGRATION_FILENAME_RE = re.compile(r"^(\d{4})_[A-Za-z0-9_]+\.sql$")
+
+
+def check_numbering(migrations: list[Migration]) -> tuple[list[str], list[str]]:
+    """Return ``(numbering_gaps, notes)`` for the migration file sequence.
+
+    Detects a missing number in ``EXPECTED_FIRST_MIGRATION``..``EXPECTED_LATEST_MIGRATION``,
+    a number used by more than one file, and a file name that does not follow
+    the ``NNNN_name.sql`` convention.  These are gaps (hard failures); the only
+    note is a file numbered beyond ``EXPECTED_LATEST_MIGRATION``, which means
+    the constant needs bumping.
+    """
+    numbering_gaps: list[str] = []
+    notes: list[str] = []
+
+    by_number: dict[int, list[str]] = {}
+    for mig in migrations:
+        match = _MIGRATION_FILENAME_RE.match(mig.name)
+        if not match:
+            numbering_gaps.append(
+                f"migration file '{mig.name}' does not follow the NNNN_name.sql convention"
+            )
+            continue
+        by_number.setdefault(int(match.group(1)), []).append(mig.name)
+
+    for number, names in sorted(by_number.items()):
+        if len(names) > 1:
+            numbering_gaps.append(
+                f"migration number {number:04d} is claimed by {len(names)} files "
+                f"({', '.join(sorted(names))}); exactly one migration may own a number"
+            )
+
+    for number in range(EXPECTED_FIRST_MIGRATION, EXPECTED_LATEST_MIGRATION + 1):
+        if number not in by_number:
+            numbering_gaps.append(
+                f"migration number {number:04d} is MISSING from the chain "
+                f"(expected {EXPECTED_FIRST_MIGRATION:04d}..{EXPECTED_LATEST_MIGRATION:04d}); "
+                "later migrations may assume it ran"
+            )
+
+    for number in sorted(by_number):
+        if number > EXPECTED_LATEST_MIGRATION:
+            notes.append(
+                f"migration {number:04d} is numbered beyond EXPECTED_LATEST_MIGRATION "
+                f"({EXPECTED_LATEST_MIGRATION:04d}); bump the constant to bring it into the gate"
+            )
+
+    return numbering_gaps, notes
+
+
 def _gather_migrations(migrations_dir: Path) -> list[Migration]:
     files = sorted(
         (p for p in migrations_dir.glob("*.sql") if p.is_file()),
@@ -466,13 +544,28 @@ def main(argv=None) -> int:
     print("=" * width)
     print(f"Migrations directory : {migrations_dir}")
     print(f"verify_rls.py        : {verify_rls_path}")
-    print(f"Migrations found     : {len(migrations)}")
+    expected_count = EXPECTED_LATEST_MIGRATION - EXPECTED_FIRST_MIGRATION + 1
+    print(f"Migrations found     : {len(migrations)} (expected {expected_count})")
     print(f"Verified table list  : {len(verified)} tables")
     print("")
 
     _print_per_migration_report(migrations, width)
 
+    numbering_gaps, numbering_notes = check_numbering(migrations)
     coverage_gaps, rls_gaps, notes = run_checks(migrations, verified)
+    notes = numbering_notes + notes
+
+    print("-" * width)
+    print(f"Check 1: migration numbering continuity "
+          f"({EXPECTED_FIRST_MIGRATION:04d}..{EXPECTED_LATEST_MIGRATION:04d})")
+    print("-" * width)
+    if numbering_gaps:
+        for gap in numbering_gaps:
+            print(f"[FAIL] {gap}")
+    else:
+        print(f"[PASS] migration numbers {EXPECTED_FIRST_MIGRATION:04d}.."
+              f"{EXPECTED_LATEST_MIGRATION:04d} are each present exactly once")
+    print("")
 
     print("-" * width)
     print("Check 2: verify_rls.py coverage")
@@ -498,11 +591,13 @@ def main(argv=None) -> int:
               "and has a policy in its migration")
     print("")
 
-    failed = len(coverage_gaps) + len(rls_gaps)
+    failed = len(numbering_gaps) + len(coverage_gaps) + len(rls_gaps)
     print("-" * width)
     print(f"Summary: {failed} gap(s) found, {len(notes)} note(s)")
     if failed == 0:
-        print("RESULT: PASS")
+        print("RESULT: PASS — numbering, verify-list coverage and per-migration "
+              "RLS declarations are consistent (static file check; no database "
+              "was contacted, so nothing here proves a migration was applied)")
         return EXIT_OK
 
     print("RESULT: FAIL")

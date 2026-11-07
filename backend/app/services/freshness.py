@@ -24,7 +24,7 @@ __all__ = [
     "next_incident_status",
 ]
 
-FRESHNESS_STATES: tuple[str, ...] = ("HEALTHY", "AT_RISK", "LATE", "STALE", "UNKNOWN")
+FRESHNESS_STATES: tuple[str, ...] = ("HEALTHY", "AT_RISK", "LATE", "STALE", "UNKNOWN", "PAUSED")
 
 _REASON_NO_SLA = "No freshness SLA is configured."
 _REASON_NO_ACTIVITY = (
@@ -60,6 +60,7 @@ def evaluate_freshness(
     warn_after_minutes: int | None,
     error_after_minutes: int | None,
     stale_after_minutes: int | None = None,
+    paused: bool = False,
 ) -> FreshnessVerdict:
     """Evaluate the freshness state for one dataset.
 
@@ -68,8 +69,12 @@ def evaluate_freshness(
     1. Missing warn/error thresholds → ``UNKNOWN``.
     2. No observed source activity → ``UNKNOWN`` (never ``LATE``).
     3. Otherwise compute the age and compare it against the thresholds,
-       highest first: stale, then error, then warn, otherwise ``HEALTHY``.
+    highest first: stale, then error, then warn, otherwise ``HEALTHY``. Each
+    threshold is crossed only when age is strictly greater than the limit, so
+    an age exactly equal to a threshold remains in the lower-severity state.
     """
+    if paused:
+        return FreshnessVerdict("PAUSED", None, None, "Freshness evaluation is explicitly paused for this asset.")
     if warn_after_minutes is None or error_after_minutes is None:
         return FreshnessVerdict("UNKNOWN", None, None, _REASON_NO_SLA)
     if last_source_activity_at is None:
@@ -78,21 +83,21 @@ def evaluate_freshness(
     age_minutes = max(0, math.floor((_as_utc(now) - _as_utc(last_source_activity_at)).total_seconds() / 60))
     stale_limit = stale_after_minutes if stale_after_minutes is not None else error_after_minutes * 3
 
-    if age_minutes >= stale_limit:
+    if age_minutes > stale_limit:
         return FreshnessVerdict(
             "STALE",
             age_minutes,
             stale_limit,
             f"Source activity is {age_minutes} minutes old; the {stale_limit}-minute stale threshold was reached.",
         )
-    if age_minutes >= error_after_minutes:
+    if age_minutes > error_after_minutes:
         return FreshnessVerdict(
             "LATE",
             age_minutes,
             error_after_minutes,
             f"Source activity is {age_minutes} minutes old; the {error_after_minutes}-minute error threshold was reached.",
         )
-    if age_minutes >= warn_after_minutes:
+    if age_minutes > warn_after_minutes:
         return FreshnessVerdict(
             "AT_RISK",
             age_minutes,

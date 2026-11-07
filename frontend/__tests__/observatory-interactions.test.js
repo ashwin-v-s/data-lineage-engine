@@ -330,7 +330,7 @@ describe('observatory asset selector', () => {
     );
 
     expect(handler).toContain('S.selected=a.id');
-    expect(handler).toContain("$('#observatoryDetail')");
+    expect(handler).toContain("getElementById('observatoryDetail')");
     expect(handler).toContain('detail(a)');
     expect(handler).toContain('three()');
   });

@@ -23,8 +23,21 @@ from psycopg2.extras import RealDictCursor
 
 from backend.app.db import get_conn
 from backend.app.schemas.lineage import LineageEdge, LineageNode, LineageResponse
+from backend.app.services.evidence_strength import STRENGTH_RULE_VERSION, evidence_strength
 
 router = APIRouter(dependencies=[Depends(require_user)])
+
+_SECRET_KEY_RE = re.compile(r"(?:token|secret|password|credential|private.?key|api.?key)", re.I)
+
+
+def _sanitize_evidence_payload(value):
+    """Redact secret-like keys before returning stored source evidence."""
+    if isinstance(value, dict):
+        return {key: _sanitize_evidence_payload(child) for key, child in value.items()
+                if not _SECRET_KEY_RE.search(str(key))}
+    if isinstance(value, list):
+        return [_sanitize_evidence_payload(child) for child in value]
+    return value
 
 _UUID_RE = re.compile(
     r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$',
@@ -34,6 +47,148 @@ _UUID_RE = re.compile(
 
 def _now_utc() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+@router.get("/lineage/edges/{edge_id}/evidence")
+def edge_evidence(edge_id: str, user: dict = Depends(require_user)):
+    """Return stored provenance for one edge, including safe raw/normalized views."""
+    if not _UUID_RE.match(edge_id):
+        raise HTTPException(status_code=404, detail="Lineage edge not found.")
+    with get_conn() as conn:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(
+                """
+                SELECT le.id::text AS edge_id, le.granularity, le.operator_fingerprint,
+                       e.id::text AS evidence_row_id, e.evidence_id, e.evidence_type,
+                       e.source_system, e.run_id, e.coverage, e.parser_status, e.operator,
+                       e.diagnostics, e.event_time, e.effective_time,
+                       e.ingestion_time, e.source_dataset_id::text AS source_dataset_id,
+                       e.target_dataset_id::text AS target_dataset_id,
+                       e.source_column_id::text AS source_column_id,
+                       e.target_column_id::text AS target_column_id,
+                       sd.name AS source_dataset, sc.column_name AS source_column,
+                       td.name AS target_dataset, tc.column_name AS target_column,
+                       etv.valid_from, etv.valid_to, etv.effective_time_status,
+                       etv.transaction_from AS recorded_from, etv.transaction_to AS recorded_to,
+                       raw.payload AS raw_payload,
+                       COALESCE((
+                           SELECT es.state FROM execution_state es
+                           WHERE e.run_id IS NOT NULL AND es.run_id = e.run_id
+                             AND es.source_column_id = e.source_column_id
+                             AND es.target_column_id = e.target_column_id
+                           ORDER BY es.computed_at DESC LIMIT 1
+                       ), 'UNKNOWN') AS state,
+                       ARRAY(
+                           SELECT DISTINCT es.state FROM execution_state es
+                           WHERE e.run_id IS NOT NULL AND es.run_id = e.run_id
+                             AND es.source_column_id = e.source_column_id
+                             AND es.target_column_id = e.target_column_id
+                             AND es.state IN ('OBSERVED', 'REFUTED_FOR_RUN')
+                       ) AS execution_states
+                FROM lineage_edge le
+                LEFT JOIN edge_temporal_version etv ON etv.edge_id = le.id
+                LEFT JOIN evidence e ON e.id = etv.evidence_id
+                LEFT JOIN raw_event raw ON raw.event_id = e.raw_event_id
+                LEFT JOIN column_record sc ON sc.id = e.source_column_id
+                LEFT JOIN dataset sd ON sd.id = COALESCE(sc.dataset_id, e.source_dataset_id)
+                LEFT JOIN column_record tc ON tc.id = e.target_column_id
+                LEFT JOIN dataset td ON td.id = COALESCE(tc.dataset_id, e.target_dataset_id)
+                WHERE le.id = %s::uuid
+                ORDER BY e.ingestion_time DESC NULLS LAST, etv.transaction_from DESC NULLS LAST
+                LIMIT 501
+                """,
+                (edge_id,),
+            )
+            rows = [dict(row) for row in cur.fetchall()]
+    if not rows:
+        raise HTTPException(status_code=404, detail="Lineage edge not found.")
+
+    truncated = len(rows) > 500
+    rows = rows[:500]
+    evidence = []
+    states_by_run: dict[str, set[str]] = {}
+    for row in rows:
+        # A logical edge can exist before any evidence has been attached. The
+        # LEFT JOIN row identifies the edge, but is not an evidence record.
+        if row.get("evidence_row_id") is None:
+            continue
+        state = row.get("state") or "UNKNOWN"
+        if row.get("run_id"):
+            recorded_states = row.get("execution_states") or [state]
+            states_by_run.setdefault(row["run_id"], set()).update(
+                value for value in recorded_states if value in {"OBSERVED", "REFUTED_FOR_RUN"}
+            )
+        raw = _sanitize_evidence_payload(row.get("raw_payload"))
+        normalized = {
+            "evidence_id": row.get("evidence_id"),
+            "evidence_type": row.get("evidence_type"),
+            "source_system": row.get("source_system"),
+            "run_id": row.get("run_id"),
+            "source_dataset": row.get("source_dataset"),
+            "source_column": row.get("source_column"),
+            "target_dataset": row.get("target_dataset"),
+            "target_column": row.get("target_column"),
+            "coverage": row.get("coverage"),
+            "parser_status": row.get("parser_status"),
+            "diagnostics": _sanitize_evidence_payload(row.get("diagnostics")),
+        }
+        strength = evidence_strength(
+            state=state,
+            evidence_type=row.get("evidence_type"),
+            coverage=row.get("coverage"),
+            parser_status=row.get("parser_status"),
+        )
+        evidence.append({
+            "evidence_row_id": row.get("evidence_row_id"),
+            "evidence_id": row.get("evidence_id"),
+            "relationship_type": row.get("operator") or row.get("operator_fingerprint") or row.get("granularity"),
+            "state": state,
+            "evidence_type": row.get("evidence_type"),
+            "source_system": row.get("source_system"),
+            "run_id": row.get("run_id"),
+            "coverage": row.get("coverage"),
+            "strength": strength,
+            "strength_rule_version": STRENGTH_RULE_VERSION,
+            "valid_time": {
+                "from": row["valid_from"].isoformat() if row.get("valid_from") else None,
+                "to": row["valid_to"].isoformat() if row.get("valid_to") else None,
+                "status": row.get("effective_time_status"),
+            },
+            "recorded_time": {
+                "from": row["recorded_from"].isoformat() if row.get("recorded_from") else None,
+                "to": row["recorded_to"].isoformat() if row.get("recorded_to") else None,
+            },
+            "explanation": (
+                row["diagnostics"].get("explanation")
+                if isinstance(row.get("diagnostics"), dict) and row["diagnostics"].get("explanation")
+                else "Stored evidence record; interpret it within its run, coverage, and time scope."
+            ),
+            "provenance": {
+                "raw_available": raw is not None,
+                "raw": raw,
+                "parser": {
+                    "adapter": raw.get("provenance", {}).get("adapter") if isinstance(raw, dict) else row.get("source_system"),
+                    "adapter_version": raw.get("provenance", {}).get("adapter_version") if isinstance(raw, dict) else None,
+                },
+                "normalized": normalized,
+                "canonical": {
+                    "source_dataset_id": row.get("source_dataset_id"),
+                    "source_column_id": row.get("source_column_id"),
+                    "target_dataset_id": row.get("target_dataset_id"),
+                    "target_column_id": row.get("target_column_id"),
+                },
+            },
+        })
+    conflicts = [run_id for run_id, states in states_by_run.items()
+                 if {"OBSERVED", "REFUTED_FOR_RUN"}.issubset(states)]
+    return {
+        "edge_id": edge_id,
+        "granularity": rows[0].get("granularity"),
+        "evidence": evidence,
+        "conflict": bool(conflicts),
+        "conflicting_runs": sorted(conflicts),
+        "truncated": truncated,
+    }
 
 
 def _resolve_asset(cur, asset_id: str) -> dict | None:

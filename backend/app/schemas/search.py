@@ -18,6 +18,8 @@ class SearchResult(BaseModel):
     row_count: Optional[int] = None
     steward: Optional[str] = None
     tags: Optional[list[str]] = None
+    score: Optional[float] = None  # Search relevance score
+    match_type: Optional[str] = None  # keyword, semantic, or hybrid
 
     @property
     def schema(self) -> Optional[str]:
@@ -27,3 +29,6 @@ class SearchResult(BaseModel):
 class SearchResponse(BaseModel):
     results: list[SearchResult]
     total: int
+    page: Optional[int] = None
+    page_size: Optional[int] = None
+    mode: Optional[str] = None  # hybrid, keyword, or semantic

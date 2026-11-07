@@ -9,8 +9,8 @@ import {
 /**
  * The single badge that states where the data on screen came from.
  *
- * It never guesses upwards: an unknown or missing mode is rendered as the
- * demonstration-fixture mode rather than as live connected data.
+ * The connected label is shown only after this page session receives a
+ * successful authenticated catalog response.
  */
 export default function DataModeLabel({ mode, className = '' }) {
   const resolved = normalizeDataMode(mode);

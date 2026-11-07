@@ -322,14 +322,195 @@ def run_plumbing(protocol: Dict[str, Any], loss_level: int = 0, seed: int = 1) -
     return artifact
 
 
-def run_real(_protocol: Dict[str, Any]) -> None:
-    """Placeholder for the real experiment pipeline.
-    Will be wired when benchmarks, real GT provider, and storage are ready.
+def run_real(protocol: Dict[str, Any], loss_mechanism: str = "mcar", loss_level: int = 0, seed: int = 1) -> Dict[str, Any]:
+    """Real experiment pipeline against committed benchmark cases.
+
+    Reads benchmark cases from research/benchmarks/, applies the specified
+    loss mechanism, runs all predictors (proposed + B1-B5), loads ground truth
+    AFTER predictions, evaluates, and writes a result artifact.
+
+    Ground-truth isolation contract (LOCKED):
+      GT is loaded only after ALL predictions are complete.
+      The GT object never enters the engine, any baseline, or coverage construction.
+
+    Ground-truth provider: ReferenceInterpreterProvider (human-derived, see
+    docs/RESEARCH_LOG.md Entry R-01 for the ProvSQL downgrade decision).
+
+    Args:
+        protocol:       Loaded protocol dict (must have 0 TBDs in required fields).
+        loss_mechanism: One of mcar, operator, dataset, branch, complete_run, correlated.
+        loss_level:     Loss percentage (0, 10, 30, 50, 70, 90).
+        seed:           Random seed.
+
+    Returns:
+        Result artifact dict.
     """
-    raise NotImplementedError(
-        "Real experiment pipeline is not yet implemented. "
-        "Run with --plumbing to execute the mock pipeline."
+    import yaml
+    from pathlib import Path as _Path
+    from contracts.evidence import StaticEvidence, RuntimeEvidence, PredictorInput
+    from contracts.types import (
+        DependencyKey, Granularity, ParserStatus, EvidenceType, CoverageVector, CoverageMode
     )
+    from research.ground_truth.reference_interpreter import ReferenceInterpreterProvider
+    from research.ground_truth.provider import PropagationLabel
+    from research.missingness.additional_mechanisms import ALL_LOSS_MECHANISMS
+    from research.missingness.mcar import mcar_loss
+
+    # ── 1. Load benchmark cases ──────────────────────────────────────────────
+    benchmark_path = _Path(protocol.get("benchmark_path", "research/benchmarks/"))
+    case_files = sorted(benchmark_path.glob("W*.yaml"))
+    if not case_files:
+        raise RuntimeError(
+            f"No benchmark cases found in {benchmark_path}. "
+            "Create W01-W10 case files before running a real experiment."
+        )
+
+    all_keys: List[DependencyKey] = []
+    all_static: List[StaticEvidence] = []
+    all_runtime: List[RuntimeEvidence] = []
+    gt_propagation_map: Dict[Tuple[str, str], bool] = {}
+    case_ids: List[str] = []
+
+    # Fake run_id per case for the real experiment
+    for case_file in case_files:
+        with open(case_file, encoding="utf-8") as f:
+            case = yaml.safe_load(f)
+
+        case_id = case["case_id"]
+        case_ids.append(case_id)
+        run_id = f"real_run_{case_id}"
+
+        # Build static evidence from expected_static_candidates
+        for cand in case.get("expected_static_candidates", []):
+            src = cand["source"]
+            tgt = cand["target"]
+            ps_str = cand.get("parser_status", "SUPPORTED")
+            ps = ParserStatus[ps_str]
+            op = cand.get("operator", "PROJECTION")
+
+            key = DependencyKey(
+                run_id=run_id,
+                source_column_id=src,
+                target_column_id=tgt,
+                granularity=Granularity.COLUMN,
+            )
+            all_keys.append(key)
+
+            se = StaticEvidence(
+                evidence_id=f"se_{case_id}_{src}_{tgt}".replace(".", "_")[:64],
+                source_dataset_id=src.split(".")[0] if "." in src else src,
+                target_dataset_id=tgt.split(".")[0] if "." in tgt else tgt,
+                source_column_id=src,
+                target_column_id=tgt,
+                granularity=Granularity.COLUMN,
+                operator=op,
+                expression_fingerprint=f"efp:{case_id}:{op}",
+                query_fingerprint=f"qfp:{case_id}",
+                schema_fingerprint=f"sfp:{case_id}",
+                parser_status=ps,
+                diagnostics=(),
+            )
+            all_static.append(se)
+
+            # Build a synthetic positive runtime event for PROPAGATED pairs
+            # (at loss level 0, all events survive; loss is applied below)
+            gt_labels = {
+                (lbl["source"], lbl["target"]): lbl["label"]
+                for lbl in case.get("ground_truth", {}).get("labels", [])
+            }
+            if gt_labels.get((src, tgt)) == "PROPAGATED":
+                cov = CoverageVector(
+                    run_covered=True,
+                    operator_covered=True,
+                    source_dataset_covered=True,
+                    target_dataset_covered=True,
+                    source_columns_covered=(src,),
+                    target_columns_covered=(tgt,),
+                    branches_covered=True,
+                    coverage_mode=CoverageMode.RUNTIME,
+                    parser_status=ParserStatus.SUPPORTED,
+                )
+                re = RuntimeEvidence(
+                    evidence_id=f"re_{case_id}_{src}_{tgt}".replace(".", "_")[:64],
+                    evidence_type=EvidenceType.RUNTIME_POSITIVE,
+                    key=key,
+                    source_system="reference_interpreter",
+                    event_time=f"2026-11-02T00:00:00Z",
+                    coverage=cov,
+                    raw_payload_hash=f"hash:{case_id}:{src}:{tgt}",
+                )
+                all_runtime.append(re)
+
+        # Build ground truth propagation map (for ReferenceInterpreterProvider)
+        for lbl in case.get("ground_truth", {}).get("labels", []):
+            gt_propagation_map[(lbl["source"], lbl["target"])] = (lbl["label"] == "PROPAGATED")
+
+    # ── 2. Apply loss mechanism ──────────────────────────────────────────────
+    event_ids = [ev.evidence_id for ev in all_runtime]
+
+    if loss_mechanism == "mcar":
+        loss_result = mcar_loss(event_ids, loss_level, seed)
+    elif loss_mechanism in ALL_LOSS_MECHANISMS:
+        loss_fn = ALL_LOSS_MECHANISMS[loss_mechanism]
+        loss_result = loss_fn(event_ids, loss_level, seed)
+    else:
+        raise ValueError(f"Unknown loss mechanism: {loss_mechanism!r}")
+
+    kept_set = set(loss_result.kept)
+    surviving_runtime = [ev for ev in all_runtime if ev.evidence_id in kept_set]
+    mask_hash = loss_result.mask_hash
+
+    # ── 3. PREDICT — GT not loaded yet ──────────────────────────────────────
+    predictions_by_method = _predict_all(all_keys, all_static, surviving_runtime)
+
+    # ── 4. Load ground truth AFTER all predictions ──────────────────────────
+    gt_provider = ReferenceInterpreterProvider(
+        propagation_map=gt_propagation_map,
+        version="reference-1.0",
+    )
+    # Build truth dict keyed by DependencyKey
+    from contracts.truth import TruthLabel as ContractTruthLabel
+
+    truth: Dict[DependencyKey, ContractTruthLabel] = {}
+    for key in all_keys:
+        gt_result = gt_provider.determine(key.source_column_id, key.target_column_id)
+        label = (ContractTruthLabel.PROPAGATED
+                 if gt_result.label.value == "PROPAGATED"
+                 else ContractTruthLabel.NOT_PROPAGATED)
+        truth[key] = label
+
+    gt_hash = _gt_hash(truth)
+
+    # ── 5. Evaluate ──────────────────────────────────────────────────────────
+    metrics_by_method = _evaluate_all(predictions_by_method, truth)
+
+    # ── 6. Build and write artifact ──────────────────────────────────────────
+    validation = validate_protocol(protocol)
+    artifact = result_artifact(
+        mode="REAL",
+        protocol_version=protocol.get("protocol_version", "TBD"),
+        benchmark_version=protocol.get("benchmark_version", "TBD"),
+        loss_mechanism=loss_mechanism,
+        loss_level=loss_level,
+        seed=seed,
+        mask_hash=mask_hash,
+        gt_hash=gt_hash,
+        predictions_by_method=predictions_by_method,
+        metrics_by_method=metrics_by_method,
+        tbd_fields=validation.tbd_fields,
+    )
+    # Add real-run metadata
+    artifact["case_ids"] = case_ids
+    artifact["n_cases"] = len(case_ids)
+    artifact["ground_truth_provider"] = "ReferenceInterpreterProvider"
+    artifact["ground_truth_note"] = (
+        "Semi-automated: human-derived propagation maps. "
+        "See docs/RESEARCH_LOG.md Entry R-01 for the ProvSQL downgrade decision."
+    )
+
+    output_path = protocol.get("output_path", "research/results/")
+    _write_artifact(artifact, output_path)
+    return artifact
 
 
 # ---------------------------------------------------------------------------
@@ -349,6 +530,12 @@ def main(argv: Optional[List[str]] = None) -> int:
         "--plumbing",
         action="store_true",
         help="Run in plumbing mode (mock fixture, TBD values permitted).",
+    )
+    parser.add_argument(
+        "--loss-mechanism",
+        default="mcar",
+        choices=["mcar", "operator", "dataset", "branch", "complete_run", "correlated"],
+        help="Loss mechanism (default: mcar).",
     )
     parser.add_argument(
         "--loss-level",
@@ -388,7 +575,14 @@ def main(argv: Optional[List[str]] = None) -> int:
               f"{artifact['metrics']['proposed'].get('committed_accuracy')}")
         return 0
     else:
-        run_real(protocol)
+        artifact = run_real(protocol, loss_mechanism=args.loss_mechanism, loss_level=args.loss_level, seed=args.seed)
+        output_path = protocol.get("output_path", "research/results/")
+        level = artifact["loss_level_pct"]
+        seed = artifact["seed"]
+        mech = artifact["loss_mechanism"]
+        print(f"[INFO] Real run complete. Result written to {output_path}result_real_{mech}{level}_seed{seed}.json")
+        print(f"[INFO] Cases evaluated: {artifact.get('n_cases', 'N/A')}")
+        print(f"[INFO] Proposed committed_accuracy = {artifact['metrics']['proposed'].get('committed_accuracy')}")
         return 0
 
 

@@ -4,18 +4,62 @@
   const frame = document.getElementById('authFrame');
   const sessionKey = 'kairos_supabase_session';
   const appScripts = [
-    'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js',
-    'https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js',
+    '/vendors/three.min.js',
+    '/vendors/chart.umd.min.js',
     '/observatory.js?v=304',
     '/stewardship.js?v=304',
-    '/app.js?v=305',
-    '/pii-lineage-enhancements.js?v=304',
+    '/evidence-semantics.js?v=1',
+    '/lineage-investigation.js?v=1',
+    '/app.js?v=310',
   ];
   let config = null;
   let configLoaded = false;
   let activeSession = null;
   let refreshTimer = null;
   let appStarted = false;
+
+  function showDashboardStartupError(message, details = '') {
+    const main = document.getElementById('mainContent');
+    if (!main || !appShell || appShell.hidden) return;
+    if (!main.querySelector('.loading-state')) return;
+    const section = document.createElement('section');
+    section.className = 'panel';
+    const body = document.createElement('div');
+    body.className = 'panel-body';
+    const state = document.createElement('div');
+    state.className = 'empty-state';
+    const title = document.createElement('strong');
+    title.textContent = 'Kairos could not start the dashboard';
+    const explanation = document.createElement('p');
+    explanation.textContent = message || 'A dashboard script failed before the workspace rendered.';
+    state.append(title, explanation);
+    if (details) {
+      const technical = document.createElement('details');
+      const summary = document.createElement('summary');
+      summary.textContent = 'Technical details';
+      const pre = document.createElement('pre');
+      pre.style.cssText = 'white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px;text-align:left';
+      pre.textContent = details;
+      technical.append(summary, pre);
+      state.append(technical);
+    }
+    const reload = document.createElement('button');
+    reload.type = 'button';
+    reload.className = 'btn primary';
+    reload.textContent = 'Reload workspace';
+    reload.addEventListener('click', () => location.reload());
+    state.append(reload);
+    body.append(state);
+    section.append(body);
+    main.replaceChildren(section);
+  }
+  window.addEventListener('error', event => {
+    showDashboardStartupError(event.message, event.error?.stack || `${event.filename || ''}:${event.lineno || 0}:${event.colno || 0}`);
+  });
+  window.addEventListener('unhandledrejection', event => {
+    const reason = event.reason;
+    showDashboardStartupError(reason?.message || String(reason || 'An unexpected startup request failed.'), reason?.stack || 'Unhandled promise rejection');
+  });
 
   const trustedProviders = new Set(['google', 'github', 'azure']);
   const hasActiveSession = () => Boolean(activeSession?.access_token
@@ -110,10 +154,6 @@
     window.fetch = async (input, init = {}) => {
       const url = typeof input === 'string' ? input : input?.url || '';
       if (!url.startsWith('/api/v1/') && !url.startsWith('/ingestion.html')) return originalFetch(input, init);
-      if (window.kairosDemoPreview) {
-        const isIngestion = url.startsWith('/ingestion.html');
-        return new Response(isIngestion ? 'Demo preview cannot access ingestion.' : JSON.stringify({ ok: false, error: { message: 'Demo preview cannot access the catalog.' } }), { status: 403, headers: { 'Content-Type': isIngestion ? 'text/plain' : 'application/json' } });
-      }
       let session = activeSession || readSaved();
       if (session?.expires_at && session.expires_at * 1000 < Date.now() + 20_000) {
         try { session = await refreshSession(session); } catch (_) { clearSession(); session = null; }
@@ -153,6 +193,9 @@
       script.onerror = () => reject(new Error(`Could not load ${appScripts[index]}`));
       document.body.appendChild(script);
     });
+    if (index === appScripts.length - 1 && document.querySelector('#mainContent .loading-state')) {
+      showDashboardStartupError('The dashboard bundle loaded but did not render the workspace. Check the technical details in the browser console.', 'The initial workspace placeholder is still present after app.js finished loading.');
+    }
     return loadAppScripts(index + 1);
   }
   function addSignOut(session) {
@@ -162,7 +205,7 @@
     button.id = 'kairosSignOut';
     button.className = 'auth-link';
     button.type = 'button';
-    button.textContent = window.kairosDemoPreview ? 'Exit demo preview' : 'Sign out';
+    button.textContent = 'Sign out';
     button.style.margin = '10px 18px';
     button.addEventListener('click', signOut);
     row.insertAdjacentElement('afterend', button);
@@ -174,17 +217,11 @@
     }
   }
   async function signOut() {
-    if (window.kairosDemoPreview) {
-      window.kairosDemoPreview = false;
-      location.replace('/');
-      return;
-    }
     try { await authRequest('logout', null, activeSession?.access_token); } catch (_) { /* Clear the local session even if remote logout is unreachable. */ }
     clearSession();
     location.replace('/');
   }
-  async function startApp(session, { demoPreview = false } = {}) {
-    window.kairosDemoPreview = Boolean(demoPreview);
+  async function startApp(session) {
     if (session?.access_token) {
       activeSession = session;
       scheduleRefresh(session);
@@ -238,10 +275,6 @@
     if (event.origin !== location.origin || event.source !== frame?.contentWindow) return;
     const message = event.data;
     if (!message || message.source !== 'kairos-auth-stitch') return;
-    if (message.type === 'demo-preview') {
-      await startApp(null, { demoPreview: true });
-      return;
-    }
     if (message.type === 'ready') {
       if (configLoaded && (!config?.url || !config?.publishable_key)) frameStatus('signin', false, 'Supabase sign-in is not configured. Set the project URL and publishable key on the server.');
       sendCurrentUserToFrame();
@@ -312,7 +345,7 @@
         });
         const result = await response.json().catch(() => ({}));
         if (!response.ok) throw new Error(result.msg || result.message || `Password update failed (${response.status}).`);
-        message.textContent = 'Password updated. Opening your Kairos workspace…';
+        message.textContent = 'Password updated. Opening your Kairos workspaceâ€¦';
         message.classList.add('success');
         await startApp(session);
       } catch (error) {
@@ -373,3 +406,4 @@
   }
   boot();
 })();
+

@@ -7,5 +7,4 @@
 - `python scripts/make_fixtures.py` regenerates the mock fixtures; review its output before committing.
 - `python scripts/test_connection.py` checks the configured database connection and requires valid environment settings and network access to Supabase.
 - `python scripts/db/verify_rls.py` verifies row-level-security hardening of the business tables; run it against a release database and expect a zero exit code.
-- `python scripts/seed_demo_catalog.py --user-id <uuid>` prints the Olist sample assets it would load into that user's workspace; add `--apply` to write them as clearly-labelled demo data.
 - `python scripts/run_migration.py` is a legacy helper that applies only migration 0001; use the numbered migration instructions in `docs/SUPABASE_SETUP.md` for a complete setup.

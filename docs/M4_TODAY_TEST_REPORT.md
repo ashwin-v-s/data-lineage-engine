@@ -1,21 +1,28 @@
 # M4 Research Integrity — Test Report and Evaluation Gate
 
-**Date:** 2026-10-01
+**Date:** 2026-10-01 · **Superseded by:** 2026-11-02 re-measurement (see correction note below)
 **Branch:** `feature/reasoning-experiments`
-**Owner:** Person 4 (M4)
+**Owner:** Pranav (`pranav-samal`) — M5 Research Integrity & Demo Honesty
 **Workstream:** `docs/workstreams/M4_RESEARCH_INTEGRITY_AND_EVALUATION.md`
+
+> ⚠️ **CORRECTION — 2026-11-02:** The original report (2026-10-01) quoted results from
+> `tests/test_api_slice.py` (3 tests, 92 total). That file was deleted from `main` by
+> commit `38d38ca` ("replace obsolete mock API tests with fail-closed contract tests").
+> The numbers below have been corrected to reflect the reproducible state on the merged
+> tree as of 2026-11-02. The stale row has been removed. All other findings stand.
+> Source: `docs/PROJECT_STATUS_2026-11-02.md` §5.11.
 
 ---
 
 ## 1. Test Results (Task 1)
 
-### Exact command
+### Exact command (reproducible on merged tree, 2026-11-02)
 
 ```
-python -m pytest tests/test_engine_rules.py tests/test_leakage.py tests/test_ground_truth_independence.py tests/test_baselines.py tests/test_metrics.py tests/test_fixtures_plumbing.py tests/test_mcar.py tests/test_protocol_runner.py tests/test_api_slice.py -v --tb=short -p no:langsmith_plugin
+python -m pytest tests/test_engine_rules.py tests/test_leakage.py tests/test_ground_truth_independence.py tests/test_baselines.py tests/test_metrics.py tests/test_fixtures_plumbing.py tests/test_mcar.py tests/test_protocol_runner.py -v --tb=short -p no:langsmith_plugin
 ```
 
-### Results
+### Results (corrected — as-of main merge 2026-11-02)
 
 | Suite | Tests | Passed | Failed | Skipped | Timed out | Not run |
 |---|---|---|---|---|---|---|
@@ -27,18 +34,12 @@ python -m pytest tests/test_engine_rules.py tests/test_leakage.py tests/test_gro
 | `test_fixtures_plumbing.py` | 4 | 4 | 0 | 0 | 0 | 0 |
 | `test_mcar.py` | 21 | 21 | 0 | 0 | 0 | 0 |
 | `test_protocol_runner.py` | 24 | 24 | 0 | 0 | 0 | 0 |
-| `test_api_slice.py` | 3 | 3 | 0 | 0 | 0 | 0 |
-| **Total** | **84** | **84** | **0** | **0** | **0** | **0** |
+| ~~`test_api_slice.py`~~ | ~~3~~ | ~~3~~ | — | — | — | ~~Deleted from main by `38d38ca`~~ |
+| **Total (research suite)** | **81** | **81** | **0** | **0** | **0** | **0** |
 
-**Note:** `test_engine_rules.py` has 17 tests (15 original + 2 Day 2A gap tests). `test_ground_truth_independence.py` is newly added in this session (Task 3). The combined research suite is 84 tests. When counting the API slice separately (which tests product integration, not research semantics), the total is 92. The earlier "87 passed" figure reflected the research subset before adding the 2 new regression tests.
-
-### Environment note
-
-A `langsmith` pytest plugin in the environment has a Python 3.12 compatibility bug (pydantic v1 `ForwardRef._evaluate` signature change). It crashes pytest at startup. The workaround is `-p no:langsmith_plugin`. This is an environment issue, not a project code issue.
-
-### API suite (separate check)
-
-`test_api_slice.py` was run separately with a 20-second timeout guard. It completed in 3.46s with 3 passed, 1 warning (httpx deprecation). No hang, no failure.
+**Qualified statement (required per `PROJECT_STATUS_2026-11-02.md` §2):**
+81 offline research tests pass. 0 endpoint bodies verified against a database
+in this research suite. For live DB verification see `docs/RESEARCH_LOG.md` Entry R-02.
 
 ---
 

@@ -1,0 +1,87 @@
+# W10 — CASE WHEN — NOT_PROPAGATED case (no matching rows at runtime)
+# Split: held_out
+# SQL construct: CASE_WHEN
+# This is the complement of W03: same SQL, but the value column does NOT
+# propagate because the condition is never true in the data.
+# DO NOT tune on this case.
+case_id: W10
+case_version: "1.0"
+split: held_out
+sql_construct: CASE_WHEN
+description: >
+  CASE WHEN with a condition that is never satisfied in the runtime data.
+  Static analysis sees salary as a candidate (POSSIBLE), but runtime evidence
+  of a complete negative evaluation would yield REFUTED_FOR_RUN.
+  Without runtime evidence, the engine must return POSSIBLE — not REFUTED_FOR_RUN.
+  This is the key NOT_PROPAGATED ground-truth case for the research hypothesis.
+
+sql: |
+  CREATE TABLE eu_adjusted AS
+  SELECT employee_id,
+         region,
+         CASE
+           WHEN region = 'EU' THEN salary * 1.2
+           ELSE salary
+         END AS adjusted_salary
+  FROM employees_eu;
+
+schema:
+  employees_eu:
+    columns: [employee_id, region, salary]
+  eu_adjusted:
+    columns: [employee_id, region, adjusted_salary]
+
+expected_static_candidates:
+  - source: employees_eu.employee_id
+    target: eu_adjusted.employee_id
+    operator: PROJECTION
+    parser_status: SUPPORTED
+  - source: employees_eu.region
+    target: eu_adjusted.region
+    operator: PROJECTION
+    parser_status: SUPPORTED
+  - source: employees_eu.region
+    target: eu_adjusted.adjusted_salary
+    operator: CASE_WHEN
+    parser_status: SUPPORTED
+  - source: employees_eu.salary
+    target: eu_adjusted.adjusted_salary
+    operator: CASE_WHEN
+    parser_status: SUPPORTED
+
+ground_truth:
+  provider: ReferenceInterpreterProvider
+  provider_version: "reference-1.0"
+  labels:
+    - source: employees_eu.employee_id
+      target: eu_adjusted.employee_id
+      label: PROPAGATED
+      rationale: Direct projection — always propagates.
+    - source: employees_eu.region
+      target: eu_adjusted.region
+      label: PROPAGATED
+      rationale: Direct projection — always propagates.
+    - source: employees_eu.region
+      target: eu_adjusted.adjusted_salary
+      label: PROPAGATED
+      rationale: Region controls the CASE branch — always evaluated.
+    - source: employees_eu.salary
+      target: eu_adjusted.adjusted_salary
+      label: PROPAGATED
+      rationale: >
+        salary appears in BOTH branches (EU: salary*1.2, ELSE: salary),
+        so it always propagates regardless of region value.
+
+never_proves:
+  - >
+    Even if a hypothetical run had no EU employees, salary would still propagate
+    via the ELSE branch. This case demonstrates that CASE WHEN with salary in
+    every branch makes salary an unconditional dependency.
+  - The NOT_PROPAGATED scenario requires a case where the column appears in only
+    ONE branch and that branch never executes — see W03 for the motif.
+
+research_note: >
+  This case is designed to test the boundary: salary is PROPAGATED here because
+  it appears in all branches. A true NOT_PROPAGATED case requires a column that
+  appears only in the non-executing branch (the W03 motif with a run containing
+  no 'US' employees). Include this as a held-out "no false refutation" check.

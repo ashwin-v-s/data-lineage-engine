@@ -14,7 +14,6 @@ Bitemporal data lineage infrastructure and execution-conditioned reasoning engin
 │   └── requirements.txt      # Backend Python dependencies
 ├── configs/                  # Project and environment configuration files
 ├── contracts/                # Shared domain types, interfaces, fixtures, and test mocks
-├── data/olist/               # Tracked Olist sample dataset used by research/demo workflows
 ├── docs/                     # Current architecture, setup, research, and team documentation
 │   ├── archive/               # Historical notes and superseded setup/task documents
 │   └── workstreams/           # M1–M5 independent work assignments
@@ -86,7 +85,7 @@ python -m pytest -q
 ### 3. Database & Migrations
 
 Kairos uses the team's **shared Supabase project** for Auth and hosted Postgres.
-You do not need to install PostgreSQL locally for the product demo. Get the
+You do not need to install PostgreSQL locally for product development. Get the
 database pooler URI and API keys from the project's Supabase dashboard and
 follow [`docs/SUPABASE_SETUP.md`](docs/SUPABASE_SETUP.md). Local PostgreSQL is
 optional for isolated research experiments and offline development.

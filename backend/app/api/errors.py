@@ -1,6 +1,7 @@
+import uuid
+
 from fastapi import Request
 from fastapi.responses import JSONResponse
-import uuid
 
 
 def api_error(
@@ -9,7 +10,11 @@ def api_error(
     status_code: int,
     code: str,
 ):
-    request_id = request.headers.get("X-Request-ID") or str(uuid.uuid4())
+    request_id = (
+        request.headers.get("X-Request-ID")
+        or getattr(request.state, "request_id", None)
+        or str(uuid.uuid4())
+    )
 
     return JSONResponse(
         status_code=status_code,

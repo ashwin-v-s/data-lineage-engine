@@ -100,3 +100,51 @@ Clicking any visible edge opens a panel whose every word comes from a stored evi
 | B6 | Root-cause view (upstream walk + incident overlay), mini-map (P2, optional) | root-cause demoable; mini-map only if time remains |
 
 Coordinates with M4: stewardship/product endpoints they build are your callers; agree the response shapes first.
+
+---
+
+## 7. Implementation update — 2026-11-05
+
+The following M3 items were implemented in the worktree during the 2026-11-05 reconciliation. The older status below is a point-in-time audit; section 8 supersedes it where the code has since changed.
+
+| Item | Current result | Verification |
+|---|---|---|
+| G1 / Wave 2 edge inspector | Added authenticated `GET /api/v1/lineage/edges/{edge_id}/evidence`; persisted graph edge clicks now request stored evidence and show state, source/type, run, coverage, rule-derived ordinal strength, valid/recorded times, explanation, sanitized raw payload, normalized record, canonical IDs, and a conflict disclosure. Missing evidence remains an explicit empty state. | `tests/test_lineage_evidence_api.py` |
+| B1 evidence strength | Added rule version `kairos.evidence-strength.v1`; labels are High/Medium/Low, with no numeric confidence or stored opinion. | `tests/test_m3_evidence_contract.py` |
+| F3 missing runtime coverage | Absent, malformed, or incomplete coverage manifests no longer become fully covered runtime evidence; inference omits them rather than fabricating coverage. | `tests/test_m3_evidence_contract.py` |
+| F4 / B3 catalog response bounds | `/catalog` now supports `limit` (1–500) and `offset`, caps edges/evidence at 1,000 each, returns truncation metadata and `X-Result-Truncated`. The current browser client retrieves all asset pages and displays a warning if relationship/evidence caps apply. | `tests/test_catalog_limits.py` |
+| G7 canonical identity lookup | Replaced the `NotImplementedError` placeholder with a stored dataset identity lookup; malformed or workspace-invisible IDs return `None`. UUID v5 remains intentionally non-reversible. | `tests/test_canonical_dataset_components.py`, `tests/test_identity.py` |
+| B5 client-side lineage export | Added JSON export for visible assets/edges and the evidence references/states loaded in the current catalog response, plus PNG and existing SVG export. JSON describes the visible current catalog slice, not a server-side historical snapshot. | `node --check frontend/app.js`; frontend production build |
+| Incident phantom paths | Repointed incident list/status calls to the existing governance routes. Incident creation remains clearly disabled because the API has no create route. | `node --check frontend/app.js`; OpenAPI drift check |
+| Unsupported PII/export callers | Removed the loaded enhancement module that injected buttons calling nonexistent `/pii-classification` and `/lineage/export` routes. | Confirmed module is no longer loaded or bundled |
+| Contract snapshot | Refreshed the committed OpenAPI snapshot for the evidence route and catalog paging parameters. | `python scripts/check_openapi_drift.py` |
+
+## 8. Reconciled handout status — 2026-11-05
+
+This section supersedes the stale “Still open” bullets in section 7 where noted. It describes code and offline verification only; it does not claim a successful authenticated browser session against live workspace data.
+
+### Completed in this worktree
+
+- **Four-state interpretation:** `frontend/evidence-semantics.js` provides the exact Section 19 text for `OBSERVED`, `REFUTED_FOR_RUN`, `POSSIBLE`, and `UNKNOWN`. Missing runtime events map to `UNKNOWN`; the UI displays the interpretation for edge evidence. Unit tests pin every exact sentence and the no-event behavior.
+- **Evidence inspector / conflict disclosure:** persisted edge evidence is retrieved by the workspace-authenticated API, secret-like raw/normalized keys are sanitized, and contradictory execution states are evaluated per run and disclosed. Strength remains an API-derived `High` / `Medium` / `Low` label; no numeric confidence is introduced.
+- **Canonical identity helper:** UUIDs resolve through the stored dataset identity using the caller's connection; malformed or invisible identifiers return no identity. UUID v5 is not treated as reversible.
+- **Bounded discovery responses:** catalog pagination and edge/evidence caps are enforced and surfaced with truncation metadata and response headers. Keyword search now returns total and page-truncation headers. These changes do not implement vector/hybrid search or prove tenant isolation for every search result.
+- **Capability registry is consumed by the served asset-detail UI:** the vanilla dashboard requests `/api/v1/assets/{id}/capabilities` and uses availability/reason data to gate unsupported detail tabs. This does not mount the orphan React component.
+- **Lineage investigation and export:** the dashboard has upstream path tracing with incident matching where the governance API is available, plus PNG, SVG, and visible-subgraph JSON downloads. A path or matching incident is presented as investigative context, never causal proof. The optional mini-map and server-side historical export are not implemented.
+- **Unsupported endpoint callers:** the loaded enhancement that injected calls to nonexistent PII classification and lineage export routes was removed; incident reads/status updates use the existing governance route. Incident creation remains unavailable because there is no create endpoint.
+- **API snapshot:** OpenAPI drift check passes at 76 paths.
+
+### Remaining work and explicit ownership boundaries
+
+- **Temporal graph UI:** the API supports separate valid/recorded time inputs for lineage queries, and evidence-at-time is displayed. The current graph is not replaced with a graph re-queried at those timestamps. Unknown-valid-time evidence is excluded from an `as_of` graph by default and must be disclosed separately. This is proposed behavior, pending M1/M5 contract review.
+- **D-13 route identity:** proposal is UUID canonical routes with qualified-name aliases resolved through stored identity; redirect/canonical URL behavior still needs M1/M5 agreement.
+- **Search isolation and hybrid retrieval:** keyword search exists, but a workspace-membership negative test, embedding generation/model/provider, vector index, and hybrid ranking are not complete. Do not describe search as semantic or tenant-isolation verified.
+- **M4-backed relationships and stewardship:** glossary/product/access request UI flows depend on API contracts that M4 owns. Do not invent their schemas in M3.
+- **Activity and schema constraints:** asset-version activity depends on M1's write path; primary-key/constraint metadata requires ingestion/storage support. Neither is represented as available when absent.
+- **React adoption:** the served UI remains the current dashboard shell. `AssetCapabilitiesPanel.jsx` is still not mounted; a full shell migration or removal of orphan React components needs an explicit frontend workstream decision.
+- **Live browser proof:** no real authenticated workspace request or screenshot was available during this pass. Supabase was not queried or mutated.
+- **Full frontend suite:** production build passes and 35 focused frontend tests pass. Full Vitest run currently has 17 failures in existing navigation/Observatory source-contract tests that expect the older vanilla shell or different Observatory event wiring; 39 other tests pass. These failures are recorded rather than represented as green.
+
+### Verification record
+
+`pytest -q`: **424 passed, 84 skipped**. Focused Vitest: **35 passed**. Full Vitest: **39 passed, 17 failed**. `npm run build`: passed. `node --check` for the changed JavaScript entry/modules: passed. `python scripts/check_openapi_drift.py`: passed, 76 paths. Pytest emitted existing httpx and pytest-asyncio deprecation warnings.

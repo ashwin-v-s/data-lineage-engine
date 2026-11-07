@@ -15,6 +15,7 @@ import {
   statusExplanation,
   summarizeTransition,
 } from '../views/incidents.js';
+import { API_BASE, requestJson } from '../api/client.js';
 import './IncidentsView.css';
 
 /** The status filter offers `All` plus every canonical status. */
@@ -46,7 +47,7 @@ function jsonPreview(value, limit = 480) {
 }
 
 /** The incidents stored on the server, rendered from live responses only. */
-export default function IncidentsView() {
+export default function IncidentsView({ demoPreview = false } = {}) {
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [incidents, setIncidents] = useState([]);
   const [count, setCount] = useState(0);
@@ -62,6 +63,10 @@ export default function IncidentsView() {
   const [busyAction, setBusyAction] = useState(null);
   const [notice, setNotice] = useState(null);
   const [noticeError, setNoticeError] = useState(null);
+  const [resolutionReason, setResolutionReason] = useState('');
+  const [resolutionAction, setResolutionAction] = useState('');
+  const [comment, setComment] = useState('');
+  const [assignmentUserId, setAssignmentUserId] = useState('');
 
   const [reloadKey, setReloadKey] = useState(0);
   const mountedRef = useRef(true);
@@ -75,6 +80,13 @@ export default function IncidentsView() {
   useEffect(() => {
     let cancelled = false;
     setListLoading(true);
+    if (demoPreview) {
+      setIncidents([]);
+      setCount(0);
+      setListError('Incidents are unavailable in demo preview. No sample incidents are substituted.');
+      setListLoading(false);
+      return () => { cancelled = true; };
+    }
     fetchIncidents({ status: statusFilter }).then((result) => {
       if (cancelled || !mountedRef.current) return;
       if (result.ok) {
@@ -90,7 +102,7 @@ export default function IncidentsView() {
       setListLoading(false);
     });
     return () => { cancelled = true; };
-  }, [statusFilter, reloadKey]);
+  }, [demoPreview, statusFilter, reloadKey]);
 
   const handleSelect = useCallback((id) => {
     if (!id) return;
@@ -111,10 +123,16 @@ export default function IncidentsView() {
   const handleAction = useCallback((action) => {
     if (!detail || !detail.id) return;
     const previousStatus = detail.status;
-    setBusyAction(action);
     setNotice(null);
     setNoticeError(null);
-    applyIncidentAction(detail.id, action).then((result) => {
+    const body = action === 'resolve' ? { reason: resolutionReason.trim(), action_taken: resolutionAction.trim() } : undefined;
+    if (action === 'resolve' && (!body.reason || !body.action_taken)) {
+      setBusyAction(null);
+      setNoticeError('Record a resolution reason and action before closing this incident.');
+      return;
+    }
+    setBusyAction(action);
+    applyIncidentAction(detail.id, action, { body }).then((result) => {
       if (!mountedRef.current) return;
       setBusyAction(null);
       if (result.ok) {
@@ -126,7 +144,29 @@ export default function IncidentsView() {
         setNoticeError(result.error);
       }
     });
-  }, [detail]);
+  }, [detail, resolutionReason, resolutionAction]);
+
+  const handleComment = async (event) => {
+    event.preventDefault();
+    if (!detail?.id || !comment.trim()) return;
+    setBusyAction('comment'); setNoticeError(null); setNotice(null);
+    try {
+      await requestJson(`${API_BASE}/governance/incidents/${encodeURIComponent(detail.id)}/comments`, { method: 'POST', body: { comment: comment.trim() } });
+      setComment(''); setNotice('Comment added to the incident timeline.'); handleSelect(detail.id);
+    } catch (error) { setNoticeError(error.message || 'Comment could not be added.'); }
+    finally { setBusyAction(null); }
+  };
+
+  const handleAssign = async (event) => {
+    event.preventDefault();
+    if (!detail?.id || !assignmentUserId.trim()) return;
+    setBusyAction('assign'); setNoticeError(null); setNotice(null);
+    try {
+      await requestJson(`${API_BASE}/governance/incidents/${encodeURIComponent(detail.id)}/assign`, { method: 'POST', body: { user_id: assignmentUserId.trim() } });
+      setAssignmentUserId(''); setNotice('Incident assigned to the workspace member.'); handleSelect(detail.id); setReloadKey((key) => key + 1);
+    } catch (error) { setNoticeError(error.message || 'Incident could not be assigned.'); }
+    finally { setBusyAction(null); }
+  };
 
   const allowed = detail ? allowedIncidentActions(detail.status) : [];
 
@@ -134,12 +174,15 @@ export default function IncidentsView() {
     <section className="kv-view" data-live-view="incidents">
       <div className="kv-view-head">
         <h1>Incident console</h1>
-        {live ? <DataModeLabel mode={DATA_MODES.LIVE} /> : null}
+        {live ? <DataModeLabel mode={DATA_MODES.LIVE} /> : demoPreview ? <DataModeLabel mode={DATA_MODES.DEMO_FIXTURE} /> : null}
       </div>
       <p className="kv-sub">
+        {demoPreview ? 'Incident records are not included in the demo preview.' : null}
+        {!demoPreview ? <>
         This console reads the live incidents written by the Kairos freshness engine.
         Severity follows the breach that opened the incident: a STALE verdict opens a
         HIGH incident and a LATE verdict opens a MEDIUM one; every other breach is LOW.
+        </> : null}
       </p>
 
       <div className="kv-toolbar">
@@ -162,7 +205,7 @@ export default function IncidentsView() {
 
       {listError ? (
         <p className="kv-note kv-note--error">
-          {listError} No sample incidents are substituted while the live API is unreachable.
+          {listError}{demoPreview ? '' : ' No sample incidents are substituted while the live API is unreachable.'}
         </p>
       ) : null}
 
@@ -300,6 +343,10 @@ export default function IncidentsView() {
                   <pre className="kv-mono kv-incidents-json">{jsonPreview(detail.detail)}</pre>
                 </dd>
               </div>
+              {detail.resolutionDetail && Object.keys(detail.resolutionDetail).length > 0 && <div className="kv-incidents-fields-wide">
+                <dt>Resolution evidence</dt>
+                <dd><pre className="kv-mono kv-incidents-json">{jsonPreview(detail.resolutionDetail)}</pre></dd>
+              </div>}
             </dl>
 
             <div className="kv-actions kv-incidents-actions">
@@ -321,6 +368,22 @@ export default function IncidentsView() {
                 </span>
               )}
             </div>
+
+            {detail.status !== 'RESOLVED' && <>
+              <form className="kv-card" onSubmit={handleAssign}>
+                <label>Assign to active workspace member (user UUID)<input value={assignmentUserId} onChange={(event) => setAssignmentUserId(event.target.value)} maxLength={36} required /></label>
+                <button className="kv-btn" disabled={busyAction !== null || !assignmentUserId.trim()} type="submit">Assign incident</button>
+              </form>
+              {allowed.includes('resolve') && <div className="kv-card">
+                <label>Resolution reason<textarea value={resolutionReason} onChange={(event) => setResolutionReason(event.target.value)} maxLength={2000} required /></label>
+                <label>Action taken<textarea value={resolutionAction} onChange={(event) => setResolutionAction(event.target.value)} maxLength={2000} required /></label>
+                <p className="kv-muted">The API stores the reason, action, actor, and resolution time with the incident.</p>
+              </div>}
+              <form className="kv-card" onSubmit={handleComment}>
+                <label>Add incident comment<textarea value={comment} onChange={(event) => setComment(event.target.value)} maxLength={4000} required /></label>
+                <button className="kv-btn" disabled={busyAction !== null || !comment.trim()} type="submit">Add comment</button>
+              </form>
+            </>}
 
             {notice ? <p className="kv-note kv-note--ok">{notice}</p> : null}
             {noticeError ? <p className="kv-note kv-note--error">{noticeError}</p> : null}
@@ -348,6 +411,12 @@ export default function IncidentsView() {
                 </ol>
               )}
             </div>
+            <section className="kv-card" aria-label="Related incident history">
+              <h3>Related incidents for this asset</h3>
+              {detail.relatedIncidents?.length
+                ? <ul>{detail.relatedIncidents.map((incident) => <li key={incident.id}>{incident.title} · {incident.status} · {formatTimestamp(incident.opened_at) || 'time unavailable'}</li>)}</ul>
+                : <p className="kv-muted">No other stored incidents for this asset.</p>}
+            </section>
           </>
         ) : null}
       </div>

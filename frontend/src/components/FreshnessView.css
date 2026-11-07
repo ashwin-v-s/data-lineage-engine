@@ -1,0 +1,31 @@
+/*
+ * FreshnessView.css
+ * Rules that are specific to the freshness count tiles and SLA grid.
+ * Shared layout helpers (.kv-freshness-view, .kv-freshness-form, etc.)
+ * are defined in liveViews.css which GovernanceView and FreshnessView both use.
+ */
+
+.kv-freshness-counts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 10px;
+}
+
+.kv-freshness-count {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+
+.kv-freshness-count span {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.kv-freshness-count strong {
+  font-size: 20px;
+}

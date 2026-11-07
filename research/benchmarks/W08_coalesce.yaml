@@ -1,0 +1,74 @@
+# W08 — COALESCE (first non-null wins — multiple sources to one target)
+# Split: validation
+# SQL construct: COALESCE
+case_id: W08
+case_version: "1.0"
+split: validation
+sql_construct: COALESCE
+description: >
+  COALESCE picks the first non-null value from a list of columns.
+  All columns in the COALESCE are static dependencies of the target,
+  but only columns whose value was actually selected at runtime propagate.
+  This tests the POSSIBLE state — statically all are candidates,
+  but at runtime only some may propagate depending on nulls.
+
+sql: |
+  CREATE TABLE customer_contact AS
+  SELECT customer_id,
+         COALESCE(phone, mobile, email) AS primary_contact
+  FROM customers;
+
+schema:
+  customers:
+    columns: [customer_id, phone, mobile, email]
+  customer_contact:
+    columns: [customer_id, primary_contact]
+
+expected_static_candidates:
+  - source: customers.customer_id
+    target: customer_contact.customer_id
+    operator: PROJECTION
+    parser_status: SUPPORTED
+  - source: customers.phone
+    target: customer_contact.primary_contact
+    operator: COALESCE
+    parser_status: SUPPORTED
+  - source: customers.mobile
+    target: customer_contact.primary_contact
+    operator: COALESCE
+    parser_status: SUPPORTED
+  - source: customers.email
+    target: customer_contact.primary_contact
+    operator: COALESCE
+    parser_status: SUPPORTED
+
+ground_truth:
+  provider: ReferenceInterpreterProvider
+  provider_version: "reference-1.0"
+  labels:
+    - source: customers.customer_id
+      target: customer_contact.customer_id
+      label: PROPAGATED
+      rationale: Direct projection.
+    - source: customers.phone
+      target: customer_contact.primary_contact
+      label: PROPAGATED
+      rationale: >
+        At least one customer has a non-null phone in the fixture data,
+        so phone propagates for those rows.
+    - source: customers.email
+      target: customer_contact.primary_contact
+      label: PROPAGATED
+      rationale: >
+        At least one customer has null phone and mobile but non-null email,
+        so email propagates as a fallback.
+    - source: customers.mobile
+      target: customer_contact.primary_contact
+      label: PROPAGATED
+      rationale: >
+        At least one customer has null phone but non-null mobile.
+
+never_proves:
+  - COALESCE dependency does not prove which column was selected for each row.
+  - A column in COALESCE may never propagate if it is always NULL in the data.
+  - Without runtime evidence, all COALESCE sources are POSSIBLE, not OBSERVED.

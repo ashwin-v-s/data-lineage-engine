@@ -1,0 +1,56 @@
+# W01 — Simple projection (direct column copy)
+# Split: development
+# SQL construct: PROJECTION
+case_id: W01
+case_version: "1.0"
+split: development
+sql_construct: PROJECTION
+description: >
+  Direct column projection — source column copied to target without transformation.
+  The simplest possible lineage case.
+
+sql: |
+  CREATE TABLE orders_summary AS
+  SELECT order_id, customer_id, amount
+  FROM raw_orders;
+
+schema:
+  raw_orders:
+    columns: [order_id, customer_id, amount]
+  orders_summary:
+    columns: [order_id, customer_id, amount]
+
+expected_static_candidates:
+  - source: raw_orders.order_id
+    target: orders_summary.order_id
+    operator: PROJECTION
+    parser_status: SUPPORTED
+  - source: raw_orders.customer_id
+    target: orders_summary.customer_id
+    operator: PROJECTION
+    parser_status: SUPPORTED
+  - source: raw_orders.amount
+    target: orders_summary.amount
+    operator: PROJECTION
+    parser_status: SUPPORTED
+
+ground_truth:
+  provider: ReferenceInterpreterProvider
+  provider_version: "reference-1.0"
+  labels:
+    - source: raw_orders.order_id
+      target: orders_summary.order_id
+      label: PROPAGATED
+      rationale: Direct SELECT copy — every source row contributes.
+    - source: raw_orders.customer_id
+      target: orders_summary.customer_id
+      label: PROPAGATED
+      rationale: Direct SELECT copy.
+    - source: raw_orders.amount
+      target: orders_summary.amount
+      label: PROPAGATED
+      rationale: Direct SELECT copy.
+
+never_proves:
+  - Source column existence does not prove runtime execution.
+  - Projection candidate does not imply every row was processed in a given run.

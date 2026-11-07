@@ -1,0 +1,59 @@
+# W07 — WHERE filter (filter column not in SELECT)
+# Split: validation
+# SQL construct: WHERE_FILTER
+case_id: W07
+case_version: "1.0"
+split: validation
+sql_construct: WHERE_FILTER
+description: >
+  WHERE clause filters rows by a column that is NOT in the SELECT list.
+  The filter column (status) controls which rows appear in the output
+  but does not itself appear as a target column — it is NOT a lineage dependency.
+
+sql: |
+  CREATE TABLE active_orders AS
+  SELECT order_id, customer_id, amount
+  FROM orders
+  WHERE status = 'ACTIVE';
+
+schema:
+  orders:
+    columns: [order_id, customer_id, amount, status]
+  active_orders:
+    columns: [order_id, customer_id, amount]
+
+expected_static_candidates:
+  - source: orders.order_id
+    target: active_orders.order_id
+    operator: PROJECTION
+    parser_status: SUPPORTED
+  - source: orders.customer_id
+    target: active_orders.customer_id
+    operator: PROJECTION
+    parser_status: SUPPORTED
+  - source: orders.amount
+    target: active_orders.amount
+    operator: PROJECTION
+    parser_status: SUPPORTED
+
+ground_truth:
+  provider: ReferenceInterpreterProvider
+  provider_version: "reference-1.0"
+  labels:
+    - source: orders.order_id
+      target: active_orders.order_id
+      label: PROPAGATED
+      rationale: Direct projection.
+    - source: orders.customer_id
+      target: active_orders.customer_id
+      label: PROPAGATED
+      rationale: Direct projection.
+    - source: orders.amount
+      target: active_orders.amount
+      label: PROPAGATED
+      rationale: Direct projection.
+
+never_proves:
+  - status is used in WHERE but is NOT selected — it is not a column-level dependency.
+  - A filter dependency does not mean status propagates to any output column.
+  - The WHERE clause may produce an empty result if no rows match.
