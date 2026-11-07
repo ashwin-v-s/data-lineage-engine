@@ -16,6 +16,7 @@ const runtimeFiles = [
   'stewardship.css',
   'ingestion.html',
   'ingestion.js',
+  'folder-ingestion.js',
   'observatory.js',
   'stewardship.js',
   'evidence-semantics.js',

@@ -80,13 +80,14 @@ describe('catalog data modes', () => {
   it('refuses to present synthetic records as the live catalog', () => {
     const app = read('app.js');
     expect(app).toContain('Demo fixture mode is not available in this build');
-    expect(app).toContain('no fixture data is substituted');
+    expect(app).toContain('Persisted catalog data is shown instead.');
+    expect(app).toContain('The demo graph is not shown in PostgreSQL mode.');
   });
 
   it('still labels the retained demo code path as synthetic', () => {
     const app = read('app.js');
     expect(app).toContain("S.dataMode==='demo'?'DEMO PREVIEW'");
-    expect(app).toContain("S.dataMode==='demo'?'Synthetic data preview.'");
+    expect(app).toContain("S.dataMode==='demo'?'Synthetic example workspace'");
     expect(app).toContain("S.dataMode==='demo'?'DEMO DATA'");
   });
 
