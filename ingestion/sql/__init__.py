@@ -161,8 +161,12 @@ class SQLGlotLineageProvider:
 
         # Check for LEFT/RIGHT/FULL OUTER JOINs (not supported in MVP)
         for join in tree.find_all(exp.Join):
-            join_type = join.kind
-            if join_type and any(x in str(join_type).upper() for x in ["LEFT", "RIGHT", "FULL", "OUTER"]):
+            # SQLGlot stores LEFT/RIGHT/FULL in side for common dialects,
+            # while kind may carry OUTER. Inspect both to catch each form.
+            join_type = " ".join(
+                str(value) for value in (join.args.get("side"), join.args.get("kind")) if value
+            )
+            if any(x in join_type.upper() for x in ("LEFT", "RIGHT", "FULL", "OUTER")):
                 diagnostics.append(f"Outer join ({join_type}) not supported in MVP")
                 return StaticExtraction(
                     evidence=tuple(),
@@ -171,7 +175,7 @@ class SQLGlotLineageProvider:
                 )
 
         # Check for dynamic SQL patterns
-        if "EXECUTE" in sql.upper() or "USING" in sql.upper():
+        if "EXECUTE" in sql.upper():
             diagnostics.append("Dynamic SQL not supported")
             return StaticExtraction(
                 evidence=tuple(),
