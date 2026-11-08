@@ -181,3 +181,30 @@ class TestSupportedVsUnsupported:
 
         assert result.parser_status == ParserStatus.SUPPORTED
         assert len(result.evidence) > 0
+
+
+def test_lineage_failure_is_reported_instead_of_silently_accepted(monkeypatch):
+    """A per-target SQLGlot failure must downgrade the extraction to PARTIAL."""
+    import ingestion.sql as sql_module
+
+    def fail_lineage(*args, **kwargs):
+        raise RuntimeError("simulated SQLGlot lineage failure")
+
+    monkeypatch.setattr(sql_module, "lineage", fail_lineage)
+    schema = SchemaSnapshot(
+        dataset_id="employees",
+        columns=("id", "name"),
+        fingerprint="schema-test",
+    )
+
+    result = SQLGlotLineageProvider().extract(
+        "SELECT id FROM employees",
+        schema,
+    )
+
+    assert result.parser_status == ParserStatus.PARTIAL
+    assert result.evidence == ()
+    assert any(
+        "target id" in diagnostic and "simulated SQLGlot lineage failure" in diagnostic
+        for diagnostic in result.diagnostics
+    )
