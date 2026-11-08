@@ -68,4 +68,4 @@ jobs:
         SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
         KAIROS_TEST_USER_TOKEN: ${{ secrets.KAIROS_TEST_USER_TOKEN }}
       run: python -m pytest tests/test_live_api.py tests/test_audit_api_live.py tests/test_workspace_membership.py
-        -v --tb=short || true
+        -v --tb=short
