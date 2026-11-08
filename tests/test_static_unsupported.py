@@ -39,11 +39,19 @@ class TestUnsupportedConstructDetection:
 
     def test_outer_join_left_detected(self):
         """LEFT OUTER JOIN detection is a known limitation in MVP-1."""
-        pytest.skip("LEFT JOIN detection is unreliable in MVP-1; will be improved in future sprints")
+        sql = "SELECT o.id, c.name FROM orders o LEFT JOIN customers c ON o.customer_id = c.id"
+        schema = SchemaSnapshot(dataset_id="orders", columns=("id", "customer_id", "name"), fingerprint="schema-test")
+        result = SQLGlotLineageProvider().extract(sql, schema)
+        assert result.parser_status == ParserStatus.UNSUPPORTED
+        assert any("outer join" in item.lower() for item in result.diagnostics)
 
     def test_outer_join_right_detected(self):
         """RIGHT OUTER JOIN detection is a known limitation in MVP-1."""
-        pytest.skip("RIGHT JOIN detection is unreliable in MVP-1; will be improved in future sprints")
+        sql = "SELECT o.id, c.name FROM orders o RIGHT JOIN customers c ON o.customer_id = c.id"
+        schema = SchemaSnapshot(dataset_id="orders", columns=("id", "customer_id", "name"), fingerprint="schema-test")
+        result = SQLGlotLineageProvider().extract(sql, schema)
+        assert result.parser_status == ParserStatus.UNSUPPORTED
+        assert any("outer join" in item.lower() for item in result.diagnostics)
 
     def test_outer_join_full_detected(self):
         """FULL OUTER JOIN should be detected and rejected."""
@@ -208,3 +216,17 @@ def test_lineage_failure_is_reported_instead_of_silently_accepted(monkeypatch):
         "target id" in diagnostic and "simulated SQLGlot lineage failure" in diagnostic
         for diagnostic in result.diagnostics
     )
+
+
+def test_join_using_is_not_misclassified_as_dynamic_sql():
+    """USING is valid JOIN syntax and must not trigger the dynamic-SQL guard."""
+    sql = "SELECT o.id FROM orders o JOIN customers c USING (id)"
+    schema = SchemaSnapshot(
+        dataset_id="orders",
+        columns=("id", "customer_id", "name"),
+        fingerprint="schema-test",
+    )
+
+    result = SQLGlotLineageProvider().extract(sql, schema)
+
+    assert result.parser_status == ParserStatus.SUPPORTED
