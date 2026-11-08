@@ -34,8 +34,9 @@ def test_get_my_workspace_authenticated():
     assert response.status_code == 200
     spec = response.json()
     
-    # Check that the endpoint is in the spec
-    assert "/api/v1/me/workspace" in spec["paths"] or True  # Endpoint exists
+    # Verify the real route is registered; do not let this contract test pass
+    # unconditionally when the endpoint is accidentally removed.
+    assert "/api/v1/me/workspace" in spec["paths"]
 
 
 def test_get_workspace_by_id_unauthenticated():
