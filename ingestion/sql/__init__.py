@@ -27,7 +27,11 @@ def _leaves(node) -> list:
 
 
 def _column_deps(
-    sql: str, schema: Dict[str, Dict[str, str]], targets: Sequence[str], dialect: str = "postgres"
+    sql: str,
+    schema: Dict[str, Dict[str, str]],
+    targets: Sequence[str],
+    dialect: str = "postgres",
+    diagnostics: Optional[list] = None,
 ) -> Dict[str, Sequence[str]]:
     """For each target column, return sorted list of source columns it depends on."""
     out = {}
@@ -36,7 +40,12 @@ def _column_deps(
             node = lineage(t, sql, schema=schema, dialect=dialect)
             out[t] = sorted(set(_leaves(node)))
         except Exception as e:
-            # Lineage extraction failed for this target; record as empty
+            # Never silently turn an extraction failure into an apparently
+            # complete result. Preserve other targets, but downgrade the
+            # overall extraction through an explicit diagnostic.
+            if diagnostics is None:
+                raise
+            diagnostics.append(f"Lineage extraction failed for target {t}: {e}")
             out[t] = []
     return out
 
@@ -217,7 +226,7 @@ class SQLGlotLineageProvider:
 
         # Step 6: Extract column dependencies via lineage
         try:
-            col_deps = _column_deps(sql, schema_dict, target_cols, dialect)
+            col_deps = _column_deps(sql, schema_dict, target_cols, dialect, diagnostics)
         except Exception as e:
             diagnostics.append(f"Lineage extraction failed: {str(e)}")
             col_deps = {}
