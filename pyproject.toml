@@ -47,4 +47,4 @@ extend-exclude = ["node_modules", "dist", "build", ".pw-browsers"]
 select = ["E9", "F", "I"]
 
 [tool.vercel]
-entrypoint = "app.main:app"
+entrypoint = "backend.api.index:app"
