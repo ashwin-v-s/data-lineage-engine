@@ -474,6 +474,7 @@
           "kind": {
             "enum": [
               "metadata_graph",
+              "sql_file",
               "dbt_manifest",
               "file_inventory",
               "csv_headers"
@@ -1191,6 +1192,71 @@
         "title": "GitHubDisconnectResult",
         "type": "object"
       },
+      "GitHubImportCommitRequest": {
+        "properties": {
+          "idempotency_key": {
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Idempotency Key",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "metadata_graph",
+              "sql_file",
+              "dbt_manifest",
+              "csv_headers"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          },
+          "ref": {
+            "title": "Ref",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ref",
+          "path",
+          "kind",
+          "idempotency_key"
+        ],
+        "title": "GitHubImportCommitRequest",
+        "type": "object"
+      },
+      "GitHubImportRequest": {
+        "properties": {
+          "kind": {
+            "enum": [
+              "metadata_graph",
+              "sql_file",
+              "dbt_manifest",
+              "csv_headers"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          },
+          "ref": {
+            "title": "Ref",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ref",
+          "path",
+          "kind"
+        ],
+        "title": "GitHubImportRequest",
+        "type": "object"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -1366,6 +1432,7 @@
           "kind": {
             "enum": [
               "metadata_graph",
+              "sql_file",
               "dbt_manifest",
               "file_inventory",
               "csv_headers"
@@ -1509,6 +1576,21 @@
           "action_taken"
         ],
         "title": "IncidentResolution",
+        "type": "object"
+      },
+      "InviteAccept": {
+        "properties": {
+          "token": {
+            "maxLength": 128,
+            "minLength": 32,
+            "title": "Token",
+            "type": "string"
+          }
+        },
+        "required": [
+          "token"
+        ],
+        "title": "InviteAccept",
         "type": "object"
       },
       "InviteCreate": {
@@ -1660,6 +1742,20 @@
           "notification_ids"
         ],
         "title": "MarkReadInput",
+        "type": "object"
+      },
+      "MemberRoleUpdate": {
+        "properties": {
+          "role": {
+            "pattern": "^(admin|editor|viewer)$",
+            "title": "Role",
+            "type": "string"
+          }
+        },
+        "required": [
+          "role"
+        ],
+        "title": "MemberRoleUpdate",
         "type": "object"
       },
       "MetadataUpdateResponse": {
@@ -2886,6 +2982,20 @@
         ],
         "title": "ValidationError",
         "type": "object"
+      },
+      "WelcomeEmailRequest": {
+        "properties": {
+          "event_id": {
+            "format": "uuid",
+            "title": "Event Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "event_id"
+        ],
+        "title": "WelcomeEmailRequest",
+        "type": "object"
       }
     },
     "securitySchemes": {
@@ -3274,6 +3384,66 @@
           }
         ],
         "summary": "Star Asset"
+      }
+    },
+    "/api/v1/audit/workspace": {
+      "get": {
+        "description": "Return a workspace-scoped change feed without old/new field values.",
+        "operationId": "get_workspace_audit_api_v1_audit_workspace_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "minimum": 0,
+              "title": "Offset",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Workspace Audit",
+        "tags": [
+          "audit"
+        ]
       }
     },
     "/api/v1/audit/{asset_id}/compliance-report": {
@@ -4217,6 +4387,53 @@
         "summary": "Evaluate Dataset",
         "tags": [
           "governance"
+        ]
+      }
+    },
+    "/api/v1/governance/datasets/{dataset_id}/columns": {
+      "get": {
+        "description": "Return columns for a dataset already visible in the current workspace.",
+        "operationId": "list_dataset_columns_api_v1_governance_datasets__dataset_id__columns_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "dataset_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Dataset Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Dataset Columns",
+        "tags": [
+          "governance-registry"
         ]
       }
     },
@@ -5544,6 +5761,397 @@
         "summary": "Github Disconnect"
       }
     },
+    "/api/v1/integrations/github/connections/{connection_id}/repositories": {
+      "get": {
+        "operationId": "github_repositories_api_v1_integrations_github_connections__connection_id__repositories_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "connection_id",
+            "required": true,
+            "schema": {
+              "title": "Connection Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Github Repositories"
+      }
+    },
+    "/api/v1/integrations/github/connections/{connection_id}/repositories/{owner}/{repo}/branches": {
+      "get": {
+        "operationId": "github_repository_branches_api_v1_integrations_github_connections__connection_id__repositories__owner___repo__branches_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "connection_id",
+            "required": true,
+            "schema": {
+              "title": "Connection Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "owner",
+            "required": true,
+            "schema": {
+              "title": "Owner",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "repo",
+            "required": true,
+            "schema": {
+              "title": "Repo",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Github Repository Branches"
+      }
+    },
+    "/api/v1/integrations/github/connections/{connection_id}/repositories/{owner}/{repo}/commit-import": {
+      "post": {
+        "description": "Fetch, validate and persist private repository metadata with trusted origin.",
+        "operationId": "commit_github_import_api_v1_integrations_github_connections__connection_id__repositories__owner___repo__commit_import_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "connection_id",
+            "required": true,
+            "schema": {
+              "title": "Connection Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "owner",
+            "required": true,
+            "schema": {
+              "title": "Owner",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "repo",
+            "required": true,
+            "schema": {
+              "title": "Repo",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GitHubImportCommitRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Commit Github Import"
+      }
+    },
+    "/api/v1/integrations/github/connections/{connection_id}/repositories/{owner}/{repo}/content": {
+      "get": {
+        "operationId": "github_repository_file_api_v1_integrations_github_connections__connection_id__repositories__owner___repo__content_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "connection_id",
+            "required": true,
+            "schema": {
+              "title": "Connection Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "owner",
+            "required": true,
+            "schema": {
+              "title": "Owner",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "repo",
+            "required": true,
+            "schema": {
+              "title": "Repo",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "ref",
+            "required": true,
+            "schema": {
+              "title": "Ref",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "path",
+            "required": true,
+            "schema": {
+              "title": "Path",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Github Repository File"
+      }
+    },
+    "/api/v1/integrations/github/connections/{connection_id}/repositories/{owner}/{repo}/preview-import": {
+      "post": {
+        "description": "Preview a verified private GitHub file through the standard static adapters.",
+        "operationId": "preview_github_import_api_v1_integrations_github_connections__connection_id__repositories__owner___repo__preview_import_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "connection_id",
+            "required": true,
+            "schema": {
+              "title": "Connection Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "owner",
+            "required": true,
+            "schema": {
+              "title": "Owner",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "repo",
+            "required": true,
+            "schema": {
+              "title": "Repo",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GitHubImportRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Preview Github Import"
+      }
+    },
+    "/api/v1/integrations/github/connections/{connection_id}/repositories/{owner}/{repo}/tree": {
+      "get": {
+        "operationId": "github_repository_tree_api_v1_integrations_github_connections__connection_id__repositories__owner___repo__tree_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "connection_id",
+            "required": true,
+            "schema": {
+              "title": "Connection Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "owner",
+            "required": true,
+            "schema": {
+              "title": "Owner",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "repo",
+            "required": true,
+            "schema": {
+              "title": "Repo",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "ref",
+            "required": true,
+            "schema": {
+              "title": "Ref",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Github Repository Tree"
+      }
+    },
     "/api/v1/integrations/github/status": {
       "get": {
         "operationId": "github_connector_status_api_v1_integrations_github_status_get",
@@ -5858,6 +6466,48 @@
         "summary": "List Starred Assets"
       }
     },
+    "/api/v1/me/welcome-email": {
+      "post": {
+        "description": "Send one welcome message per authenticated login session.",
+        "operationId": "send_login_welcome_email_api_v1_me_welcome_email_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WelcomeEmailRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Send Login Welcome Email"
+      }
+    },
     "/api/v1/me/workspace": {
       "get": {
         "description": "Return the current user's personal workspace.\n\nEach user gets a personal workspace created automatically on signup.\nThis endpoint returns that workspace's ID and metadata.",
@@ -5878,6 +6528,28 @@
           }
         ],
         "summary": "Get My Workspace"
+      }
+    },
+    "/api/v1/me/workspaces": {
+      "get": {
+        "description": "List only workspaces where the verified user has active membership.",
+        "operationId": "list_my_workspaces_api_v1_me_workspaces_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List My Workspaces"
       }
     },
     "/api/v1/members": {
@@ -5970,6 +6642,50 @@
         ]
       }
     },
+    "/api/v1/members/invites/accept": {
+      "post": {
+        "operationId": "accept_invite_api_v1_members_invites_accept_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InviteAccept"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Accept Invite",
+        "tags": [
+          "membership"
+        ]
+      }
+    },
     "/api/v1/members/invites/{invite_id}": {
       "delete": {
         "operationId": "revoke_invite_api_v1_members_invites__invite_id__delete",
@@ -6015,16 +6731,17 @@
         ]
       }
     },
-    "/api/v1/members/invites/{token}/accept": {
+    "/api/v1/members/invites/{invite_id}/send": {
       "post": {
-        "operationId": "accept_invite_api_v1_members_invites__token__accept_post",
+        "operationId": "resend_invite_api_v1_members_invites__invite_id__send_post",
         "parameters": [
           {
             "in": "path",
-            "name": "token",
+            "name": "invite_id",
             "required": true,
             "schema": {
-              "title": "Token",
+              "format": "uuid",
+              "title": "Invite Id",
               "type": "string"
             }
           }
@@ -6054,7 +6771,109 @@
             "HTTPBearer": []
           }
         ],
-        "summary": "Accept Invite",
+        "summary": "Resend Invite",
+        "tags": [
+          "membership"
+        ]
+      }
+    },
+    "/api/v1/members/{member_user_id}": {
+      "delete": {
+        "description": "Remove an active member without deleting their historical workspace data.",
+        "operationId": "remove_member_api_v1_members__member_user_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "member_user_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Member User Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Remove Member",
+        "tags": [
+          "membership"
+        ]
+      },
+      "put": {
+        "description": "Change an active member's role; owners must be transferred out of band.",
+        "operationId": "update_member_role_api_v1_members__member_user_id__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "member_user_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Member User Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MemberRoleUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Update Member Role",
         "tags": [
           "membership"
         ]
