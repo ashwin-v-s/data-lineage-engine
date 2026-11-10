@@ -208,13 +208,9 @@ def _persist_import(
         database_name, schema_name = _split_namespace(asset.namespace)
         cur.execute(
             """
-            INSERT INTO dataset (source_system, namespace, database_name, schema_name, name,
-                asset_type, description, tags)
-            VALUES ('upload', %s, %s, %s, %s, %s, %s, %s)
-            ON CONFLICT (workspace_id, source_system, namespace, database_name, schema_name, name, asset_type)
-            DO UPDATE SET description=COALESCE(EXCLUDED.description, dataset.description),
-                          tags=CASE WHEN cardinality(EXCLUDED.tags) > 0 THEN EXCLUDED.tags ELSE dataset.tags END
-            RETURNING id::text AS id
+            SELECT public.kairos_upsert_dataset(
+                'upload', %s, %s, %s, %s, %s, %s, %s
+            )::text AS id
             """,
             (
                 asset.namespace,

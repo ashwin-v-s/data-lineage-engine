@@ -146,6 +146,7 @@ b,strong{font-weight:600}
 .btn.ghost{border-color:transparent;background:transparent}.btn.ghost:hover{border-color:var(--ink);background:var(--hl)}
 .btn.danger{background:var(--tint-red);color:var(--warn-ink)}
 .btn.small{min-height:34px;padding:5px 15px;font-size:.82rem}
+.asset-row-actions{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
 .panel-link,.inline-link{padding:0;border:0;background:none;color:var(--link);font:600 .85rem var(--font-body);text-align:left;text-underline-offset:3px}
 .inline-link{font-size:inherit}
 .panel-link:hover,.inline-link:hover{text-decoration:underline}

@@ -120,12 +120,9 @@ def _upsert_dataset(cur, namespace: str, name: str) -> Optional[str]:
     try:
         cur.execute(
             """
-            INSERT INTO dataset
-                (source_system, namespace, database_name, schema_name, name, asset_type)
-            VALUES ('openlineage', %s, '', %s, %s, 'table')
-            ON CONFLICT (source_system, namespace, database_name, schema_name, name, asset_type)
-            DO UPDATE SET name = EXCLUDED.name
-            RETURNING id
+            SELECT public.kairos_upsert_dataset(
+                'openlineage', %s, '', %s, %s, 'table'
+            ) AS id
             """,
             (namespace or "", namespace or "", name),
         )
@@ -422,11 +419,7 @@ def _insert_asset(cur, asset: dict[str, Any], source_kind: str, source_ref: str)
     database_name = source_ref or "kairos-import"
     cur.execute(
         """
-        INSERT INTO dataset (source_system, namespace, database_name, schema_name, name, asset_type)
-        VALUES (%s, %s, %s, %s, %s, %s)
-        ON CONFLICT (workspace_id, source_system, namespace, database_name, schema_name, name, asset_type)
-        DO UPDATE SET name = EXCLUDED.name
-        RETURNING id::text AS id
+        SELECT public.kairos_upsert_dataset(%s, %s, %s, %s, %s, %s)::text AS id
         """,
         (source_kind, namespace, database_name, namespace, name, asset_type),
     )

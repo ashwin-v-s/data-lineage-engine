@@ -5,6 +5,7 @@ import { defineConfig } from 'vite';
 const frontendRoot = import.meta.dirname;
 const runtimeFiles = [
   'app.js',
+  'asset-removal.js',
   'auth.js',
   'auth-stitch.html',
   'auth-stitch.css',

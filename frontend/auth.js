@@ -11,6 +11,7 @@
     '/evidence-semantics.js?v=1',
     '/lineage-investigation.js?v=1',
     '/app.js?v=311',
+    '/asset-removal.js?v=1',
   ];
   let config = null;
   let configLoaded = false;

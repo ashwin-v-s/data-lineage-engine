@@ -18,7 +18,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from backend.app import db as db_module
-from backend.app.api.routes import governance, governance_registry, membership, quality
+from backend.app.api.routes import assets, governance, governance_registry, membership, quality
 from backend.app.auth import require_user
 from backend.app.main import app
 
@@ -278,6 +278,15 @@ def test_editor_cannot_approve_a_glossary_term(client, monkeypatch):
     _authenticate(monkeypatch, EDITOR, role="editor")
 
     response = client.post(f"/api/v1/governance/terms/{TERM_ID}/approve")
+
+    assert response.status_code == 403
+    assert "owner" in response.json()["detail"] or "admin" in response.json()["detail"]
+
+
+def test_editor_cannot_remove_a_catalog_asset(client, monkeypatch):
+    _authenticate(monkeypatch, EDITOR, role="editor")
+
+    response = client.delete(f"/api/v1/assets/{DATASET_ID}")
 
     assert response.status_code == 403
     assert "owner" in response.json()["detail"] or "admin" in response.json()["detail"]
