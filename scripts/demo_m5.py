@@ -160,8 +160,8 @@ def run_demo() -> int:
     print("\n" + "=" * 65)
     if failures == 0:
         print("RESULT: ALL CHECKS PASSED")
-        print("\nNote: 346 offline tests pass; 0 endpoint bodies verified")
-        print("against a database in this script. For live DB verification:")
+        print("\nNote: this script checks offline route availability only; it does not")
+        print("verify endpoint response bodies or database-backed behavior. For live DB verification:")
         print("  KAIROS_LIVE_API_TESTS=1 KAIROS_TEST_USER_TOKEN=<token>")
         print("  pytest tests/test_live_api.py tests/test_ingest_runs.py")
         print("  tests/test_workspace_scope.py -v")

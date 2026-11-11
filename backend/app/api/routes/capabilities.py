@@ -169,20 +169,27 @@ def _count_runs(cur, dataset_id: str) -> int:
 
 
 def _quality_facts(cur, dataset_id: str) -> tuple[bool, bool]:
-    """Return ``(supported, available)`` for the quality capability.
-
-    ``quality_assertion`` / ``freshness_evaluation`` are proposal-only today, so
-    ``supported`` is expected to be ``False`` in the current deployment.
-    """
-    supported = _table_exists(cur, "quality_assertion") or _table_exists(cur, "freshness_evaluation")
-    if not supported:
+    """Return ``(supported, available)`` from stored quality evaluations."""
+    has_assertion_store = _table_exists(cur, "quality_assertion") and _table_exists(cur, "quality_result")
+    if not has_assertion_store:
         return False, False
-    # Prefer the richer freshness table when present, else the legacy results.
-    table = "freshness_evaluation" if _table_exists(cur, "freshness_evaluation") else "quality_result"
-    cur.execute(
-        f"SELECT EXISTS (SELECT 1 FROM {table} WHERE dataset_id = %s::uuid) AS has_quality",
-        (dataset_id,),
-    )
+    # quality_result is keyed by assertion_id; dataset membership lives on
+    # quality_assertion in the proposed M4 schema. Never query a column that
+    # the migration does not define.
+    if has_assertion_store:
+        cur.execute(
+            """SELECT EXISTS (
+                   SELECT 1
+                   FROM quality_result qr
+                   JOIN quality_assertion qa ON qa.id = qr.assertion_id
+                   WHERE qa.dataset_id = %s::uuid
+               ) AS has_quality""",
+            (dataset_id,),
+        )
+    else:
+        # Guard retained for clarity if a future schema splits result stores;
+        # freshness history alone is not a quality capability.
+        return False, False
     return True, bool(cur.fetchone()["has_quality"])
 
 

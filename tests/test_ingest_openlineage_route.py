@@ -29,7 +29,6 @@ stub before importing anything that transitively pulls it in.
 """
 from __future__ import annotations
 
-import json
 import sys
 from contextlib import contextmanager
 from types import ModuleType
@@ -48,6 +47,7 @@ if "psycopg2" not in sys.modules:
 
     _extras = ModuleType("psycopg2.extras")
     _extras.RealDictCursor = dict
+    _extras.Json = lambda value: value
 
     _pool = ModuleType("psycopg2.pool")
     _pool.ThreadedConnectionPool = MagicMock()
@@ -61,6 +61,16 @@ from fastapi.testclient import TestClient  # noqa: E402 — must come after stub
 from backend.app.main import app  # noqa: E402
 
 client = TestClient(app)
+
+
+@pytest.fixture(autouse=True)
+def _authenticated_openlineage_test_client(monkeypatch):
+    """Provide the configured service bearer token to the normal route cases."""
+    monkeypatch.setenv("KAIROS_OPENLINEAGE_WEBHOOK_SECRET", "test-openlineage-secret")
+    monkeypatch.setenv("KAIROS_OPENLINEAGE_WORKSPACE_ID", "11111111-1111-4111-8111-111111111111")
+    client.headers["Authorization"] = "Bearer test-openlineage-secret"
+    yield
+    client.headers.pop("Authorization", None)
 
 # ---------------------------------------------------------------------------
 # Fixtures / helpers
@@ -162,6 +172,29 @@ def test_r1_complete_event_accepted():
     assert data["accepted"] == 1
     assert data["duplicate"] == 0
     assert data["skipped"] == 0
+
+
+def test_openlineage_rejects_missing_or_invalid_webhook_token():
+    resp = client.post(
+        "/api/v1/ingest/openlineage", json=_complete_event(),
+        headers={"Authorization": "Bearer incorrect-token"},
+    )
+    assert resp.status_code == 401
+    assert resp.json()["error"]["code"] == "UNAUTHORIZED"
+
+
+def test_openlineage_fails_closed_when_webhook_auth_is_unconfigured(monkeypatch):
+    monkeypatch.delenv("KAIROS_OPENLINEAGE_WEBHOOK_SECRET")
+    resp = client.post("/api/v1/ingest/openlineage", json=_complete_event())
+    assert resp.status_code == 503
+    assert resp.json()["error"]["code"] == "WEBHOOK_AUTH_UNAVAILABLE"
+
+
+def test_openlineage_fails_closed_when_workspace_binding_is_missing(monkeypatch):
+    monkeypatch.delenv("KAIROS_OPENLINEAGE_WORKSPACE_ID")
+    resp = client.post("/api/v1/ingest/openlineage", json=_complete_event())
+    assert resp.status_code == 503
+    assert resp.json()["error"]["code"] == "WEBHOOK_WORKSPACE_UNAVAILABLE"
 
 
 # ---------------------------------------------------------------------------

@@ -1,4 +1,4 @@
-import logging
+﻿import logging
 import os
 import uuid
 from pathlib import Path
@@ -13,8 +13,10 @@ from backend.app.api.routes.assets import router as assets_router
 from backend.app.api.routes.audit import router as audit_router
 from backend.app.api.routes.capabilities import router as capabilities_router
 from backend.app.api.routes.dependency import router as dependency_router
-from backend.app.api.routes.ingest import router as ingest_router
 from backend.app.api.routes.governance import router as governance_router
+from backend.app.api.routes.governance_registry import router as governance_registry_router
+from backend.app.api.routes.quality import router as quality_router
+from backend.app.api.routes.notifications import router as notifications_router
 from backend.app.api.routes.health import router as health_router
 from backend.app.api.routes.ingest import router as ingest_router
 from backend.app.api.routes.ingestion import router as ingestion_router
@@ -27,6 +29,7 @@ from backend.app.api.routes.personalization import router as personalization_rou
 from backend.app.api.routes.rea import router as rea_router
 from backend.app.api.routes.search import router as search_router
 from backend.app.api.routes.sources import router as sources_router
+from backend.app.api.routes.vector_search import router as vector_search_router
 from backend.app.api.routes.workspaces import router as workspaces_router
 from backend.app.auth import auth_disabled, require_user, supabase_auth_url
 
@@ -71,7 +74,7 @@ async def unauthorized_handler(request: Request, exc):
 async def service_unavailable_handler(request: Request, exc):
     return api_error(request=request, message=str(exc.detail), status_code=503, code="AUTH_UNAVAILABLE")
 
-# ── CORS ─────────────────────────────────────────────────────────────────────
+# â”€â”€ CORS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 # Vite origin locally and the configured frontend origin in hosted deployments.
 frontend_origin = os.getenv("FRONTEND_ORIGIN", "http://localhost:3000").rstrip("/")
 app.add_middleware(
@@ -84,7 +87,7 @@ app.add_middleware(
 )
 
 
-# ── Request-ID middleware ─────────────────────────────────────────────────────
+# â”€â”€ Request-ID middleware â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 @app.middleware("http")
 async def add_request_id(request: Request, call_next):
     request_id = request.headers.get("X-Request-ID") or str(uuid.uuid4())
@@ -94,7 +97,7 @@ async def add_request_id(request: Request, call_next):
     return response
 
 
-# ── Request body size guard ───────────────────────────────────────────────────
+# â”€â”€ Request body size guard â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 @app.middleware("http")
 async def limit_request_body(request: Request, call_next):
     """Reject oversized bodies before they are read or parsed.
@@ -120,7 +123,7 @@ async def limit_request_body(request: Request, call_next):
     return await call_next(request)
 
 
-# ── Error handlers ────────────────────────────────────────────────────────────
+# â”€â”€ Error handlers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 @app.exception_handler(404)
 async def not_found_handler(request: Request, exc):
     return api_error(
@@ -131,7 +134,7 @@ async def not_found_handler(request: Request, exc):
     )
 
 
-# ── Routers ───────────────────────────────────────────────────────────────────
+# â”€â”€ Routers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 app.include_router(health_router,     prefix="/api/v1")
 app.include_router(search_router,     prefix="/api/v1")
 app.include_router(assets_router,     prefix="/api/v1")
@@ -144,16 +147,19 @@ app.include_router(owner_router,      prefix="/api/v1")
 app.include_router(metadata_router,   prefix="/api/v1")
 app.include_router(personalization_router, prefix="/api/v1")
 app.include_router(integrations_router, prefix="/api/v1")
-app.include_router(ingest_router, prefix="/api/v1")
 app.include_router(ingestion_router, prefix="/api/v1")
 app.include_router(membership_router, prefix="/api/v1")
 app.include_router(sources_router, prefix="/api/v1")
 app.include_router(governance_router, prefix="/api/v1")
+app.include_router(governance_registry_router, prefix="/api/v1")
+app.include_router(quality_router, prefix="/api/v1")
+app.include_router(notifications_router, prefix="/api/v1")
 app.include_router(capabilities_router, prefix="/api/v1")
 app.include_router(workspaces_router, prefix="/api/v1")
+app.include_router(vector_search_router, prefix="/api/v1")
 
 
-# ── Liveness probe ────────────────────────────────────────────────────────────
+# â”€â”€ Liveness probe â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 # Unauthenticated and dependency-free so a hosting platform (Vercel, a load
 # balancer, an uptime monitor) can confirm the process is up.  It deliberately
 # does NOT touch the database or Supabase: the authenticated, database-backed
@@ -213,6 +219,8 @@ FRONTEND_SOURCE_DIR = Path(__file__).resolve().parents[2] / "frontend"
 FRONTEND_DIR = FRONTEND_SOURCE_DIR / "dist"
 if FRONTEND_DIR.is_dir():
     app.mount("/", StaticFiles(directory=FRONTEND_DIR, html=True), name="frontend")
+
+
 
 
 

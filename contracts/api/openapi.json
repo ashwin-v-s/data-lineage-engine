@@ -19,6 +19,69 @@
         "title": "ApproveOwnerRequest",
         "type": "object"
       },
+      "AssertionInput": {
+        "additionalProperties": false,
+        "properties": {
+          "assertion_type": {
+            "enum": [
+              "freshness",
+              "completeness",
+              "uniqueness",
+              "validity",
+              "schema",
+              "custom_sql"
+            ],
+            "title": "Assertion Type",
+            "type": "string"
+          },
+          "dataset_id": {
+            "format": "uuid",
+            "title": "Dataset Id",
+            "type": "string"
+          },
+          "definition": {
+            "additionalProperties": true,
+            "title": "Definition",
+            "type": "object"
+          },
+          "name": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "schedule": {
+            "default": "manual",
+            "enum": [
+              "manual",
+              "15m",
+              "hourly",
+              "daily",
+              "on_import"
+            ],
+            "title": "Schedule",
+            "type": "string"
+          },
+          "severity": {
+            "default": "MEDIUM",
+            "enum": [
+              "LOW",
+              "MEDIUM",
+              "HIGH",
+              "CRITICAL"
+            ],
+            "title": "Severity",
+            "type": "string"
+          }
+        },
+        "required": [
+          "dataset_id",
+          "name",
+          "assertion_type"
+        ],
+        "title": "AssertionInput",
+        "type": "object"
+      },
       "AssetResponse": {
         "properties": {
           "description": {
@@ -152,6 +215,21 @@
           "assigned_by"
         ],
         "title": "AssignOwnerResponse",
+        "type": "object"
+      },
+      "AssignmentInput": {
+        "additionalProperties": false,
+        "properties": {
+          "dataset_id": {
+            "format": "uuid",
+            "title": "Dataset Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "dataset_id"
+        ],
+        "title": "AssignmentInput",
         "type": "object"
       },
       "Body_update_tags_api_v1_metadata__asset_id__tags_put": {
@@ -318,6 +396,62 @@
         "title": "BulkUpdateResponse",
         "type": "object"
       },
+      "ClassificationInput": {
+        "additionalProperties": false,
+        "properties": {
+          "classification": {
+            "enum": [
+              "PII_SOURCE",
+              "PII_INHERITED",
+              "PII_MASKED",
+              "PII_POTENTIAL",
+              "PII_CLEARED",
+              "UNKNOWN"
+            ],
+            "title": "Classification",
+            "type": "string"
+          },
+          "column_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Column Id"
+          },
+          "dataset_id": {
+            "format": "uuid",
+            "title": "Dataset Id",
+            "type": "string"
+          },
+          "evidence_state": {
+            "enum": [
+              "OBSERVED",
+              "POSSIBLE",
+              "UNKNOWN"
+            ],
+            "title": "Evidence State",
+            "type": "string"
+          },
+          "provenance": {
+            "additionalProperties": true,
+            "title": "Provenance",
+            "type": "object"
+          }
+        },
+        "required": [
+          "dataset_id",
+          "classification",
+          "evidence_state",
+          "provenance"
+        ],
+        "title": "ClassificationInput",
+        "type": "object"
+      },
       "CommitInput": {
         "additionalProperties": false,
         "properties": {
@@ -340,6 +474,7 @@
           "kind": {
             "enum": [
               "metadata_graph",
+              "sql_file",
               "dbt_manifest",
               "file_inventory",
               "csv_headers"
@@ -366,6 +501,62 @@
           "idempotency_key"
         ],
         "title": "CommitInput",
+        "type": "object"
+      },
+      "ContractInput": {
+        "additionalProperties": false,
+        "properties": {
+          "clauses": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "maxItems": 100,
+            "title": "Clauses",
+            "type": "array"
+          },
+          "enforcement_mode": {
+            "enum": [
+              "MONITOR",
+              "WARN",
+              "BLOCK"
+            ],
+            "title": "Enforcement Mode",
+            "type": "string"
+          },
+          "version": {
+            "minimum": 1.0,
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "version",
+          "enforcement_mode"
+        ],
+        "title": "ContractInput",
+        "type": "object"
+      },
+      "ContractLinkInput": {
+        "additionalProperties": false,
+        "properties": {
+          "assertion_id": {
+            "format": "uuid",
+            "title": "Assertion Id",
+            "type": "string"
+          },
+          "clause_key": {
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Clause Key",
+            "type": "string"
+          }
+        },
+        "required": [
+          "assertion_id",
+          "clause_key"
+        ],
+        "title": "ContractLinkInput",
         "type": "object"
       },
       "CoverageOut": {
@@ -502,6 +693,40 @@
           "temporal_context"
         ],
         "title": "DependencyStateResponse",
+        "type": "object"
+      },
+      "DomainInput": {
+        "additionalProperties": false,
+        "properties": {
+          "description": {
+            "default": "",
+            "maxLength": 2000,
+            "title": "Description",
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "owner_user_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Owner User Id"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "DomainInput",
         "type": "object"
       },
       "EditableField": {
@@ -713,6 +938,28 @@
           "source_system"
         ],
         "title": "EvidenceRef",
+        "type": "object"
+      },
+      "FreshnessConfirmation": {
+        "additionalProperties": false,
+        "properties": {
+          "note": {
+            "maxLength": 1000,
+            "minLength": 1,
+            "title": "Note",
+            "type": "string"
+          },
+          "observed_at": {
+            "format": "date-time",
+            "title": "Observed At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "observed_at",
+          "note"
+        ],
+        "title": "FreshnessConfirmation",
         "type": "object"
       },
       "GitHubCallbackRequest": {
@@ -945,6 +1192,71 @@
         "title": "GitHubDisconnectResult",
         "type": "object"
       },
+      "GitHubImportCommitRequest": {
+        "properties": {
+          "idempotency_key": {
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Idempotency Key",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "metadata_graph",
+              "sql_file",
+              "dbt_manifest",
+              "csv_headers"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          },
+          "ref": {
+            "title": "Ref",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ref",
+          "path",
+          "kind",
+          "idempotency_key"
+        ],
+        "title": "GitHubImportCommitRequest",
+        "type": "object"
+      },
+      "GitHubImportRequest": {
+        "properties": {
+          "kind": {
+            "enum": [
+              "metadata_graph",
+              "sql_file",
+              "dbt_manifest",
+              "csv_headers"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          },
+          "ref": {
+            "title": "Ref",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ref",
+          "path",
+          "kind"
+        ],
+        "title": "GitHubImportRequest",
+        "type": "object"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -1120,6 +1432,7 @@
           "kind": {
             "enum": [
               "metadata_graph",
+              "sql_file",
               "dbt_manifest",
               "file_inventory",
               "csv_headers"
@@ -1209,6 +1522,75 @@
           "ref"
         ],
         "title": "ImportSource",
+        "type": "object"
+      },
+      "IncidentAssignment": {
+        "additionalProperties": false,
+        "properties": {
+          "user_id": {
+            "format": "uuid",
+            "title": "User Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "user_id"
+        ],
+        "title": "IncidentAssignment",
+        "type": "object"
+      },
+      "IncidentComment": {
+        "additionalProperties": false,
+        "properties": {
+          "comment": {
+            "maxLength": 4000,
+            "minLength": 1,
+            "title": "Comment",
+            "type": "string"
+          }
+        },
+        "required": [
+          "comment"
+        ],
+        "title": "IncidentComment",
+        "type": "object"
+      },
+      "IncidentResolution": {
+        "additionalProperties": false,
+        "properties": {
+          "action_taken": {
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Action Taken",
+            "type": "string"
+          },
+          "reason": {
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason",
+          "action_taken"
+        ],
+        "title": "IncidentResolution",
+        "type": "object"
+      },
+      "InviteAccept": {
+        "properties": {
+          "token": {
+            "maxLength": 128,
+            "minLength": 32,
+            "title": "Token",
+            "type": "string"
+          }
+        },
+        "required": [
+          "token"
+        ],
+        "title": "InviteAccept",
         "type": "object"
       },
       "InviteCreate": {
@@ -1342,6 +1724,38 @@
           "edges"
         ],
         "title": "LineageResponse",
+        "type": "object"
+      },
+      "MarkReadInput": {
+        "additionalProperties": false,
+        "properties": {
+          "notification_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Notification Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "notification_ids"
+        ],
+        "title": "MarkReadInput",
+        "type": "object"
+      },
+      "MemberRoleUpdate": {
+        "properties": {
+          "role": {
+            "pattern": "^(admin|editor|viewer)$",
+            "title": "Role",
+            "type": "string"
+          }
+        },
+        "required": [
+          "role"
+        ],
+        "title": "MemberRoleUpdate",
         "type": "object"
       },
       "MetadataUpdateResponse": {
@@ -1855,6 +2269,30 @@
         "title": "PersonalizedAssetList",
         "type": "object"
       },
+      "PreferenceInput": {
+        "additionalProperties": false,
+        "properties": {
+          "email": {
+            "default": false,
+            "title": "Email",
+            "type": "boolean"
+          },
+          "event_type": {
+            "title": "Event Type",
+            "type": "string"
+          },
+          "in_app": {
+            "default": true,
+            "title": "In App",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "event_type"
+        ],
+        "title": "PreferenceInput",
+        "type": "object"
+      },
       "PreviewResult": {
         "properties": {
           "commit_blocker": {
@@ -1888,6 +2326,71 @@
           "commit_ready"
         ],
         "title": "PreviewResult",
+        "type": "object"
+      },
+      "ProductInput": {
+        "additionalProperties": false,
+        "properties": {
+          "asset_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "maxItems": 100,
+            "title": "Asset Ids",
+            "type": "array"
+          },
+          "description": {
+            "default": "",
+            "maxLength": 4000,
+            "title": "Description",
+            "type": "string"
+          },
+          "domain_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Domain Id"
+          },
+          "name": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "owner_user_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Owner User Id"
+          },
+          "status": {
+            "default": "DRAFT",
+            "enum": [
+              "DRAFT",
+              "ACTIVE",
+              "DEPRECATED"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "ProductInput",
         "type": "object"
       },
       "RollbackRequest": {
@@ -1933,6 +2436,39 @@
       },
       "SearchResponse": {
         "properties": {
+          "mode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mode"
+          },
+          "page": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Page"
+          },
+          "page_size": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Page Size"
+          },
           "results": {
             "items": {
               "$ref": "#/components/schemas/SearchResult"
@@ -1992,6 +2528,17 @@
             ],
             "title": "Label"
           },
+          "match_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Match Type"
+          },
           "name": {
             "title": "Name",
             "type": "string"
@@ -2028,6 +2575,17 @@
               }
             ],
             "title": "Schema"
+          },
+          "score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score"
           },
           "steward": {
             "anyOf": [
@@ -2092,6 +2650,22 @@
             "minimum": 1.0,
             "title": "Error After Minutes",
             "type": "integer"
+          },
+          "evaluation_schedule": {
+            "default": "manual",
+            "enum": [
+              "manual",
+              "15m",
+              "hourly",
+              "daily"
+            ],
+            "title": "Evaluation Schedule",
+            "type": "string"
+          },
+          "paused": {
+            "default": false,
+            "title": "Paused",
+            "type": "boolean"
           },
           "signal": {
             "enum": [
@@ -2319,6 +2893,29 @@
         "title": "TeamMember",
         "type": "object"
       },
+      "TermInput": {
+        "additionalProperties": false,
+        "properties": {
+          "definition": {
+            "maxLength": 4000,
+            "minLength": 1,
+            "title": "Definition",
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "definition"
+        ],
+        "title": "TermInput",
+        "type": "object"
+      },
       "TestResult": {
         "properties": {
           "lifecycle_state": {
@@ -2384,6 +2981,20 @@
           "type"
         ],
         "title": "ValidationError",
+        "type": "object"
+      },
+      "WelcomeEmailRequest": {
+        "properties": {
+          "event_id": {
+            "format": "uuid",
+            "title": "Event Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "event_id"
+        ],
+        "title": "WelcomeEmailRequest",
         "type": "object"
       }
     },
@@ -2775,6 +3386,66 @@
         "summary": "Star Asset"
       }
     },
+    "/api/v1/audit/workspace": {
+      "get": {
+        "description": "Return a workspace-scoped change feed without old/new field values.",
+        "operationId": "get_workspace_audit_api_v1_audit_workspace_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "minimum": 0,
+              "title": "Offset",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Workspace Audit",
+        "tags": [
+          "audit"
+        ]
+      }
+    },
     "/api/v1/audit/{asset_id}/compliance-report": {
       "get": {
         "description": "Get compliance & governance report",
@@ -2904,7 +3575,7 @@
     },
     "/api/v1/audit/{asset_id}/rollback": {
       "post": {
-        "description": "Request rollback to previous version (with approval workflow)\n\nParameters:\n    asset_id: Asset ID (must be valid UUID)\n    rollback_request: Rollback details\n    current_user: User requesting rollback\n\nReturns:\n    Rollback request with status\n    \nStatus Codes:\n    200: Success\n    400: Invalid input\n    404: Asset not found\n    429: Rate limit exceeded\n    500: Server error",
+        "description": "Return an explicit unsupported response until approval/execution exists.",
         "operationId": "request_rollback_api_v1_audit__asset_id__rollback_post",
         "parameters": [
           {
@@ -3464,6 +4135,214 @@
         "summary": "Evidence At Time"
       }
     },
+    "/api/v1/governance/classifications": {
+      "get": {
+        "operationId": "list_classifications_api_v1_governance_classifications_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "dataset_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Dataset Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Classifications",
+        "tags": [
+          "governance-registry"
+        ]
+      },
+      "post": {
+        "operationId": "create_classification_api_v1_governance_classifications_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClassificationInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Create Classification",
+        "tags": [
+          "governance-registry"
+        ]
+      }
+    },
+    "/api/v1/governance/contracts/{contract_id}/assertions": {
+      "post": {
+        "operationId": "link_contract_assertion_api_v1_governance_contracts__contract_id__assertions_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "contract_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Contract Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ContractLinkInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Link Contract Assertion",
+        "tags": [
+          "governance-registry"
+        ]
+      }
+    },
+    "/api/v1/governance/datasets/{asset_id}/confirm-freshness": {
+      "post": {
+        "description": "Record a human freshness attestation as MANUAL evidence, never runtime evidence.",
+        "operationId": "confirm_freshness_api_v1_governance_datasets__asset_id__confirm_freshness_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "asset_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Asset Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FreshnessConfirmation"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Confirm Freshness",
+        "tags": [
+          "governance"
+        ]
+      }
+    },
     "/api/v1/governance/datasets/{asset_id}/evaluate": {
       "post": {
         "description": "Run the freshness engine for one dataset and reconcile its incident.",
@@ -3508,6 +4387,119 @@
         "summary": "Evaluate Dataset",
         "tags": [
           "governance"
+        ]
+      }
+    },
+    "/api/v1/governance/datasets/{dataset_id}/columns": {
+      "get": {
+        "description": "Return columns for a dataset already visible in the current workspace.",
+        "operationId": "list_dataset_columns_api_v1_governance_datasets__dataset_id__columns_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "dataset_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Dataset Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Dataset Columns",
+        "tags": [
+          "governance-registry"
+        ]
+      }
+    },
+    "/api/v1/governance/domains": {
+      "get": {
+        "operationId": "list_domains_api_v1_governance_domains_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Domains",
+        "tags": [
+          "governance-registry"
+        ]
+      },
+      "post": {
+        "operationId": "create_domain_api_v1_governance_domains_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DomainInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Create Domain",
+        "tags": [
+          "governance-registry"
         ]
       }
     },
@@ -3683,6 +4675,118 @@
         ]
       }
     },
+    "/api/v1/governance/incidents/{incident_id}/assign": {
+      "post": {
+        "operationId": "assign_incident_api_v1_governance_incidents__incident_id__assign_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "incident_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Incident Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IncidentAssignment"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Assign Incident",
+        "tags": [
+          "governance"
+        ]
+      }
+    },
+    "/api/v1/governance/incidents/{incident_id}/comments": {
+      "post": {
+        "operationId": "comment_on_incident_api_v1_governance_incidents__incident_id__comments_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "incident_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Incident Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IncidentComment"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Comment On Incident",
+        "tags": [
+          "governance"
+        ]
+      }
+    },
     "/api/v1/governance/incidents/{incident_id}/investigate": {
       "post": {
         "description": "Transition an incident to INVESTIGATING (409 on an illegal transition).",
@@ -3732,7 +4836,7 @@
     },
     "/api/v1/governance/incidents/{incident_id}/resolve": {
       "post": {
-        "description": "Transition an incident to RESOLVED (409 on an illegal transition).",
+        "description": "Resolve only with auditable reason and action details.",
         "operationId": "resolve_incident_api_v1_governance_incidents__incident_id__resolve_post",
         "parameters": [
           {
@@ -3742,6 +4846,128 @@
             "schema": {
               "format": "uuid",
               "title": "Incident Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IncidentResolution"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Resolve Incident",
+        "tags": [
+          "governance"
+        ]
+      }
+    },
+    "/api/v1/governance/products": {
+      "get": {
+        "operationId": "list_products_api_v1_governance_products_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Products",
+        "tags": [
+          "governance-registry"
+        ]
+      },
+      "post": {
+        "operationId": "create_product_api_v1_governance_products_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProductInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Create Product",
+        "tags": [
+          "governance-registry"
+        ]
+      }
+    },
+    "/api/v1/governance/products/{product_id}/contracts": {
+      "get": {
+        "operationId": "list_contracts_api_v1_governance_products__product_id__contracts_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "product_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Product Id",
               "type": "string"
             }
           }
@@ -3771,9 +4997,63 @@
             "HTTPBearer": []
           }
         ],
-        "summary": "Resolve Incident",
+        "summary": "List Contracts",
         "tags": [
-          "governance"
+          "governance-registry"
+        ]
+      },
+      "post": {
+        "operationId": "create_contract_api_v1_governance_products__product_id__contracts_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "product_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Product Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ContractInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Create Contract",
+        "tags": [
+          "governance-registry"
         ]
       }
     },
@@ -3842,6 +5122,174 @@
         "summary": "Upsert Sla",
         "tags": [
           "governance"
+        ]
+      }
+    },
+    "/api/v1/governance/terms": {
+      "get": {
+        "operationId": "list_terms_api_v1_governance_terms_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Terms",
+        "tags": [
+          "governance-registry"
+        ]
+      },
+      "post": {
+        "operationId": "create_term_api_v1_governance_terms_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TermInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Create Term",
+        "tags": [
+          "governance-registry"
+        ]
+      }
+    },
+    "/api/v1/governance/terms/{term_id}/approve": {
+      "post": {
+        "operationId": "approve_term_api_v1_governance_terms__term_id__approve_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "term_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Term Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Approve Term",
+        "tags": [
+          "governance-registry"
+        ]
+      }
+    },
+    "/api/v1/governance/terms/{term_id}/assets": {
+      "post": {
+        "operationId": "assign_term_api_v1_governance_terms__term_id__assets_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "term_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Term Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssignmentInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Assign Term",
+        "tags": [
+          "governance-registry"
         ]
       }
     },
@@ -4313,6 +5761,397 @@
         "summary": "Github Disconnect"
       }
     },
+    "/api/v1/integrations/github/connections/{connection_id}/repositories": {
+      "get": {
+        "operationId": "github_repositories_api_v1_integrations_github_connections__connection_id__repositories_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "connection_id",
+            "required": true,
+            "schema": {
+              "title": "Connection Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Github Repositories"
+      }
+    },
+    "/api/v1/integrations/github/connections/{connection_id}/repositories/{owner}/{repo}/branches": {
+      "get": {
+        "operationId": "github_repository_branches_api_v1_integrations_github_connections__connection_id__repositories__owner___repo__branches_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "connection_id",
+            "required": true,
+            "schema": {
+              "title": "Connection Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "owner",
+            "required": true,
+            "schema": {
+              "title": "Owner",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "repo",
+            "required": true,
+            "schema": {
+              "title": "Repo",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Github Repository Branches"
+      }
+    },
+    "/api/v1/integrations/github/connections/{connection_id}/repositories/{owner}/{repo}/commit-import": {
+      "post": {
+        "description": "Fetch, validate and persist private repository metadata with trusted origin.",
+        "operationId": "commit_github_import_api_v1_integrations_github_connections__connection_id__repositories__owner___repo__commit_import_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "connection_id",
+            "required": true,
+            "schema": {
+              "title": "Connection Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "owner",
+            "required": true,
+            "schema": {
+              "title": "Owner",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "repo",
+            "required": true,
+            "schema": {
+              "title": "Repo",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GitHubImportCommitRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Commit Github Import"
+      }
+    },
+    "/api/v1/integrations/github/connections/{connection_id}/repositories/{owner}/{repo}/content": {
+      "get": {
+        "operationId": "github_repository_file_api_v1_integrations_github_connections__connection_id__repositories__owner___repo__content_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "connection_id",
+            "required": true,
+            "schema": {
+              "title": "Connection Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "owner",
+            "required": true,
+            "schema": {
+              "title": "Owner",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "repo",
+            "required": true,
+            "schema": {
+              "title": "Repo",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "ref",
+            "required": true,
+            "schema": {
+              "title": "Ref",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "path",
+            "required": true,
+            "schema": {
+              "title": "Path",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Github Repository File"
+      }
+    },
+    "/api/v1/integrations/github/connections/{connection_id}/repositories/{owner}/{repo}/preview-import": {
+      "post": {
+        "description": "Preview a verified private GitHub file through the standard static adapters.",
+        "operationId": "preview_github_import_api_v1_integrations_github_connections__connection_id__repositories__owner___repo__preview_import_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "connection_id",
+            "required": true,
+            "schema": {
+              "title": "Connection Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "owner",
+            "required": true,
+            "schema": {
+              "title": "Owner",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "repo",
+            "required": true,
+            "schema": {
+              "title": "Repo",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GitHubImportRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Preview Github Import"
+      }
+    },
+    "/api/v1/integrations/github/connections/{connection_id}/repositories/{owner}/{repo}/tree": {
+      "get": {
+        "operationId": "github_repository_tree_api_v1_integrations_github_connections__connection_id__repositories__owner___repo__tree_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "connection_id",
+            "required": true,
+            "schema": {
+              "title": "Connection Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "owner",
+            "required": true,
+            "schema": {
+              "title": "Owner",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "repo",
+            "required": true,
+            "schema": {
+              "title": "Repo",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "ref",
+            "required": true,
+            "schema": {
+              "title": "Ref",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Github Repository Tree"
+      }
+    },
     "/api/v1/integrations/github/status": {
       "get": {
         "operationId": "github_connector_status_api_v1_integrations_github_status_get",
@@ -4627,6 +6466,48 @@
         "summary": "List Starred Assets"
       }
     },
+    "/api/v1/me/welcome-email": {
+      "post": {
+        "description": "Send one welcome message per authenticated login session.",
+        "operationId": "send_login_welcome_email_api_v1_me_welcome_email_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WelcomeEmailRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Send Login Welcome Email"
+      }
+    },
     "/api/v1/me/workspace": {
       "get": {
         "description": "Return the current user's personal workspace.\n\nEach user gets a personal workspace created automatically on signup.\nThis endpoint returns that workspace's ID and metadata.",
@@ -4647,6 +6528,28 @@
           }
         ],
         "summary": "Get My Workspace"
+      }
+    },
+    "/api/v1/me/workspaces": {
+      "get": {
+        "description": "List only workspaces where the verified user has active membership.",
+        "operationId": "list_my_workspaces_api_v1_me_workspaces_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List My Workspaces"
       }
     },
     "/api/v1/members": {
@@ -4739,6 +6642,50 @@
         ]
       }
     },
+    "/api/v1/members/invites/accept": {
+      "post": {
+        "operationId": "accept_invite_api_v1_members_invites_accept_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InviteAccept"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Accept Invite",
+        "tags": [
+          "membership"
+        ]
+      }
+    },
     "/api/v1/members/invites/{invite_id}": {
       "delete": {
         "operationId": "revoke_invite_api_v1_members_invites__invite_id__delete",
@@ -4784,16 +6731,17 @@
         ]
       }
     },
-    "/api/v1/members/invites/{token}/accept": {
+    "/api/v1/members/invites/{invite_id}/send": {
       "post": {
-        "operationId": "accept_invite_api_v1_members_invites__token__accept_post",
+        "operationId": "resend_invite_api_v1_members_invites__invite_id__send_post",
         "parameters": [
           {
             "in": "path",
-            "name": "token",
+            "name": "invite_id",
             "required": true,
             "schema": {
-              "title": "Token",
+              "format": "uuid",
+              "title": "Invite Id",
               "type": "string"
             }
           }
@@ -4823,7 +6771,109 @@
             "HTTPBearer": []
           }
         ],
-        "summary": "Accept Invite",
+        "summary": "Resend Invite",
+        "tags": [
+          "membership"
+        ]
+      }
+    },
+    "/api/v1/members/{member_user_id}": {
+      "delete": {
+        "description": "Remove an active member without deleting their historical workspace data.",
+        "operationId": "remove_member_api_v1_members__member_user_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "member_user_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Member User Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Remove Member",
+        "tags": [
+          "membership"
+        ]
+      },
+      "put": {
+        "description": "Change an active member's role; owners must be transferred out of band.",
+        "operationId": "update_member_role_api_v1_members__member_user_id__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "member_user_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Member User Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MemberRoleUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Update Member Role",
         "tags": [
           "membership"
         ]
@@ -5089,6 +7139,198 @@
         "summary": "Update Tags",
         "tags": [
           "metadata"
+        ]
+      }
+    },
+    "/api/v1/notifications": {
+      "get": {
+        "operationId": "list_notifications_api_v1_notifications_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "unread_only",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Unread Only",
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Notifications",
+        "tags": [
+          "notifications"
+        ]
+      }
+    },
+    "/api/v1/notifications/preferences": {
+      "get": {
+        "operationId": "get_preferences_api_v1_notifications_preferences_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Preferences",
+        "tags": [
+          "notifications"
+        ]
+      },
+      "put": {
+        "operationId": "set_preference_api_v1_notifications_preferences_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PreferenceInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Set Preference",
+        "tags": [
+          "notifications"
+        ]
+      }
+    },
+    "/api/v1/notifications/read": {
+      "post": {
+        "operationId": "mark_read_api_v1_notifications_read_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MarkReadInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Mark Read",
+        "tags": [
+          "notifications"
+        ]
+      }
+    },
+    "/api/v1/notifications/read-all": {
+      "post": {
+        "operationId": "mark_all_read_api_v1_notifications_read_all_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Mark All Read",
+        "tags": [
+          "notifications"
         ]
       }
     },
@@ -5484,6 +7726,205 @@
         "summary": "Get Assignment History",
         "tags": [
           "ownership"
+        ]
+      }
+    },
+    "/api/v1/quality/assertions": {
+      "get": {
+        "operationId": "list_assertions_api_v1_quality_assertions_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "dataset_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Dataset Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Assertions",
+        "tags": [
+          "quality"
+        ]
+      },
+      "post": {
+        "operationId": "create_assertion_api_v1_quality_assertions_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssertionInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Create Assertion",
+        "tags": [
+          "quality"
+        ]
+      }
+    },
+    "/api/v1/quality/assertions/{assertion_id}/evaluate": {
+      "post": {
+        "operationId": "evaluate_assertion_api_v1_quality_assertions__assertion_id__evaluate_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "assertion_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Assertion Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Evaluate Assertion",
+        "tags": [
+          "quality"
+        ]
+      }
+    },
+    "/api/v1/quality/assertions/{assertion_id}/results": {
+      "get": {
+        "operationId": "list_assertion_results_api_v1_quality_assertions__assertion_id__results_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "assertion_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Assertion Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Assertion Results",
+        "tags": [
+          "quality"
         ]
       }
     },
@@ -5975,6 +8416,87 @@
           }
         ],
         "summary": "Search"
+      }
+    },
+    "/api/v1/search/hybrid": {
+      "get": {
+        "description": "Hybrid search endpoint combining keyword + semantic search.\n\nSecurity:\n- Enforces workspace isolation via user's workspace_id\n- RLS policies at DB level provide additional protection\n- No cross-workspace data leakage possible\n\nModes:\n- hybrid: 70% keyword + 30% semantic\n- keyword: Traditional ILIKE search only\n- semantic: Vector similarity only",
+        "operationId": "hybrid_search_api_v1_search_hybrid_get",
+        "parameters": [
+          {
+            "description": "Search query",
+            "in": "query",
+            "name": "q",
+            "required": true,
+            "schema": {
+              "description": "Search query",
+              "title": "Q",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "mode",
+            "required": false,
+            "schema": {
+              "default": "hybrid",
+              "pattern": "^(hybrid|keyword|semantic)$",
+              "title": "Mode",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "minimum": 1,
+              "title": "Page",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page_size",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Page Size",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Hybrid Search"
       }
     },
     "/api/v1/sources": {

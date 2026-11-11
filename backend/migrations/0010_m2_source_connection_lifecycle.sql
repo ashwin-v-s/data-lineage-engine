@@ -33,8 +33,7 @@
 -- STALE               Last successful sync older than the configured threshold.
 -- REFRESH_IN_PROGRESS A manual or scheduled refresh is currently running.
 --
--- NOT IMPLEMENTED: APPLIED to shared Supabase project.
--- Run `python scripts/db/verify_applied.py` after applying and update this header.
+-- Status: APPLIED to shared Supabase (verified 2026-11-07).
 
 BEGIN;
 

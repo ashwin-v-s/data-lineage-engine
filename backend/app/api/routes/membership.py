@@ -9,14 +9,17 @@ is never read from the JWT.  Invitations can never grant ownership.
 from __future__ import annotations
 
 import secrets
+import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from psycopg2 import Error as PostgresError
 from pydantic import BaseModel, EmailStr, Field
 
 from backend.app.auth import require_user
 from backend.app.db import get_conn
+from backend.app.services.email_delivery import EmailDeliveryError, EmailSettings, invite_url, send_workspace_invitation
 
 router = APIRouter(prefix="/members", tags=["membership"], dependencies=[Depends(require_user)])
 
@@ -108,6 +111,14 @@ class InviteResponse(BaseModel):
     accepted: bool
 
 
+class MemberRoleUpdate(BaseModel):
+    role: str = Field(pattern="^(admin|editor|viewer)$")
+
+
+class InviteAccept(BaseModel):
+    token: str = Field(min_length=32, max_length=128)
+
+
 @router.get("")
 def list_members(user: dict = Depends(require_user)):
     with get_conn() as conn:
@@ -188,48 +199,154 @@ def create_invite(body: InviteCreate, user: dict = Depends(require_user)):
             )
             row = cur.fetchone()
         conn.commit()
-    return {"ok": True, "id": row[0], "expires_at": expires_at.isoformat()}
+    email_sent = False
+    delivery_error = None
+    try:
+        if EmailSettings.from_env() is None:
+            delivery_error = "Email delivery is not configured on this server."
+        else:
+            send_workspace_invitation(body.email, token, expires_at.isoformat())
+            email_sent = True
+    except EmailDeliveryError as exc:
+        delivery_error = str(exc)
+    return {
+        "ok": True,
+        "id": row[0],
+        "token": token,
+        "invite_url": invite_url(token),
+        "expires_at": expires_at.isoformat(),
+        "email_sent": email_sent,
+        "delivery_error": delivery_error,
+    }
 
 
-@router.post("/invites/{token}/accept")
-def accept_invite(token: str, user: dict = Depends(require_user)):
-    user_id = user.get("id") or user.get("sub")
+@router.post("/invites/{invite_id}/send", dependencies=[Depends(require_role("owner", "admin"))])
+def resend_invite(invite_id: uuid.UUID):
     with get_conn() as conn:
         with conn.cursor() as cur:
             if _table_missing(cur, "workspace_invite"):
                 raise HTTPException(status_code=503, detail=_UNPROVISIONED_DETAIL)
             cur.execute(
-                "SELECT workspace_id::text, role, expires_at, accepted_at FROM workspace_invite WHERE token = %s",
-                (token,),
+                """
+                SELECT email, token, expires_at, accepted_at
+                FROM workspace_invite
+                WHERE id=%s::uuid AND workspace_id=current_setting('kairos.workspace_id', true)::uuid
+                """,
+                (str(invite_id),),
             )
             row = cur.fetchone()
-            if not row:
-                raise HTTPException(status_code=404, detail="Invitation not found")
-            workspace_id, role, expires_at, accepted_at = row
-            if accepted_at is not None:
-                raise HTTPException(status_code=409, detail="Invitation was already accepted")
-            if expires_at < datetime.now(timezone.utc):
-                raise HTTPException(status_code=410, detail="Invitation expired")
+    if not row:
+        raise HTTPException(status_code=404, detail="Invitation not found")
+    email, token, expires_at, accepted_at = row
+    if accepted_at is not None:
+        raise HTTPException(status_code=409, detail="Invitation was already accepted")
+    if expires_at <= datetime.now(timezone.utc):
+        raise HTTPException(status_code=410, detail="Invitation expired")
+    try:
+        url = send_workspace_invitation(email, token, expires_at.isoformat())
+    except EmailDeliveryError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    return {"ok": True, "email_sent": True, "invite_url": url}
+
+
+def _accept_invite_token(token: str, user: dict):
+    user_id = user.get("id") or user.get("sub")
+    try:
+        with get_conn() as conn:
+            with conn.cursor() as cur:
+                if _table_missing(cur, "workspace_invite"):
+                    raise HTTPException(status_code=503, detail=_UNPROVISIONED_DETAIL)
+                cur.execute(
+                    "SELECT workspace_id::text, role FROM kairos_accept_workspace_invite(%s, %s::uuid, %s)",
+                    (token, user_id, user.get("email")),
+                )
+                row = cur.fetchone()
+                if not row:
+                    raise HTTPException(status_code=404, detail="Invitation could not be accepted")
+    except PostgresError as exc:
+        errors = {
+            "P0002": (404, "Invitation not found"),
+            "23505": (409, "Invitation was already accepted"),
+            "P0001": (410, "Invitation expired"),
+            "42501": (403, "Sign in with the email address this invitation was sent to"),
+        }
+        status, message = errors.get(getattr(exc, "pgcode", None), (500, "Invitation could not be accepted"))
+        raise HTTPException(status_code=status, detail=message) from exc
+    return {"ok": True, "workspace_id": row[0], "role": row[1]}
+
+
+@router.post("/invites/accept")
+def accept_invite(body: InviteAccept, user: dict = Depends(require_user)):
+    return _accept_invite_token(body.token, user)
+
+
+@router.post("/invites/{token}/accept", include_in_schema=False)
+def accept_invite_legacy(token: str, user: dict = Depends(require_user)):
+    """Backward-compatible route; new clients send tokens in the request body."""
+    return _accept_invite_token(token, user)
+
+
+@router.put("/{member_user_id}", dependencies=[Depends(require_role("owner", "admin"))])
+def update_member_role(member_user_id: uuid.UUID, body: MemberRoleUpdate, user: dict = Depends(require_user)):
+    """Change an active member's role; owners must be transferred out of band."""
+    from backend.app import db as _db
+    workspace_id = _db._workspace_id.get()
+    actor_id = user.get("id") or user.get("sub")
+    if str(actor_id) == str(member_user_id):
+        raise HTTPException(status_code=409, detail="Use another workspace owner to change your own role")
+    with get_conn() as conn:
+        with conn.cursor() as cur:
             if _table_missing(cur, "workspace_member"):
                 raise HTTPException(status_code=503, detail=_UNPROVISIONED_DETAIL)
+            actor_role = _member_role(conn, workspace_id, actor_id)
             cur.execute(
-                "SELECT set_config('kairos.workspace_id', %s, true)", (workspace_id,)
+                "SELECT role FROM workspace_member WHERE workspace_id=%s::uuid AND user_id=%s::uuid AND status='active'",
+                (workspace_id, str(member_user_id)),
             )
+            target = cur.fetchone()
+            if not target:
+                raise HTTPException(status_code=404, detail="Active workspace member not found")
+            if target[0] == "owner":
+                raise HTTPException(status_code=409, detail="The workspace owner role cannot be changed here")
+            if actor_role != "owner" and (target[0] == "admin" or body.role == "admin"):
+                raise HTTPException(status_code=403, detail="Only the workspace owner can grant or change admin roles")
             cur.execute(
-                """
-                INSERT INTO workspace_member (workspace_id, user_id, role, status, invited_by)
-                SELECT workspace_id, %s, role, 'active', invited_by
-                FROM workspace_invite WHERE token = %s
-                ON CONFLICT (workspace_id, user_id)
-                DO UPDATE SET role = EXCLUDED.role, status = 'active'
-                """,
-                (user_id, token),
+                "UPDATE workspace_member SET role=%s WHERE workspace_id=%s::uuid AND user_id=%s::uuid RETURNING role",
+                (body.role, workspace_id, str(member_user_id)),
             )
+            role = cur.fetchone()[0]
+    return {"ok": True, "user_id": str(member_user_id), "role": role}
+
+
+@router.delete("/{member_user_id}", dependencies=[Depends(require_role("owner", "admin"))])
+def remove_member(member_user_id: uuid.UUID, user: dict = Depends(require_user)):
+    """Remove an active member without deleting their historical workspace data."""
+    from backend.app import db as _db
+    workspace_id = _db._workspace_id.get()
+    actor_id = user.get("id") or user.get("sub")
+    if str(actor_id) == str(member_user_id):
+        raise HTTPException(status_code=409, detail="You cannot remove your own active workspace session")
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            if _table_missing(cur, "workspace_member"):
+                raise HTTPException(status_code=503, detail=_UNPROVISIONED_DETAIL)
+            actor_role = _member_role(conn, workspace_id, actor_id)
             cur.execute(
-                "UPDATE workspace_invite SET accepted_at = now() WHERE token = %s", (token,)
+                "SELECT role FROM workspace_member WHERE workspace_id=%s::uuid AND user_id=%s::uuid AND status='active'",
+                (workspace_id, str(member_user_id)),
             )
-        conn.commit()
-    return {"ok": True, "workspace_id": workspace_id, "role": role}
+            target = cur.fetchone()
+            if not target:
+                raise HTTPException(status_code=404, detail="Active workspace member not found")
+            if target[0] == "owner":
+                raise HTTPException(status_code=409, detail="Transfer workspace ownership before removing the owner")
+            if actor_role != "owner" and target[0] == "admin":
+                raise HTTPException(status_code=403, detail="Only the workspace owner can remove an admin")
+            cur.execute(
+                "UPDATE workspace_member SET status='removed' WHERE workspace_id=%s::uuid AND user_id=%s::uuid",
+                (workspace_id, str(member_user_id)),
+            )
+    return {"ok": True, "user_id": str(member_user_id), "status": "removed"}
 
 
 @router.delete("/invites/{invite_id}", dependencies=[Depends(require_role("owner", "admin"))])

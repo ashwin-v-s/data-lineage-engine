@@ -12,7 +12,7 @@ shared **Supabase Postgres** project.
 >
 > See `docs/DECISION_LOG.md` D12 for the DB runtime decision.
 
-## Apply status (last verified 2026-11-03 — all 9 migrations applied to shared Supabase)
+## Apply status (last verified 2026-11-07 — migrations 0001–0011 applied to shared Supabase)
 
 | Migration | Tables | Status |
 |---|---|---|
@@ -25,6 +25,10 @@ shared **Supabase Postgres** project.
 | 0007_membership_roles | workspace_member, workspace_invite | âš ï¸ NOT VERIFIED â€” run verify_applied.py |
 | 0008_source_connections | source_connection | âš ï¸ NOT VERIFIED â€” run verify_applied.py |
 | 0009_governance | freshness_sla, freshness_evaluation, incident, incident_event | âš ï¸ CLAIMED Applied in header â€” run verify_applied.py to confirm |
+| 0010_m2_source_connection_lifecycle | sync_job + source lifecycle/sync columns | Applied — verified 2026-11-07 |
+| 0011_m4_governance | Governance, quality, contracts, notifications and freshness/incident extensions | Applied — verified 2026-11-07 |
+| 0013_membership_lifecycle | Repair owner membership for existing and newly provisioned workspaces; secure workspace listing and invitation acceptance functions | Applied — live functions and owner backfill verified 2026-11-07 |
+| 0014_welcome_email_delivery | Workspace-scoped login welcome email idempotency and delivery status | Applied — table/RLS verified 2026-11-07 |
 
 
 
@@ -175,4 +179,30 @@ or forward migration changes in a separate Supabase project/branch or isolated
 local database. Migrations are forward-only; production corrections require a
 reviewed follow-up migration and a backup/restore plan.
 
+---
 
+## M3 Migration Addition (2026-11-05)
+
+### 0012_m3_pgvector_embeddings.sql
+
+**Author:** M3 (Ashwin - ashwin-v-s)  
+**Status:** 📝 PROPOSAL (not yet applied)  
+**Naming:** Per D13 decision - `{number}_{owner_initials}_{feature}.sql`  
+
+Adds pgvector extension and vector embedding column to the `dataset` table for semantic search capability:
+- Adds `embedding vector(1536)` column to `dataset`
+- Creates ivfflat index for cosine similarity search
+- Uses OpenAI text-embedding-3-small model (1536 dimensions)
+- Enables hybrid search (keyword + semantic)
+
+**Requires:**
+- PostgreSQL with pgvector extension
+- `CREATE EXTENSION vector;` privilege
+- OpenAI API key for embedding generation (application layer)
+
+**To apply:**
+```sql
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f backend/migrations/0012_m3_pgvector_embeddings.sql
+```
+
+**Note:** This migration skips 0011 (reserved for M4 governance per D16). Migration 0010 (M2 source_connection_lifecycle) exists but awaits application.
