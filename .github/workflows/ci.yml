@@ -42,6 +42,13 @@ jobs:
         run: python scripts/check_openapi_drift.py
       - name: Migration / RLS consistency (static)
         run: python scripts/db/check_migrations.py
+      - name: False-green guard (verify DB probes fail on bad credentials)
+        # A verification tool that cannot fail is not a verification tool.
+        # Runs test_connection.py with a deliberately wrong DATABASE_URL and
+        # asserts it exits non-zero. If it exits 0, the guard itself fails CI.
+        run: |
+          DATABASE_URL="postgresql://postgres:wrongpassword@localhost:5432/kairos" \
+            python scripts/test_connection.py && echo "GUARD FAILED: exited 0 on bad credentials" && exit 1 || echo "Guard passed: exited non-zero on bad credentials"
       - name: Install and build frontend
         run: |
           npm --prefix frontend ci
