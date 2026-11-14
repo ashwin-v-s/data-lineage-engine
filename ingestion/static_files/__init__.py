@@ -9,6 +9,7 @@ from collections.abc import Mapping
 from typing import Any
 
 from ingestion.dbt.manifest import parse_dbt_manifest
+from ingestion.dbt.run_results import parse_dbt_run_results
 from ingestion.sql.static_file import parse_sql_file
 from ingestion.metadata_graph import Diagnostic, MetadataGraphResult, parse_metadata_graph
 from .csv_headers import parse_csv_headers
@@ -35,6 +36,11 @@ def parse_static_file(
             filename=filename or "manifest.json",
             source_revision=source_revision,
         )
+    if kind == "dbt_run_results":
+        return parse_dbt_run_results(
+            source,
+            filename=filename or "run_results.json",
+        )
     if kind == "sql_file":
         return parse_sql_file(source, filename=filename or "query.sql")
     if kind == "file_inventory":
@@ -51,7 +57,10 @@ def parse_static_file(
         )
     return MetadataGraphResult(
         None,
-        (Diagnostic("UNSUPPORTED_STATIC_FILE_KIND", f"Unsupported static file kind {kind!r}. Choose metadata_graph, sql_file, dbt_manifest, file_inventory, or csv_headers."),),
+        (Diagnostic("UNSUPPORTED_STATIC_FILE_KIND",
+            f"Unsupported static file kind {kind!r}. "
+            "Choose metadata_graph, sql_file, dbt_manifest, dbt_run_results, "
+            "file_inventory, or csv_headers."),),
     )
 
 
