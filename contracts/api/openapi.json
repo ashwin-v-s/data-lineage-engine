@@ -476,6 +476,8 @@
               "metadata_graph",
               "sql_file",
               "dbt_manifest",
+              "dbt_run_results",
+              "postgres_query_log",
               "file_inventory",
               "csv_headers"
             ],
@@ -1494,6 +1496,8 @@
               "metadata_graph",
               "sql_file",
               "dbt_manifest",
+              "dbt_run_results",
+              "postgres_query_log",
               "file_inventory",
               "csv_headers"
             ],

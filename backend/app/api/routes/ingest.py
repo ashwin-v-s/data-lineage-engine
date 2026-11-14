@@ -363,7 +363,8 @@ _RUN_COLUMNS = """
 
 class ImportInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    kind: Literal["metadata_graph", "sql_file", "dbt_manifest", "file_inventory", "csv_headers"]
+    kind: Literal["metadata_graph", "sql_file", "dbt_manifest", "dbt_run_results",
+                   "postgres_query_log", "file_inventory", "csv_headers"]
     filename: str = Field(default="upload", min_length=1, max_length=255)
     content: Any
     source_revision: str | None = Field(default=None, max_length=512)

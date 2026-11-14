@@ -12,6 +12,7 @@ from ingestion.dbt.manifest import parse_dbt_manifest
 from ingestion.dbt.run_results import parse_dbt_run_results
 from ingestion.sql.static_file import parse_sql_file
 from ingestion.metadata_graph import Diagnostic, MetadataGraphResult, parse_metadata_graph
+from ingestion.postgres_query_log import parse_postgres_query_log
 from .csv_headers import parse_csv_headers
 from .inventory import parse_file_inventory
 
@@ -43,6 +44,11 @@ def parse_static_file(
         )
     if kind == "sql_file":
         return parse_sql_file(source, filename=filename or "query.sql")
+    if kind == "postgres_query_log":
+        return parse_postgres_query_log(
+            source,
+            filename=filename or "query_log.json",
+        )
     if kind == "file_inventory":
         return parse_file_inventory(
             source,
@@ -60,7 +66,7 @@ def parse_static_file(
         (Diagnostic("UNSUPPORTED_STATIC_FILE_KIND",
             f"Unsupported static file kind {kind!r}. "
             "Choose metadata_graph, sql_file, dbt_manifest, dbt_run_results, "
-            "file_inventory, or csv_headers."),),
+            "postgres_query_log, file_inventory, or csv_headers."),),
     )
 
 
