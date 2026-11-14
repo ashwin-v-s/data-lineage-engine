@@ -465,3 +465,72 @@ freshness/incident tables, then approved application for demo readiness.
 live catalog inspection confirmed RLS enabled and forced, one workspace policy,
 and SELECT privilege for `kairos_app` on every new table.
 
+
+
+---
+
+## M2-D01 — MLflow training lineage adapter (B4)
+**Status:** BLOCKED ON M5 — 2026-11-14
+**Owner:** M2 (Anushka) implementation, M5 (Pranav) research integrity contract
+**Depends on:** M5 must define the evidence semantics (what "OBSERVED for training only" means in the four-state model, what columns are UNKNOWN), and confirm the never-proves sentence before M2 builds the adapter.
+
+**What M2 will build once unblocked:**
+- `ingestion/mlflow_adapter.py` — reads `mlflow.entities.Run.inputs.dataset_inputs`, model version, run id, parameters, metrics, artifacts
+- Emits dataset-level `RUNTIME_POSITIVE` edges (training data → model) as `OBSERVED`
+- Column-level propagation: `UNKNOWN` (MLflow does not record which features were used at inference)
+- never-proves sentence: *"that every feature contributed at inference, that the model is correct, or that the training data was not poisoned"*
+- Registered as `kind=mlflow_run` in `ingestion/static_files/__init__.py`
+
+**Prerequisite from M5:** Confirm the evidence contract in `contracts/interfaces.py` supports `RUNTIME_POSITIVE` for training-dataset edges where column-level coverage is explicitly `UNKNOWN`.
+
+---
+
+## M2-D02 — RAG trace ingestion adapter (B5)
+**Status:** BLOCKED ON M5 — 2026-11-14
+**Owner:** M2 (Anushka) implementation, M5 (Pranav) research integrity contract
+**Depends on:** M5 must confirm the evidence semantics for AI-answer provenance (retrieval OBSERVED, correctness UNKNOWN-by-rule) before M2 builds the adapter.
+
+**What M2 will build once unblocked:**
+- `ingestion/rag_trace_adapter.py` — accepts a RAG trace record (query, retrieved chunk IDs, prompt, model, answer, token counts)
+- Emits `RUNTIME_POSITIVE` for retrieval (chunk was retrieved — OBSERVED)
+- Emits no lineage for factual correctness — that is `UNKNOWN` until an evaluation artifact exists
+- never-proves sentence: *"that the retrieved chunks were relevant, that the answer is factually correct, or that the model did not hallucinate"*
+- Registered as `kind=rag_trace` in `ingestion/static_files/__init__.py`
+
+**Prerequisite from M5:** Define the `rag_trace` evidence kind in `contracts/types.py` or confirm that `RUNTIME_POSITIVE` with `evidence_class=OBSERVED_RETRIEVAL` is the correct classification.
+
+---
+
+## M2-D03 — Source wizard UI (B7)
+**Status:** BLOCKED ON M4 — 2026-11-14
+**Owner:** M4 (Gauree) UI implementation, M2 (Anushka) API contract
+**Depends on:** M4 must build the 5-step wizard UI. The backend API contract is now complete (all 4 distinct endpoints exist).
+
+**M2's API contract (complete as of 2026-11-14):**
+| Step | Endpoint | State after |
+|---|---|---|
+| 1 Configure | `POST /api/v1/sources` | `CONFIGURED` |
+| 2 Credential test | `POST /api/v1/sources/{id}/test` | `AUTHENTICATED` or `ERROR` |
+| 3 Discover | `POST /api/v1/sources/{id}/discover` | `DISCOVERY_COMPLETE` or `ERROR` |
+| 4 Review + set schedule | `PATCH /api/v1/sources/{id}` | (unchanged) |
+| 5 Sync | `POST /api/v1/sources/{id}/sync` | `VERIFIED` or `SYNC_FAILED` |
+
+**Display rules M4 must follow (Architecture v2 §9.1):**
+- Credential display: masked form only — `postgres://demo_user:••••••@host:5432/sales`
+- Credential test ≠ discovery: label step 2 "Credential verified" and step 3 "Schema discovered" — never conflate
+- Partial authorization: show `Connected but partial authorization (N gap(s))` with the gap list from `/health`, never a green tick
+- `/sources/health` returns all 12 diagnostic fields for the Sources screen rollup
+
+**Prerequisite from M4:** Build the wizard screens and wire them to the above endpoints. M2 has no frontend work remaining for the wizard.
+
+---
+
+## M2-D04 — PostgreSQL query-log capture scope gate (D8)
+**Status:** DECIDED — 2026-11-14
+**Owner:** M2 (Anushka)
+
+The `postgres_query_log` adapter is implemented (`ingestion/postgres_query_log.py`) and registered as `kind=postgres_query_log` in the ingest pipeline.
+
+**Scope gate rule (Architecture v2 §11 D8):** The import UI **must not show the query-log import option** unless the workspace owner has explicitly granted the `postgres_query_log` scope. M4 owns the UI gate; the backend adapter is ready. Until M4 wires the scope checkbox, the kind must remain hidden from the import dropdown — a hidden checkbox is correct behavior, not a gap.
+
+**Evidence class:** Every relationship produced is `POSSIBLE` (structural analysis of past SQL text). The never-proves sentence is mandatory in any UI that renders query-log lineage.
