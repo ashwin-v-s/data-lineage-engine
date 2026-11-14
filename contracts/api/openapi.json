@@ -695,6 +695,66 @@
         "title": "DependencyStateResponse",
         "type": "object"
       },
+      "DiscoverResult": {
+        "properties": {
+          "assets": {
+            "title": "Assets",
+            "type": "integer"
+          },
+          "columns": {
+            "title": "Columns",
+            "type": "integer"
+          },
+          "lifecycle_state": {
+            "title": "Lifecycle State",
+            "type": "string"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "permission_gaps": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Permission Gaps",
+            "type": "array"
+          },
+          "snapshot_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Snapshot Hash"
+          },
+          "warnings": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "ok",
+          "lifecycle_state",
+          "assets",
+          "columns",
+          "permission_gaps",
+          "message"
+        ],
+        "title": "DiscoverResult",
+        "type": "object"
+      },
       "DomainInput": {
         "additionalProperties": false,
         "properties": {
@@ -2293,41 +2353,6 @@
         "title": "PreferenceInput",
         "type": "object"
       },
-      "PreviewResult": {
-        "properties": {
-          "commit_blocker": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Commit Blocker"
-          },
-          "commit_ready": {
-            "title": "Commit Ready",
-            "type": "boolean"
-          },
-          "ok": {
-            "title": "Ok",
-            "type": "boolean"
-          },
-          "preview": {
-            "additionalProperties": true,
-            "title": "Preview",
-            "type": "object"
-          }
-        },
-        "required": [
-          "ok",
-          "preview",
-          "commit_ready"
-        ],
-        "title": "PreviewResult",
-        "type": "object"
-      },
       "ProductInput": {
         "additionalProperties": false,
         "properties": {
@@ -2768,6 +2793,38 @@
         "title": "SourceCreate",
         "type": "object"
       },
+      "SourcePatch": {
+        "additionalProperties": false,
+        "properties": {
+          "schema_name": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Schema Name"
+          },
+          "sync_schedule": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sync Schedule"
+          }
+        },
+        "title": "SourcePatch",
+        "type": "object"
+      },
       "SourceSummary": {
         "properties": {
           "created_at": {
@@ -2784,6 +2841,50 @@
           "id": {
             "title": "Id",
             "type": "string"
+          },
+          "last_assets_created": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Assets Created"
+          },
+          "last_assets_discovered": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Assets Discovered"
+          },
+          "last_assets_unchanged": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Assets Unchanged"
+          },
+          "last_assets_updated": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Assets Updated"
           },
           "last_checked_at": {
             "anyOf": [
@@ -2807,6 +2908,28 @@
             ],
             "title": "Last Error"
           },
+          "last_successful_sync_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Successful Sync At"
+          },
+          "last_sync_duration_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Sync Duration Ms"
+          },
           "lifecycle_state": {
             "title": "Lifecycle State",
             "type": "string"
@@ -2815,9 +2938,54 @@
             "title": "Name",
             "type": "string"
           },
+          "next_sync_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Sync At"
+          },
+          "permission_gaps": {
+            "anyOf": [
+              {
+                "items": {},
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Permission Gaps"
+          },
           "source_kind": {
             "title": "Source Kind",
             "type": "string"
+          },
+          "source_snapshot_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Snapshot Hash"
+          },
+          "sync_schedule": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sync Schedule"
           }
         },
         "required": [
@@ -2929,17 +3097,6 @@
           "ok": {
             "title": "Ok",
             "type": "boolean"
-          },
-          "table_count": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Table Count"
           }
         },
         "required": [
@@ -8501,7 +8658,7 @@
     },
     "/api/v1/sources": {
       "get": {
-        "description": "List the caller's workspace sources, newest first (never ciphertext).",
+        "description": "List all workspace sources, newest first.",
         "operationId": "list_sources_api_v1_sources_get",
         "responses": {
           "200": {
@@ -8530,7 +8687,7 @@
         ]
       },
       "post": {
-        "description": "Register an encrypted, workspace-scoped PostgreSQL connection.",
+        "description": "Register an encrypted, workspace-scoped PostgreSQL connection.\n\nStores credentials in encrypted form only. Does NOT test the connection \u2014\ncall /test after creation.",
         "operationId": "create_source_api_v1_sources_post",
         "requestBody": {
           "content": {
@@ -8575,9 +8732,34 @@
         ]
       }
     },
+    "/api/v1/sources/health": {
+      "get": {
+        "description": "Return the 12-field health rollup for all sources in the workspace.\n\nFields (Architecture v2 \u00a75.5 / handout A2):\n  1. source_id / name\n  2. lifecycle_state\n  3. last_checked_at           (last credential/reachability test)\n  4. last_successful_sync_at   (last VERIFIED sync)\n  5. last_sync_duration_ms\n  6. assets_discovered         (from last sync)\n  7. assets_created\n  8. assets_updated\n  9. assets_unchanged\n  10. permission_gaps          (tables not SELECTable)\n  11. sync_schedule            (cron expression or null)\n  12. next_sync_at",
+        "operationId": "sources_health_api_v1_sources_health_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Sources Health",
+        "tags": [
+          "sources"
+        ]
+      }
+    },
     "/api/v1/sources/{source_id}": {
       "delete": {
-        "description": "Soft-revoke a source (lifecycle_state -> REVOKED); 404 when unknown.",
+        "description": "Soft-revoke a source; evidence is kept as history (\u00a79.9).",
         "operationId": "delete_source_api_v1_sources__source_id__delete",
         "parameters": [
           {
@@ -8622,7 +8804,7 @@
         ]
       },
       "get": {
-        "description": "Return one source in the caller's workspace, or 404.",
+        "description": "Return one source, or 404.",
         "operationId": "get_source_api_v1_sources__source_id__get",
         "parameters": [
           {
@@ -8667,6 +8849,112 @@
         "tags": [
           "sources"
         ]
+      },
+      "patch": {
+        "description": "Update the sync schedule or schema scope for a source.",
+        "operationId": "patch_source_api_v1_sources__source_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "source_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Source Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SourcePatch"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourceSummary"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Patch Source",
+        "tags": [
+          "sources"
+        ]
+      }
+    },
+    "/api/v1/sources/{source_id}/discover": {
+      "post": {
+        "description": "Read the full source schema and record counts for review.\n\nDoes NOT write any assets to the catalog \u2014 that is /sync.\nSets lifecycle \u2192 DISCOVERY_COMPLETE on success, ERROR on failure.\n\nThis is the step between /test and /sync:\n  /test  \u2192 credential check only\n  /discover \u2192 schema read, count review  \u2190 this endpoint\n  /sync  \u2192 persist to catalog",
+        "operationId": "discover_source_api_v1_sources__source_id__discover_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "source_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Source Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiscoverResult"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Discover Source",
+        "tags": [
+          "sources"
+        ]
       }
     },
     "/api/v1/sources/{source_id}/preview": {
@@ -8689,9 +8977,7 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/PreviewResult"
-                }
+                "schema": {}
               }
             },
             "description": "Successful Response"
@@ -8718,9 +9004,79 @@
         ]
       }
     },
+    "/api/v1/sources/{source_id}/runs": {
+      "get": {
+        "description": "Return the sync history for one source, newest first.\n\nEach row is one entry from the sync_job table (created by /sync).",
+        "operationId": "list_source_runs_api_v1_sources__source_id__runs_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "source_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Source Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "minimum": 0,
+              "title": "Offset",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Source Runs",
+        "tags": [
+          "sources"
+        ]
+      }
+    },
     "/api/v1/sources/{source_id}/sync": {
       "post": {
-        "description": "Read the source and atomically persist its assets and provenance.",
+        "description": "Read the source and atomically persist assets into the catalog.",
         "operationId": "sync_source_api_v1_sources__source_id__sync_post",
         "parameters": [
           {
@@ -8767,7 +9123,7 @@
     },
     "/api/v1/sources/{source_id}/test": {
       "post": {
-        "description": "Read the source schema and record the connector lifecycle state.",
+        "description": "Credential and reachability check only \u2014 does NOT read the schema.\n\nVerifies:\n  1. The database is reachable.\n  2. The role is not a superuser.\n  3. The role holds no write grants on the target schema.\n\nOn success: lifecycle \u2192 AUTHENTICATED.\nOn failure: lifecycle \u2192 ERROR with the specific rejection reason.\n\nThis is intentionally separate from /discover. A passing /test does NOT\nmean discovery will succeed.",
         "operationId": "test_source_api_v1_sources__source_id__test_post",
         "parameters": [
           {
