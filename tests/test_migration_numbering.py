@@ -113,15 +113,19 @@ def test_number_beyond_the_expected_range_is_a_note_not_a_gap(tmp_path):
     assert any("0012" in note and "EXPECTED_LATEST_MIGRATION" in note for note in notes)
 
 
-def test_real_migrations_directory_reports_only_the_missing_number():
-    """Pin the current repository state: exactly one gap, and it is 0010."""
+def test_real_migrations_directory_has_no_numbering_gaps():
+    """The checked-in chain must contain every number exactly once.
+
+    0010 was missing while the M2 lifecycle migration lived only on
+    origin/main; it is restored, so the pin is now "no gaps" rather than
+    "exactly the 0010 gap".
+    """
     migrations_dir = Path(__file__).resolve().parents[1] / "backend" / "migrations"
     if not migrations_dir.is_dir():  # pragma: no cover - defensive
         pytest.skip("migrations directory not present")
 
     gaps, _notes = _check(migrations_dir)
 
-    missing_numbers = [gap for gap in gaps if "is MISSING" in gap]
-    assert [gap.split()[2] for gap in missing_numbers] == ["0010"]
+    assert [gap for gap in gaps if "is MISSING" in gap] == []
     assert all("does not follow" not in gap for gap in gaps)
     assert all("claimed by" not in gap for gap in gaps)

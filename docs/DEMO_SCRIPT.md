@@ -221,6 +221,94 @@ lineage. That is enforced by the test suite."*
 
 ---
 
+## Demo 7 — OpenLineage event → persisted runtime evidence
+
+**Goal:** a job and dataset pair that does not exist yet in the demo workspace
+becomes raw event → execution run → evidence → asset match → lineage edge →
+provenance, with no manual SQL.
+
+**Pre-condition:** signed in. The endpoint writes into workspace-scoped tables,
+so it requires the same bearer token a signed-in user carries; it will not guess
+a workspace. Set `TOKEN` from the browser session before running these.
+
+**1. Preview (writes nothing — safe to run twice on stage):**
+
+```bash
+curl -s -X POST http://127.0.0.1:8000/api/v1/ingest/openlineage/preview \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{
+    "eventType": "COMPLETE",
+    "eventTime": "2026-11-15T10:15:00Z",
+    "producer": "https://github.com/OpenLineage/OpenLineage/tree/1.9.0/integration/spark",
+    "job": {"namespace": "kairos.demo", "name": "new_revenue_job"},
+    "run": {"runId": "run_999"},
+    "inputs":  [{"namespace": "postgres://analytics", "name": "analytics.public.orders"}],
+    "outputs": [{"namespace": "postgres://analytics", "name": "analytics.public.revenue_daily"}]
+  }'
+```
+
+Expected: `count: 1`, `valid_count: 1`, and a normalized summary naming
+`new_revenue_job`, `run_999`, the input and the output.
+
+**2. Commit the same body to `/api/v1/ingest/openlineage`.**
+Expected counters: `accepted: 1`, `runs_written: 1`, `evidence_created: 1`,
+`edges_created: 1`.
+
+**3. Replay the identical body.** Expected: `duplicate: 1` and every other
+counter `0` — the raw event is stored once and no second edge is created.
+
+**4. Read it back from the product, not from SQL:** reload the catalog and show
+three things on the same screen — the evidence row with `state: "OBSERVED"`, the
+new edge, and the run for `run_999` with status `SUCCESS` on the Runs page.
+
+**5. Lineage view.** The new edge is drawn solid (Observed), not dashed
+(Possible), and clicking it opens the aggregate: state, coverage, basis and the
+evidence sources behind it.
+
+**Presenter says:** *"This relationship is Observed in run_999. The event named
+exactly one output, so one dataset edge was created — a multi-output event
+records evidence only, never a cartesian product of edges."*
+
+**Never say:** *"Live lineage."* One event is a snapshot, not a stream.
+
+---
+
+## Demo 8 — Coverage-aware lineage and impact analysis
+
+**What is on screen:** every dependency carries one of four states —
+`OBSERVED` (a runtime event proves it for a run), `POSSIBLE` (declared or static
+only), `REFUTED_FOR_RUN` (a complete negative evaluation for one run, never a
+universal refutation) or `UNKNOWN` (nothing stored). Coverage is `COMPLETE`,
+`PARTIAL` or `NONE`, computed by `kairos.coverage.v1`.
+
+**1. Impact report, from the UI:** Lineage → **Impact analysis**. The modal has
+Direction (both / downstream / upstream), Depth (1–5) and Evidence state
+selects; changing any of them re-queries the API, which is the point — the
+answer comes from persisted edges, not from the browser.
+
+**2. Impact report, from the API:**
+
+```bash
+curl -s "http://127.0.0.1:8000/api/v1/assets/<asset_id>/downstream-impact?depth=3&direction=downstream&evidence_state=OBSERVED" \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+Expected keys: `direction`, `evidence_state`, `depth`, `total_affected`,
+`state_counts`, and `levels[]` where each level has `depth`, `asset_count` and
+`assets[]` with `state`, `coverage`, `evidence_sources` and the connecting
+`edge_id`.
+
+**3. Say the filter rule out loud:** filtering by a state hides the hops that do
+not match *and stops traversal through them*, so an OBSERVED-only report does not
+jump past a POSSIBLE hop to reach what sits behind it. An empty result is not
+evidence that nothing depends on the asset.
+
+**Presenter says:** *"POSSIBLE means declared but not proven for a run. UNKNOWN
+means no evidence is stored — it is not proof of absence, and the product says so
+in the report itself."*
+
+---
+
 ## Viva Q&A evidence table
 
 | Claim | Evidence |
@@ -234,6 +322,10 @@ lineage. That is enforced by the test suite."*
 | Static ≠ Observed | All static edges labelled "Declared dependency" (Section 5, M4_TODAY_TEST_REPORT.md) |
 | Four-state rules R1–R5 correct | Adversarial mutation test in `M4_DAY1_REVIEW.md` §5 caught by 7 tests |
 | Protocol is reproducible | `run_plumbing()` is deterministic (same seed = same hash, 3 tests) |
+| OpenLineage event becomes evidence | `tests/test_openlineage_ingest_service.py`, `tests/test_ingest_openlineage_route.py` |
+| Coverage rules are versioned | `tests/test_lineage_coverage.py` (`kairos.coverage.v1`) |
+| Impact respects depth, direction, state | `tests/test_impact_traversal.py` (6 tests) |
+| One label per relationship, everywhere | `tests/test_catalog_read_model.py` |
 
 ---
 
@@ -247,7 +339,7 @@ lineage. That is enforced by the test suite."*
 | "Complete evaluation: no propagation for this run" | "This dependency does not exist" |
 | "Supabase-hosted PostgreSQL is our single authoritative store" | "Supabase automatically shares data" |
 | "Scheduled freshness monitoring — on-demand only, no scheduler yet" | "Real-time monitoring" |
-| "81 offline tests pass; 0 endpoint bodies verified against a DB in isolation" | "All tests pass" (unqualified) |
+| "606 offline tests pass, 85 skipped; 0 endpoint bodies verified against a DB in isolation" | "All tests pass" (unqualified) |
 
 ---
 

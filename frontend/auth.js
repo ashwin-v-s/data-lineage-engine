@@ -10,7 +10,7 @@
     '/stewardship.js?v=304',
     '/evidence-semantics.js?v=1',
     '/lineage-investigation.js?v=1',
-    '/app.js?v=310',
+    '/app.js?v=311',
   ];
   let config = null;
   let configLoaded = false;

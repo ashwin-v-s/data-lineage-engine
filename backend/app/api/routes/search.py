@@ -30,6 +30,8 @@ from backend.app.auth import require_user
 from psycopg2.extras import RealDictCursor
 
 from backend.app.db import get_conn
+from backend.app.services.lineage_coverage import state_for_evidence_type
+from backend.app.services.run_status import ui_run_status
 from backend.app.schemas.search import SearchResponse, SearchResult
 
 router = APIRouter(dependencies=[Depends(require_user)])
@@ -236,14 +238,12 @@ def catalog_snapshot(
                        sc.column_name AS source_column,
                        td.database_name || '.' || td.schema_name || '.' || td.name AS target_dataset,
                        tc.column_name AS target_column,
-                       COALESCE((
-                           SELECT es.state
-                           FROM execution_state es
-                           WHERE es.run_id = e.run_id
-                             AND es.source_column_id = e.source_column_id
-                             AND es.target_column_id = e.target_column_id
-                           ORDER BY es.computed_at DESC LIMIT 1
-                       ), 'UNKNOWN') AS state
+                       (SELECT es.state
+                        FROM execution_state es
+                        WHERE es.run_id = e.run_id
+                          AND es.source_column_id = e.source_column_id
+                          AND es.target_column_id = e.target_column_id
+                        ORDER BY es.computed_at DESC LIMIT 1) AS execution_state
                 FROM evidence e
                 LEFT JOIN column_record sc ON sc.id = e.source_column_id
                 LEFT JOIN dataset sd ON sd.id = COALESCE(sc.dataset_id, e.source_dataset_id)
@@ -278,7 +278,10 @@ def catalog_snapshot(
         target_name = ".".join(part for part in (row.get("target_dataset"), row.get("target_column")) if part)
         evidence.append({
             "id": row["id"], "source_name": source_name or row.get("source_system") or "Unknown source",
-            "target_name": target_name or "Unknown target", "state": row.get("state") or "UNKNOWN",
+            "target_name": target_name or "Unknown target",
+            # A reasoning result (execution_state) wins when one exists; otherwise
+            # the row is labelled by the claim its own evidence type makes.
+            "state": row.get("execution_state") or state_for_evidence_type(row.get("evidence_type")),
             "evidence_type": row.get("evidence_type"), "run_id": row.get("run_id"),
             "coverage": row.get("coverage"), "rule_name": row.get("operator") or row.get("granularity"),
             "explanation": (
@@ -307,7 +310,7 @@ def catalog_snapshot(
             {
                 "id": run.get("run_id"),
                 "pipeline_name": run.get("job_name") or run.get("run_id"),
-                "status": run.get("status"),
+                "status": ui_run_status(run.get("status")),
                 "started_at": run["started_at"].isoformat() if run.get("started_at") else None,
                 "completed_at": run["completed_at"].isoformat() if run.get("completed_at") else None,
                 "duration_ms": (

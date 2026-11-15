@@ -1,53 +1,48 @@
-"""
-Tests for POST /api/v1/ingest/openlineage
+"""HTTP contract tests for POST /api/v1/ingest/openlineage (+ /preview).
 
-These tests run OFFLINE — they stub get_conn() so no real database is
-needed.  They verify the route's hard behavioural rules:
+The route is exercised end to end against an in-memory cursor, so these tests
+cover validation, batching, idempotency and the write path together:
 
-  R1  A COMPLETE event with inputs + outputs is accepted.
-  R2  Replaying the same event payload is idempotent (duplicate=1, no new rows).
-  R3  Non-COMPLETE events (START, FAIL, ABORT) are stored but produce
-      zero evidence rows — non-terminal events never become evidence.
-  R4  An event missing run.runId is skipped entirely.
-  R5  An event missing job.name is skipped entirely.
+  R1  A COMPLETE event with inputs + outputs is accepted and writes evidence.
+  R2  Replaying the same payload is idempotent.
+  R3  Non-COMPLETE events store the run but produce zero evidence.
+  R4  A missing run.runId is skipped.
+  R5  A missing job.name is skipped.
   R6  A batch of >100 events returns 413 BATCH_TOO_LARGE.
-  R7  An empty batch returns accepted=0, no error.
-  R8  Invalid JSON body returns 400 INVALID_JSON.
-  R9  A body that is neither a single event nor a batch dict returns 400.
-  R10 No cartesian-product assertion: the route writes one evidence row per
-      (input, output) pair — not a separate "lineage edge" between them.
-  R11 A COMPLETE event with no inputs or no outputs produces no evidence rows.
-  R12 columnLineage facet detection is noted in diagnostics but does not
-      block ingestion.
-
-DB stub strategy: patch get_conn() with an in-memory sqlite-like cursor
-mock.  We only care about rowcount signals and that the right SQL strings
-are called — not the DB itself.
-
-psycopg2 stub: the module is not installed locally; we inject a minimal
-stub before importing anything that transitively pulls it in.
+  R7  An empty batch returns 200 with zero counters.
+  R8  Invalid JSON returns 400 INVALID_JSON.
+  R9  A body that is neither an event nor a batch returns 400 INVALID_PAYLOAD.
+  R10 Multiple inputs and outputs create evidence per pair but no edges.
+  R11 A COMPLETE event with no inputs/outputs produces no evidence.
+  R12 The columnLineage facet is noted in diagnostics and does not block.
+  R13 The preview endpoint normalizes without writing.
+  R14 An unauthenticated producer is rejected.
 """
 from __future__ import annotations
 
 import json
 import sys
-from contextlib import contextmanager
 from types import ModuleType
-from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
 
-# ---------------------------------------------------------------------------
-# psycopg2 stub — must be injected BEFORE importing backend.app.main
-# ---------------------------------------------------------------------------
-if "psycopg2" not in sys.modules:
+# psycopg2 stub — only when the driver is genuinely absent, so an installed
+# psycopg2 (with Json / execute_values) is never shadowed by a partial fake.
+try:
+    import psycopg2  # noqa: F401
+    import psycopg2.extras  # noqa: F401
+    import psycopg2.pool  # noqa: F401
+except ImportError:  # pragma: no cover - only on hosts without the driver
     _psycopg2_stub = ModuleType("psycopg2")
     _psycopg2_stub.connect = MagicMock()
     _psycopg2_stub.OperationalError = Exception
+    _psycopg2_stub.Error = Exception
 
     _extras = ModuleType("psycopg2.extras")
     _extras.RealDictCursor = dict
+    _extras.Json = lambda value: value
+    _extras.execute_values = MagicMock()
 
     _pool = ModuleType("psycopg2.pool")
     _pool.ThreadedConnectionPool = MagicMock()
@@ -56,15 +51,14 @@ if "psycopg2" not in sys.modules:
     sys.modules["psycopg2.extras"] = _extras
     sys.modules["psycopg2.pool"] = _pool
 
-from fastapi.testclient import TestClient  # noqa: E402 — must come after stub
+from fastapi.testclient import TestClient  # noqa: E402 — after stub
 
+from backend.app.auth import require_user  # noqa: E402
 from backend.app.main import app  # noqa: E402
+from tests.openlineage_fake_db import FakeCursor, make_get_conn  # noqa: E402
 
 client = TestClient(app)
 
-# ---------------------------------------------------------------------------
-# Fixtures / helpers
-# ---------------------------------------------------------------------------
 
 def _complete_event(
     run_id: str = "run-001",
@@ -77,8 +71,8 @@ def _complete_event(
         "eventTime": "2026-10-01T08:00:00Z",
         "run": {"runId": run_id},
         "job": {"namespace": "kairos://test", "name": job},
-        "inputs":  inputs  or [{"namespace": "pg://db", "name": "employees"}],
-        "outputs": outputs or [{"namespace": "pg://db", "name": "out_adjusted"}],
+        "inputs": inputs if inputs is not None else [{"namespace": "pg://db", "name": "employees"}],
+        "outputs": outputs if outputs is not None else [{"namespace": "pg://db", "name": "out_adjusted"}],
         "producer": "kairos-test",
     }
 
@@ -93,125 +87,75 @@ def _start_event(run_id: str = "run-001") -> dict:
     }
 
 
-# ---------------------------------------------------------------------------
-# Cursor mock:  first INSERT (raw_event) returns rowcount=1 (new row);
-#               second INSERT (evidence) returns rowcount=1.
-# Duplicate path: first INSERT returns rowcount=0.
-# ---------------------------------------------------------------------------
-
-class _MockCursor:
-    """Minimal cursor mock with configurable rowcount sequence."""
-
-    def __init__(self, rowcounts: list[int] | None = None):
-        self._rowcounts = list(rowcounts or [1, 1, 1, 1, 1, 1, 1])
-        self._call_index = 0
-        self.rowcount = 1
-        self._last_fetchone = {"id": "00000000-0000-0000-0000-000000000001"}
-
-    def execute(self, sql: str, params: Any = None):
-        if self._call_index < len(self._rowcounts):
-            self.rowcount = self._rowcounts[self._call_index]
-        self._call_index += 1
-
-    def fetchone(self):
-        return self._last_fetchone
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, *_):
-        pass
+@pytest.fixture(autouse=True)
+def authenticated_workspace():
+    """Every request runs as a verified user with a provisioned workspace."""
+    app.dependency_overrides[require_user] = lambda: {
+        "id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        "email": "demo@example.com",
+    }
+    yield
+    app.dependency_overrides.pop(require_user, None)
 
 
-class _MockConn:
-    def __init__(self, rowcounts: list[int] | None = None):
-        self._cursor = _MockCursor(rowcounts)
-
-    def cursor(self, **_):
-        return self._cursor
-
-    def commit(self):
-        pass
-
-    def rollback(self):
-        pass
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, *_):
-        pass
+@pytest.fixture
+def cursor():
+    return FakeCursor()
 
 
-@contextmanager
-def _mock_get_conn(rowcounts: list[int] | None = None):
-    """Context manager that yields a _MockConn."""
-    yield _MockConn(rowcounts)
+def _post(cursor: FakeCursor, path: str, payload):
+    with patch(
+        "backend.app.api.routes.ingest.get_conn",
+        side_effect=make_get_conn(cursor),
+    ):
+        return client.post(path, json=payload)
 
 
 # ---------------------------------------------------------------------------
-# R1 — COMPLETE event accepted
+# R1
 # ---------------------------------------------------------------------------
 
-def test_r1_complete_event_accepted():
-    event = _complete_event()
-    with patch("backend.app.api.routes.ingest.get_conn", side_effect=_mock_get_conn):
-        resp = client.post("/api/v1/ingest/openlineage", json=event)
+def test_r1_complete_event_accepted(cursor):
+    resp = _post(cursor, "/api/v1/ingest/openlineage", _complete_event())
+
     assert resp.status_code == 200
     data = resp.json()
     assert data["accepted"] == 1
     assert data["duplicate"] == 0
     assert data["skipped"] == 0
+    assert data["evidence_created"] == 1
+    assert data["edges_created"] == 1
+    assert data["runs_written"] == 1
+    assert len(cursor.raw_events) == 1
+    assert len(cursor.evidence) == 1
+    assert len(cursor.edges) == 1
 
 
 # ---------------------------------------------------------------------------
-# R2 — Idempotent replay: second POST with identical payload is a duplicate
+# R2
 # ---------------------------------------------------------------------------
 
-def test_r2_duplicate_event_is_idempotent():
+def test_r2_duplicate_event_is_idempotent(cursor):
     event = _complete_event()
-    # The route calls get_conn() once for the DB availability check, then once
-    # per event for the actual INSERT.  Call sequence per POST:
-    #   call 0: availability check (no-op conn)
-    #   call 1: actual event INSERT → rowcount=1 (first POST, new event)
-    #
-    #   call 2: availability check (no-op conn)
-    #   call 3: actual event INSERT → rowcount=0 (second POST, duplicate)
 
-    call_count = {"n": 0}
-
-    @contextmanager
-    def _alternating_conn():
-        n = call_count["n"]
-        call_count["n"] += 1
-        if n % 2 == 0:
-            # availability check — just needs to not raise
-            yield _MockConn([1])
-        elif n == 1:
-            # first POST's real INSERT: new raw_event
-            yield _MockConn([1, 1, 1, 1, 1])
-        else:
-            # second POST's real INSERT: duplicate
-            yield _MockConn([0])
-
-    with patch("backend.app.api.routes.ingest.get_conn", side_effect=_alternating_conn):
-        resp1 = client.post("/api/v1/ingest/openlineage", json=event)
-        resp2 = client.post("/api/v1/ingest/openlineage", json=event)
+    resp1 = _post(cursor, "/api/v1/ingest/openlineage", event)
+    resp2 = _post(cursor, "/api/v1/ingest/openlineage", event)
 
     assert resp1.json()["accepted"] == 1
     assert resp1.json()["duplicate"] == 0
-
     assert resp2.json()["accepted"] == 0
     assert resp2.json()["duplicate"] == 1
     assert resp2.json()["evidence_created"] == 0
+    assert len(cursor.evidence) == 1
+    assert len(cursor.edges) == 1
 
 
 # ---------------------------------------------------------------------------
-# R3 — Non-COMPLETE events store raw but write zero evidence
+# R3
 # ---------------------------------------------------------------------------
 
 @pytest.mark.parametrize("event_type", ["START", "FAIL", "ABORT", "RUNNING"])
-def test_r3_non_complete_event_produces_no_evidence(event_type: str):
+def test_r3_non_complete_event_produces_no_evidence(cursor, event_type):
     event = {
         "eventType": event_type,
         "eventTime": "2026-10-01T08:00:00Z",
@@ -219,134 +163,99 @@ def test_r3_non_complete_event_produces_no_evidence(event_type: str):
         "job": {"name": "kairos.test_job"},
         "producer": "kairos-test",
     }
-    with patch("backend.app.api.routes.ingest.get_conn", side_effect=_mock_get_conn):
-        resp = client.post("/api/v1/ingest/openlineage", json=event)
+    resp = _post(cursor, "/api/v1/ingest/openlineage", event)
 
     assert resp.status_code == 200
     data = resp.json()
     assert data["evidence_created"] == 0
-    assert data["accepted"] == 1  # raw event stored
-    # Diagnostic must mention the event type
-    assert any(event_type in d for d in data["diagnostics"])
+    assert data["edges_created"] == 0
+    assert data["accepted"] == 1
+    assert any(event_type in message or event_type.lower() in message for message in data["diagnostics"])
 
 
 # ---------------------------------------------------------------------------
-# R4 — Missing run.runId → skipped
+# R4 / R5
 # ---------------------------------------------------------------------------
 
-def test_r4_missing_run_id_is_skipped():
-    event = {
-        "eventType": "COMPLETE",
-        "eventTime": "2026-10-01T08:00:00Z",
-        "run": {},
-        "job": {"name": "kairos.test_job"},
-    }
-    with patch("backend.app.api.routes.ingest.get_conn", side_effect=_mock_get_conn):
-        resp = client.post("/api/v1/ingest/openlineage", json=event)
+def test_r4_missing_run_id_is_skipped(cursor):
+    event = {"eventType": "COMPLETE", "eventTime": "2026-10-01T08:00:00Z",
+             "run": {}, "job": {"name": "kairos.test_job"}}
+
+    resp = _post(cursor, "/api/v1/ingest/openlineage", event)
 
     assert resp.status_code == 200
     data = resp.json()
     assert data["accepted"] == 0
     assert data["skipped"] == 1
     assert data["evidence_created"] == 0
+    assert cursor.raw_events == {}
 
 
-# ---------------------------------------------------------------------------
-# R5 — Missing job.name → skipped
-# ---------------------------------------------------------------------------
+def test_r5_missing_job_name_is_skipped(cursor):
+    event = {"eventType": "COMPLETE", "eventTime": "2026-10-01T08:00:00Z",
+             "run": {"runId": "run-001"}, "job": {}}
 
-def test_r5_missing_job_name_is_skipped():
-    event = {
-        "eventType": "COMPLETE",
-        "eventTime": "2026-10-01T08:00:00Z",
-        "run": {"runId": "run-001"},
-        "job": {},
-    }
-    with patch("backend.app.api.routes.ingest.get_conn", side_effect=_mock_get_conn):
-        resp = client.post("/api/v1/ingest/openlineage", json=event)
+    resp = _post(cursor, "/api/v1/ingest/openlineage", event)
 
     assert resp.status_code == 200
-    data = resp.json()
-    assert data["skipped"] == 1
-    assert data["evidence_created"] == 0
+    assert resp.json()["skipped"] == 1
+    assert resp.json()["evidence_created"] == 0
 
 
 # ---------------------------------------------------------------------------
-# R6 — Batch > 100 → 413
+# R6 / R7
 # ---------------------------------------------------------------------------
 
-def test_r6_batch_too_large_returns_413():
+def test_r6_batch_too_large_returns_413(cursor):
     batch = {"events": [_complete_event(run_id=f"run-{i}") for i in range(101)]}
-    with patch("backend.app.api.routes.ingest.get_conn", side_effect=_mock_get_conn):
-        resp = client.post("/api/v1/ingest/openlineage", json=batch)
+
+    resp = _post(cursor, "/api/v1/ingest/openlineage", batch)
+
     assert resp.status_code == 413
     assert resp.json()["error"]["code"] == "BATCH_TOO_LARGE"
+    assert cursor.executed == []
 
 
-# ---------------------------------------------------------------------------
-# R7 — Empty batch → 200, accepted=0, no error
-# ---------------------------------------------------------------------------
+def test_r7_empty_batch_returns_200(cursor):
+    resp = _post(cursor, "/api/v1/ingest/openlineage", {"events": []})
 
-def test_r7_empty_batch_returns_200():
-    with patch("backend.app.api.routes.ingest.get_conn", side_effect=_mock_get_conn):
-        resp = client.post("/api/v1/ingest/openlineage", json={"events": []})
     assert resp.status_code == 200
     assert resp.json()["accepted"] == 0
+    assert cursor.count_sql("insert into evidence") == 0
 
 
 # ---------------------------------------------------------------------------
-# R8 — Invalid JSON → 400
+# R8 / R9
 # ---------------------------------------------------------------------------
 
-def test_r8_invalid_json_returns_400():
-    resp = client.post(
-        "/api/v1/ingest/openlineage",
-        content=b"not json at all }{",
-        headers={"Content-Type": "application/json"},
-    )
+def test_r8_invalid_json_returns_400(cursor):
+    with patch(
+        "backend.app.api.routes.ingest.get_conn",
+        side_effect=make_get_conn(cursor),
+    ):
+        resp = client.post(
+            "/api/v1/ingest/openlineage",
+            content=b"not json at all }{",
+            headers={"Content-Type": "application/json"},
+        )
+
     assert resp.status_code == 400
     assert resp.json()["error"]["code"] == "INVALID_JSON"
 
 
-# ---------------------------------------------------------------------------
-# R9 — Body is neither a single event nor a batch dict → 400
-# ---------------------------------------------------------------------------
+def test_r9_body_without_eventtype_or_events_returns_400(cursor):
+    resp = _post(cursor, "/api/v1/ingest/openlineage", {"foo": "bar"})
 
-def test_r9_body_without_eventtype_or_events_returns_400():
-    with patch("backend.app.api.routes.ingest.get_conn", side_effect=_mock_get_conn):
-        resp = client.post("/api/v1/ingest/openlineage", json={"foo": "bar"})
     assert resp.status_code == 400
     assert resp.json()["error"]["code"] == "INVALID_PAYLOAD"
+    assert cursor.executed == []
 
 
 # ---------------------------------------------------------------------------
-# R10 — No cartesian-product lineage edges
-#
-# A COMPLETE event with 2 inputs and 2 outputs should produce evidence rows
-# for each (input, output) pair that was OBSERVED, but the route must NOT
-# create any lineage_edge rows joining inputs to outputs.
-#
-# We verify this by asserting that no SQL containing "lineage_edge" was
-# executed by the cursor during the request.
+# R10
 # ---------------------------------------------------------------------------
 
-def test_r10_no_cartesian_product_lineage_edges_created():
-    executed_sql: list[str] = []
-
-    class _TrackingCursor(_MockCursor):
-        def execute(self, sql: str, params: Any = None):
-            executed_sql.append(sql)
-            super().execute(sql, params)
-
-    class _TrackingConn(_MockConn):
-        def cursor(self, **_):
-            c = _TrackingCursor([1, 1, 1, 1, 1, 1, 1, 1])
-            return c
-
-    @contextmanager
-    def _tracking_conn():
-        yield _TrackingConn()
-
+def test_r10_no_cartesian_product_lineage_edges_created(cursor):
     event = _complete_event(
         inputs=[
             {"namespace": "pg://db", "name": "customers"},
@@ -357,33 +266,27 @@ def test_r10_no_cartesian_product_lineage_edges_created():
             {"namespace": "pg://db", "name": "out_report"},
         ],
     )
-    with patch("backend.app.api.routes.ingest.get_conn", side_effect=_tracking_conn):
-        resp = client.post("/api/v1/ingest/openlineage", json=event)
+
+    resp = _post(cursor, "/api/v1/ingest/openlineage", event)
 
     assert resp.status_code == 200
-    # No INSERT INTO lineage_edge should appear in any executed SQL
-    for sql in executed_sql:
-        assert "lineage_edge" not in sql.lower(), (
-            f"Route issued a lineage_edge INSERT — cartesian product forbidden.\n"
-            f"Offending SQL: {sql}"
-        )
+    data = resp.json()
+    assert data["evidence_created"] == 4
+    assert data["edges_created"] == 0
+    assert cursor.count_sql("insert into lineage_edge") == 0
+    assert any("multiple_outputs" in message for message in data["diagnostics"])
 
 
 # ---------------------------------------------------------------------------
-# R11 — COMPLETE with no inputs/outputs → accepted but no evidence
+# R11 / R12
 # ---------------------------------------------------------------------------
 
-def test_r11_complete_with_no_inputs_produces_no_evidence():
-    event = {
-        "eventType": "COMPLETE",
-        "eventTime": "2026-10-01T08:00:00Z",
-        "run": {"runId": "run-empty"},
-        "job": {"name": "kairos.empty_job"},
-        "inputs": [],
-        "outputs": [],
-    }
-    with patch("backend.app.api.routes.ingest.get_conn", side_effect=_mock_get_conn):
-        resp = client.post("/api/v1/ingest/openlineage", json=event)
+def test_r11_complete_with_no_inputs_produces_no_evidence(cursor):
+    event = {"eventType": "COMPLETE", "eventTime": "2026-10-01T08:00:00Z",
+             "run": {"runId": "run-empty"}, "job": {"name": "kairos.empty_job"},
+             "inputs": [], "outputs": []}
+
+    resp = _post(cursor, "/api/v1/ingest/openlineage", event)
 
     assert resp.status_code == 200
     data = resp.json()
@@ -391,84 +294,121 @@ def test_r11_complete_with_no_inputs_produces_no_evidence():
     assert data["accepted"] == 1
 
 
-# ---------------------------------------------------------------------------
-# R12 — columnLineage facet noted in diagnostics, does not block ingestion
-# ---------------------------------------------------------------------------
-
-def test_r12_column_lineage_facet_noted_in_diagnostics():
+def test_r12_column_lineage_facet_noted_in_diagnostics(cursor):
     event = _complete_event()
     event["outputs"][0]["facets"] = {
-        "columnLineage": {
-            "_producer": "test",
-            "fields": {"salary": {"inputFields": []}},
-        }
+        "columnLineage": {"_producer": "test", "fields": {"salary": {"inputFields": []}}},
     }
-    with patch("backend.app.api.routes.ingest.get_conn", side_effect=_mock_get_conn):
-        resp = client.post("/api/v1/ingest/openlineage", json=event)
+
+    resp = _post(cursor, "/api/v1/ingest/openlineage", event)
 
     assert resp.status_code == 200
     data = resp.json()
     assert data["accepted"] == 1
-    assert any("columnLineage" in d for d in data["diagnostics"])
+    assert any("columnLineage" in message for message in data["diagnostics"])
 
 
 # ---------------------------------------------------------------------------
-# Batch path — single call with multiple events
+# R13 — preview writes nothing
 # ---------------------------------------------------------------------------
 
-def test_batch_two_events_both_accepted():
-    batch = {
-        "events": [
-            _complete_event(run_id="run-A"),
-            _complete_event(run_id="run-B"),
-        ]
-    }
-    call_count = {"n": 0}
+def test_r13_preview_returns_normalized_event_without_writes(cursor):
+    resp = _post(
+        cursor,
+        "/api/v1/ingest/openlineage/preview",
+        _complete_event(inputs=[{"namespace": "pg://db", "name": "analytics.orders"}]),
+    )
 
-    @contextmanager
-    def _multi_conn():
-        call_count["n"] += 1
-        yield _MockConn([1, 1, 1, 1, 1, 1])
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["ok"] is True
+    assert data["writes"] == 0
+    assert data["count"] == 1
+    assert data["valid_count"] == 1
+    event = data["events"][0]
+    assert event["eventType"] == "COMPLETE"
+    assert event["runId"] == "run-001"
+    assert event["job"]["name"] == "kairos.test_job"
+    assert event["producer"] == "kairos-test"
+    assert event["inputs"][0]["table"] == "orders"
+    assert event["outputs"][0]["table"] == "out_adjusted"
+    assert cursor.executed == []
 
-    with patch("backend.app.api.routes.ingest.get_conn", side_effect=_multi_conn):
-        resp = client.post("/api/v1/ingest/openlineage", json=batch)
+
+def test_preview_of_batch_reports_invalid_events(cursor):
+    resp = _post(
+        cursor,
+        "/api/v1/ingest/openlineage/preview",
+        {"events": [_complete_event(run_id="run-a"), {"eventType": "COMPLETE"}]},
+    )
+
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["count"] == 2
+    assert data["valid_count"] == 1
+    assert any("run.runId" in warning for warning in data["warnings"])
+
+
+# ---------------------------------------------------------------------------
+# R14 — authentication is required
+# ---------------------------------------------------------------------------
+
+def test_r14_unauthenticated_producer_is_rejected(cursor):
+    app.dependency_overrides.pop(require_user, None)
+    try:
+        with patch(
+            "backend.app.api.routes.ingest.get_conn",
+            side_effect=make_get_conn(cursor),
+        ):
+            resp = client.post("/api/v1/ingest/openlineage", json=_complete_event())
+    finally:
+        app.dependency_overrides[require_user] = lambda: {"id": "restored"}
+
+    assert resp.status_code == 401
+    assert cursor.executed == []
+
+
+# ---------------------------------------------------------------------------
+# Batch + run status
+# ---------------------------------------------------------------------------
+
+def test_batch_two_events_both_accepted(cursor):
+    batch = {"events": [_complete_event(run_id="run-A"), _complete_event(run_id="run-B")]}
+
+    resp = _post(cursor, "/api/v1/ingest/openlineage", batch)
 
     assert resp.status_code == 200
     data = resp.json()
     assert data["accepted"] == 2
     assert data["duplicate"] == 0
+    assert data["evidence_created"] == 2
+    assert set(cursor.runs) == {"run-A", "run-B"}
+    assert {run["status"] for run in cursor.runs.values()} == {"completed"}
 
 
-# ---------------------------------------------------------------------------
-# Absence is not a record — explicit contract test
-# ---------------------------------------------------------------------------
+def test_absence_never_creates_negative_evidence(cursor):
+    _post(cursor, "/api/v1/ingest/openlineage", {"events": []})
 
-def test_absence_never_creates_negative_evidence():
-    """
-    Sending an empty events list must never write any evidence row.
-    This is the machine-testable form of the 'missing events != negatives' rule.
-    """
-    executed_sql: list[str] = []
+    assert cursor.count_sql("insert into evidence") == 0
+    assert cursor.count_sql("insert into raw_event") == 0
 
-    class _TrackingCursor(_MockCursor):
-        def execute(self, sql: str, params: Any = None):
-            executed_sql.append(sql)
-            super().execute(sql, params)
 
-    class _TrackingConn(_MockConn):
-        def cursor(self, **_):
-            return _TrackingCursor()
+def test_storage_failure_returns_503(cursor):
+    def _broken():
+        raise RuntimeError("pool exhausted")
 
-    @contextmanager
-    def _tracking_conn():
-        yield _TrackingConn()
+    with patch("backend.app.api.routes.ingest.get_conn", side_effect=_broken):
+        resp = client.post("/api/v1/ingest/openlineage", json=_complete_event())
 
-    with patch("backend.app.api.routes.ingest.get_conn", side_effect=_tracking_conn):
-        resp = client.post("/api/v1/ingest/openlineage", json={"events": []})
+    assert resp.status_code == 503
+    assert resp.json()["error"]["code"] == "STORAGE_UNAVAILABLE"
 
-    assert resp.status_code == 200
-    # No DB writes should have occurred at all
-    evidence_inserts = [s for s in executed_sql if "INSERT INTO evidence" in s]
-    assert evidence_inserts == [], (
-        "Empty event list produced evidence INSERT — absence must never create evidence."
-    )
+
+def test_response_shape_is_stable(cursor):
+    data = _post(cursor, "/api/v1/ingest/openlineage", _complete_event()).json()
+
+    assert set(data) >= {
+        "accepted", "duplicate", "skipped", "evidence_created",
+        "edges_created", "runs_written", "diagnostics",
+    }
+    json.dumps(data)  # must be JSON serializable

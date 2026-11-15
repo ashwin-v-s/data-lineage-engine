@@ -679,7 +679,7 @@
     "/api/v1/assets/{asset_id}/downstream-impact": {
       "get": {
         "summary": "Get Downstream Impact",
-        "description": "Group everything reachable downstream of an asset by propagation depth.\n\nUnlike the flat lineage graph, this answers \"if I change this asset, what\nelse is at risk, and how far away is it?\" \u2014 one bucket per hop, with the\naffected assets labelled for display.",
+        "description": "Group everything reachable from an asset by propagation depth.\n\ndirection=downstream answers \"if this asset changes, what is at risk?\";\ndirection=upstream answers \"what could have caused this asset to change?\".\nevidence_state filters each hop by the state stored for the *connecting*\nedge, so an edge with no evidence is never presented as an observed\ndependency. A filtered-out hop also stops traversal through it: descendants\nof an edge that the filter hides are reachable only through that edge.",
         "operationId": "get_downstream_impact_api_v1_assets__asset_id__downstream_impact_get",
         "security": [
           {
@@ -749,6 +749,28 @@
               "pattern": "^(DATASET|COLUMN)$",
               "default": "DATASET",
               "title": "Granularity"
+            }
+          },
+          {
+            "name": "direction",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^(downstream|upstream|both)$",
+              "default": "downstream",
+              "title": "Direction"
+            }
+          },
+          {
+            "name": "evidence_state",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^(all|OBSERVED|POSSIBLE|REFUTED_FOR_RUN|UNKNOWN)$",
+              "default": "all",
+              "title": "Evidence State"
             }
           }
         ],
@@ -882,13 +904,38 @@
         }
       }
     },
+    "/api/v1/ingest/openlineage/preview": {
+      "post": {
+        "tags": [
+          "ingestion"
+        ],
+        "summary": "Validate and preview OpenLineage events without writing",
+        "description": "Returns the normalized producer, event type, event time, job, run id and input/output datasets with validation warnings. No database writes.",
+        "operationId": "preview_openlineage_api_v1_ingest_openlineage_preview_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/ingest/openlineage": {
       "post": {
         "tags": [
           "ingestion"
         ],
         "summary": "Ingest one or more OpenLineage runtime events",
-        "description": "Stores events immutably and normalizes COMPLETE events into RUNTIME_POSITIVE evidence. Non-COMPLETE events do not produce evidence.",
+        "description": "Stores events immutably, records the job and run, and normalizes COMPLETE events into RUNTIME_POSITIVE dataset evidence plus an observed lineage relationship. Non-COMPLETE events do not produce evidence.",
         "operationId": "ingest_openlineage_api_v1_ingest_openlineage_post",
         "responses": {
           "200": {
@@ -899,7 +946,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/api/v1/ingest/preview": {
@@ -6703,6 +6755,73 @@
           "granularity": {
             "type": "string",
             "title": "Granularity"
+          },
+          "state": {
+            "type": "string",
+            "title": "State",
+            "default": "UNKNOWN"
+          },
+          "state_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "State Reason"
+          },
+          "coverage": {
+            "type": "string",
+            "title": "Coverage",
+            "default": "NONE"
+          },
+          "coverage_basis": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Coverage Basis"
+          },
+          "evidence_sources": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Evidence Sources"
+          },
+          "evidence_count": {
+            "type": "integer",
+            "title": "Evidence Count",
+            "default": 0
+          },
+          "run_count": {
+            "type": "integer",
+            "title": "Run Count",
+            "default": 0
+          },
+          "latest_event_time": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latest Event Time"
+          },
+          "coverage_rule_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Coverage Rule Version"
           }
         },
         "type": "object",
