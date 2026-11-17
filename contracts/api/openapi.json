@@ -3173,6 +3173,48 @@
   "openapi": "3.1.0",
   "paths": {
     "/api/v1/assets/{asset_id}": {
+      "delete": {
+        "description": "Hide one asset from active catalog reads while retaining lineage history.",
+        "operationId": "remove_asset_api_v1_assets__asset_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "asset_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Asset Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Remove Asset"
+      },
       "get": {
         "operationId": "get_asset_api_v1_assets__asset_id__get",
         "parameters": [
