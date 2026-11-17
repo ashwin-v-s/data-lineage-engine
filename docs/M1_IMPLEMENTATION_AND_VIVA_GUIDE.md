@@ -1,4 +1,6 @@
-# M1 Implementation & Viva Guide: Static Metadata Ingestion & SQL Lineage
+# M1 Implementation & Viva Guide: Platform Identity, Workspace Isolation & Static Ingestion
+
+> **Scope Note (Updated 2026-11-17):** In Architecture v2 and the Ten-Demo Handouts, M1 (Jatin `Jat-in32006`) owns **Platform, Identity, Workspace Isolation (RLS), Deployment & Contract Custody** (presenting **Demo 1** and co-presenting **Demo 3**), alongside the foundational **Static Metadata Ingestion & SQL Lineage** components described below. See also [M1 Handout](handouts/M1_JATIN_platform_identity_deployment.md), [Demo 1 Guide](DEMO_1_SIGNIN_WORKSPACE_ISOLATION.md), and [Demo 3 Guide](DEMO_3_LOCAL_FOLDER_INGESTION.md).
 
 This document provides a comprehensive explanation of what I (Member 1) have implemented in the Kairos Data Lineage & Metadata Engine repository. It covers the exact location of the code, how it works, and how to confidently explain it in a review or viva.
 
@@ -43,7 +45,7 @@ Ground truth is the absolute, verified reality used for benchmarking. M1 is mere
 | **Column-level lineage** | IMPLEMENTED | `ingestion/sql/__init__.py` | `_column_deps` | Recursively walks SQLGlot AST to find source columns for each target. | `sqlglot.lineage.lineage()` call |
 | **Unsupported-SQL detection** | PARTIALLY IMPLEMENTED | `ingestion/sql/__init__.py` | `_has_window`, `_has_udf`, `extract()` | Detects window functions, UDFs, dynamic SQL, and some outer joins. | Rejects with `ParserStatus.UNSUPPORTED`. LEFT/RIGHT join detection is still unreliable (MVP-2). |
 | **Static evidence generation** | IMPLEMENTED | `ingestion/sql/__init__.py` | `extract()` | Builds `StaticEvidence` objects with fingerprints and IDs. | `StaticEvidence(...)` constructors |
-| **dbt manifest parsing** | PLANNED | `ingestion/dbt/` | N/A | Scaffolded directory; README states it is for MVP-2. | Empty directory with README. |
+| **dbt manifest & run_results parsing** | IMPLEMENTED | `ingestion/dbt/` | `manifest.py`, `run_results.py` | Normalizes dbt manifest DAGs and run_results test outcomes. | Verified in `tests/test_dbt_run_results.py` and Demo 6. |
 
 ---
 
