@@ -16,6 +16,20 @@ class EmailDeliveryError(RuntimeError):
     """Email could not be delivered using the configured SMTP service."""
 
 
+def resolve_public_app_url() -> str:
+    """Resolve the canonical public application URL with Vercel auto-detection."""
+    vercel_prod = (os.getenv("VERCEL_PROJECT_PRODUCTION_URL") or "").strip().rstrip("/")
+    if vercel_prod:
+        return f"https://{vercel_prod}"
+    explicit = (os.getenv("KAIROS_PUBLIC_APP_URL") or "").strip().rstrip("/")
+    if explicit:
+        return explicit
+    vercel_url = (os.getenv("VERCEL_URL") or "").strip().rstrip("/")
+    if vercel_url:
+        return f"https://{vercel_url}"
+    return ""
+
+
 @dataclass(frozen=True)
 class EmailSettings:
     host: str
@@ -39,7 +53,7 @@ class EmailSettings:
         password = cls._setting("SMTP_PASSWORD", "KAIROS_EMAIL_PASSWORD")
         sender = cls._setting("SMTP_FROM", "KAIROS_EMAIL_FROM").strip()
         app_name = os.getenv("SMTP_APP_NAME", "Kairos").strip() or "Kairos"
-        public_app_url = (os.getenv("KAIROS_PUBLIC_APP_URL") or "").strip().rstrip("/")
+        public_app_url = resolve_public_app_url()
         if not all((host, username, password, sender, public_app_url)):
             return None
         try:
@@ -59,7 +73,7 @@ def delivery_configured() -> bool:
 
 
 def invite_url(token: str) -> str | None:
-    public_app_url = (os.getenv("KAIROS_PUBLIC_APP_URL") or "").strip().rstrip("/")
+    public_app_url = resolve_public_app_url()
     if not public_app_url:
         return None
     return f"{public_app_url}/?view=admin&invite={quote(token, safe='')}"
