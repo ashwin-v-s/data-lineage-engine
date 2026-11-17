@@ -52,7 +52,10 @@ EDI-Metadata_Lineage/
 │   │   │   │   └── sources.py          # Data source connections
 │   │   │   └── errors.py               # Standardized error envelope handler
 │   │   ├── services/
-│   │   │   └── evidence_strength.py    # Evidence scoring algorithm (0.0 to 1.0)
+│   │   │   ├── evidence_strength.py    # Evidence scoring algorithm (0.0 to 1.0)
+│   │   │   ├── freshness.py            # Pure freshness calculation engine and threshold evaluation
+│   │   │   ├── freshness_evidence.py   # Database query for latest completed runtime activity
+│   │   │   └── freshness_scheduler.py   # Scheduler protocol and fail-closed blocked status boundary
 │   │   ├── schemas/
 │   │   │   └── lineage.py              # Pydantic models for LineageNode, LineageEdge, LineageResponse
 │   │   ├── auth.py                     # Supabase JWT bearer token verification & current user extraction
@@ -279,15 +282,57 @@ PostgreSQL Transaction
 
 ---
 
-## 6. Evidence Semantics & Verification Engine
+## 6. Freshness Engine, SLA Reconciliation & 24/7 Monitoring Architecture
 
-### 6.1 The 4 Canonical Reasoning States (`frontend/evidence-semantics.js`)
+### 6.1 The Mathematical Evaluation Engine (`backend/app/services/freshness.py`)
+Freshness in Kairos is evaluated dynamically against verified activity timestamps:
+$$\text{Age (Minutes)} = \left\lfloor \frac{\text{Now (UTC)} - \text{Last Verified Source Activity (UTC)}}{60} \right\rfloor$$
+
+The engine in `backend/app/services/freshness.py` evaluates the verdict strictly in this order:
+1. `paused == True` $\to$ **`PAUSED`**
+2. Missing thresholds (`warn_after_minutes` or `error_after_minutes` is `None`) $\to$ **`UNKNOWN`**
+3. `last_source_activity_at is None` $\to$ **`UNKNOWN`** *(Absence of evidence is never assumed to be healthy or late)*
+4. $\text{Age} > \text{Stale Limit}$ (default $3\times$ error limit) $\to$ **`STALE`**
+5. $\text{Age} > \text{Error Limit}$ $\to$ **`LATE`** (Triggers automated `FRESHNESS_BREACH` incident and in-app notification)
+6. $\text{Age} > \text{Warn Limit}$ $\to$ **`AT_RISK`**
+7. Otherwise $\to$ **`HEALTHY`** (Reconciles and resolves open incidents)
+
+### 6.2 The "Time-Decay" Principle (What Happens If Kairos Was Not Running?)
+If a database table or local folder changes on disk, but Kairos was not actively executing:
+- **Time Never Stops:** When Kairos starts or when an evaluation is requested, Kairos compares current UTC time against the stored `last_source_activity_at`.
+- If 12 hours have passed since the last verified job and the SLA is 2 hours, Kairos immediately detects that $\text{Age} = 720 > 120$ minutes.
+- The asset automatically decays into **`LATE`** state, creates an incident, and alerts downstream users that data is stale.
+- **You do not need a continuous background process to detect tardiness—the natural progression of wall-clock time causes overdue assets to be flagged immediately upon evaluation.**
+
+### 6.3 Push vs. Pull: How Events Reach Kairos
+1. **Push Model (Production Standard):**
+   Modern data stacks do not poll databases 24/7 (which causes heavy query load and egress charges). Instead, orchestrators (Airflow, Spark, dbt) emit an OpenLineage `COMPLETE` webhook to `POST /api/v1/ingest/openlineage` the moment a pipeline run finishes, updating the asset's verified timestamp.
+2. **On-Demand Evaluation (API & UI):**
+   Users or services invoke `POST /api/v1/governance/datasets/{asset_id}/evaluate` (or click "Evaluate now" in `FreshnessView.jsx`) to re-evaluate SLAs and reconcile incidents.
+3. **Manual Human Attestation:**
+   `POST /api/v1/governance/datasets/{asset_id}/confirm-freshness` allows a data steward to record a manual verification with a note. It is stored as `MANUAL_CONFIRMATION` in `freshness_confirmation` and is **never** disguised as runtime execution evidence.
+
+### 6.4 The 24/7 Scheduler Reality (`freshness_scheduler.py`)
+In serverless or edge deployments (e.g. Vercel, AWS Lambda), continuous Python background threads (`while True: sleep()`) are impossible because serverless containers spin down to zero between requests.
+- To maintain complete engineering honesty, `backend/app/services/freshness_scheduler.py` explicitly marks unconfigured scheduler adapters as:
+  ```python
+  SCHEDULER_STATUS = "BLOCKED"
+  SCHEDULER_BLOCK_REASON = "M2/M1 must approve a durable scheduler adapter before scheduled evaluations can run."
+  ```
+- The UI reports `Schedule: manual only · BLOCKED`, preventing false promises about unmonitored background cadences.
+- In persistent container deployments, scheduled evaluations are triggered by standard external cron jobs (e.g. GitHub Actions cron, AWS EventBridge) calling the evaluate API.
+
+---
+
+## 7. Evidence Semantics & Verification Engine
+
+### 7.1 The 4 Canonical Reasoning States (`frontend/evidence-semantics.js`)
 - `OBSERVED`: At least one source value was observed to contribute to at least one target output in this run. (Proves pipeline execution, not every row).
 - `REFUTED_FOR_RUN`: No propagation was established for this run under complete-evaluation conditions.
 - `POSSIBLE`: Static analysis permits this dependency, but no runtime telemetry corroborates it.
 - `UNKNOWN`: Kairos cannot safely evaluate the dependency due to ambiguous or missing instrumentation.
 
-### 6.2 Evidence Strength Scoring (`backend/app/services/evidence_strength.py`)
+### 7.2 Evidence Strength Scoring (`backend/app/services/evidence_strength.py`)
 $$\text{Confidence Score} = \text{BaseWeight}(\text{EvidenceType}) \times \text{Multiplier}(\text{State})$$
 - Query Log / WAL: **0.95**
 - OpenLineage COMPLETE: **0.90**
@@ -297,9 +342,9 @@ $$\text{Confidence Score} = \text{BaseWeight}(\text{EvidenceType}) \times \text{
 
 ---
 
-## 7. Catalog Lifecycle & Soft Removal Architecture
+## 8. Catalog Lifecycle & Soft Removal Architecture
 
-### 7.1 Stored Procedure (`0015_dataset_soft_removal.sql`)
+### 8.1 Stored Procedure (`0015_dataset_soft_removal.sql`)
 ```sql
 CREATE OR REPLACE FUNCTION public.kairos_remove_dataset(p_asset_id UUID, p_actor_id UUID)
 RETURNS TABLE (asset_id UUID, asset_name TEXT) LANGUAGE plpgsql SECURITY DEFINER AS $$
@@ -313,7 +358,7 @@ END;
 $$;
 ```
 
-### 7.2 Read Policy & UI Reactive Handling
+### 8.2 Read Policy & UI Reactive Handling
 - Active catalog queries filter via `kairos_dataset_active_read`: `WHERE removed_at IS NULL`.
 - History, lineage edges, evidence, and raw events are preserved for compliance.
 - Frontend submits `DELETE /api/v1/assets/{asset_id}`.
@@ -322,7 +367,7 @@ $$;
 
 ---
 
-## 8. Machine Learning, Feature Stores & Unstructured Data
+## 9. Machine Learning, Feature Stores & Unstructured Data
 
 1. **Why Kairos is Not Just for SQL:**
    - Asset taxonomy includes `ML feature datasets`, `Files & event streams`, `Database views`, `Transformation models`.
@@ -339,7 +384,69 @@ $$;
 
 ---
 
-## 9. Comprehensive Testing Suites & Verification
+## 10. Proactive Architectural Audits & Deep Failure Scenarios
+
+### Audit 1: Wildcard SQL Ingestion (`SELECT *`)
+*Question:* "What if a user's SQL file uses `SELECT * FROM raw_orders`? Does Kairos invent column lineages?"
+*Answer:* **No.** Kairos refuses to guess. In `ingestion/sql/static_file.py` and `frontend/app.js`, when a wildcard `*` projection is detected, the transformation mapping is classified as `kind: "illustrative"` or `kind: "unavailable"`. Authoritative column lineage requires explicit column mapping expressions or live schema reflection from the database catalog.
+
+### Audit 2: Schema Evolution & Column Alterations
+*Question:* "What happens if a pipeline adds a column or renames an existing column?"
+*Answer:* In migration `0004_ingestion_import_runs.sql`, column storage uses:
+```sql
+INSERT INTO column_record (dataset_id, column_name, data_type)
+VALUES (%s::uuid, %s, %s)
+ON CONFLICT (dataset_id, schema_version, column_name)
+DO UPDATE SET data_type = EXCLUDED.data_type;
+```
+When schema versions evolve, new columns are added without destroying historical column records. The lineage engine uses valid-time bounds to know which columns were active during any historical pipeline run.
+
+### Audit 3: Vector Search Multi-Tenant Isolation (`pgvector` in Migration 0012)
+*Question:* "How does semantic vector search prevent cross-workspace embedding leaks?"
+*Answer:* In `backend/migrations/0012_m3_pgvector_embeddings.sql` and `backend/app/api/routes/vector_search.py`, embeddings (`vector(1536)`) are stored in `dataset_embedding`. Every vector query incorporates strict RLS:
+```sql
+SELECT dataset_id, 1 - (embedding <=> :query_vector) AS similarity
+FROM dataset_embedding
+WHERE workspace_id = current_setting('app.current_workspace_id')::uuid
+ORDER BY embedding <=> :query_vector LIMIT 10;
+```
+Verified by `tests/test_vector_search_isolation.py`: similarity queries in Workspace A can never retrieve nearest neighbors from Workspace B.
+
+### Audit 4: Network Failure & Partial Ingestion Recovery
+*Question:* "What happens if the network drops or PostgreSQL crashes halfway through committing an import batch?"
+*Answer:* The entire ingestion routine in `backend/app/api/routes/ingest.py` runs inside a Python context manager `with get_conn() as conn:` with PostgreSQL transaction semantics. If an exception occurs on asset #45 of a 50-asset batch, PostgreSQL issues an automatic `ROLLBACK`. Zero partial assets or dangling edges are written.
+
+### Audit 5: Secret Sanitization & Defense-in-Depth
+*Question:* "How does Kairos guarantee that database passwords or API keys don't leak through metadata descriptions?"
+*Answer:* In `backend/app/api/routes/lineage.py` (`_SECRET_KEY_RE`) and `frontend/app.js` (`safeMetadataForDisplay`), any metadata dictionary key matching regex `/(?:token|secret|password|credential|private.?key|api.?key)/i` is redacted and stripped before transmission to the frontend or rendering in JSON viewers.
+
+### Audit 6: The Bitemporal Reference Oracle & Historical Late Corrections
+*Question:* "How does Kairos mathematically prove that past lineage views remain reproducible after late retroactive pipeline corrections?"
+*Answer:* Implemented in `backend/app/temporal/reference.py` and validated by 16 tests in `tests/test_temporal_oracle.py`. The reference oracle uses half-open intervals across two independent time axes:
+$$\text{valid\_from} \le \text{valid\_at} < \text{valid\_to} \quad \land \quad \text{tx\_from} \le \text{known\_as\_of} < \text{tx\_to}$$
+If a pipeline change from March 1st is retroactively recorded on March 10th, an audit query asking *"What was believed on March 5th?"* sets `known_as_of = March 5th` and filters out the future correction, guaranteeing complete reproducibility.
+
+### Audit 7: Automated Self-Healing Incident Reconciliation
+*Question:* "If an asset becomes LATE and an incident is raised, does an engineer have to manually close it when the pipeline runs again?"
+*Answer:* **No. Incidents are self-healing.** In `backend/app/api/routes/governance.py`:
+- When $\text{Age} > \text{Error Limit}$, Kairos opens an incident with `status = 'DETECTED'`, deduplicated by `(workspace_id, dedupe_key)`.
+- When a subsequent pipeline run finishes successfully and an evaluation is run, the engine computes `HEALTHY`, matches the open incident, executes `UPDATE incident SET status = 'RESOLVED', resolved_at = now()`, and appends a `RESOLVED` event to `incident_event`.
+
+### Audit 8: Data Contracts & Downstream Protection
+*Question:* "How do Data Contracts prevent upstream schema changes from breaking downstream BI dashboards?"
+*Answer:* In migration `0009_governance.sql`, `data_contract` records formal schema, latency, and quality agreements between data producers and consumers. If an ingested SQL file or dbt model drops a required contractual column or alters a data type, Kairos flags a `CONTRACT_BREACH` and creates a high-severity incident before downstream consumers are impacted.
+
+### Audit 9: Remote GitHub Repository Browsing Without Cloning
+*Question:* "How does the GitHub connector import metadata without running git clone or storing repositories on disk?"
+*Answer:* In `frontend/app.js` and `backend/app/api/routes/integrations.py`, Kairos queries the GitHub REST API (`/repos/{owner}/{repo}/git/trees/{branch}?recursive=1`). It streams the directory structure and file contents directly in memory to the Two-Phase Ingestion preview engine. Zero repository code is cloned or stored on the Kairos host.
+
+### Audit 10: Fail-Closed Role-Based Access Control (RBAC)
+*Question:* "Can regular data viewers remove assets or alter governance SLAs?"
+*Answer:* **No.** In `backend/app/auth.py`, sensitive administrative mutations (such as `DELETE /api/v1/assets/{id}` and SLA updates) enforce `require_role("owner", "admin")`. Unauthorized requests return `HTTP 403 Forbidden` (`{"ok": false, "detail": "Only workspace owners and admins can remove assets."}`).
+
+---
+
+## 11. Comprehensive Testing Suites & Verification
 
 1. **Backend Integration Suite (`pytest`):**
    - **688 passed**, 83 skipped, 0 failed in 11.11s.
@@ -355,11 +462,13 @@ $$;
 
 ---
 
-## 10. Viva Defense & Faculty Q&A Quick Reference
+## 12. Viva Defense & Faculty Q&A Quick Reference
 
 | Faculty Question | Core Defense Point |
 | :--- | :--- |
 | **Where is physical customer data stored?** | **Nowhere in Kairos.** Kairos is a metadata engine. CSV headers (line 1 only) and SQL ASTs are extracted. Data remains in the warehouse. |
+| **How does freshness work if the project wasn't running?** | **Time-decay:** $\text{Age} = \text{now} - \text{last\_activity}$. Time continues to elapse; overdue assets naturally decay into `LATE` and trigger incidents on next evaluation. |
+| **Is freshness running 24/7 in background?** | No background loop in serverless. Airflow/Spark pushes OpenLineage webhooks; API provides on-demand evaluation. Scheduler reports `MANUAL/BLOCKED` honestly. |
 | **How do you find evidence?** | Declared code yields `POSSIBLE` candidate edges. Runtime telemetry (OpenLineage `COMPLETE` or query logs) yields `OBSERVED` verified edges. |
 | **What happens if a pipeline fails?** | The static edge remains `POSSIBLE` or `REFUTED_FOR_RUN`. No green verified evidence is attached. |
 | **Is the graph built in backend or frontend?** | Backend queries PostgreSQL and serves adjacency list via RLS. Frontend `catalog-graph.js` runs topological layering DAG algorithm. |
@@ -368,6 +477,11 @@ $$;
 | **How does asset removal work?** | Soft deletion (`removed_at = NOW()`). RLS policy hides it from catalog views, but historical lineage and raw events are preserved. |
 | **What about ML and images?** | Metadata engines track S3 URIs, SHA-256 digests, and training runs, not raw pixels. Bitemporality prevents training data poisoning. |
 | **Can Tenant A see Tenant B's data?** | No. PostgreSQL Row-Level Security (RLS) on all 43 tables evaluates `app.current_workspace_id`. Cross-tenant queries return 0 rows. |
+| **What if a query has `SELECT *`?** | Kairos refuses to guess; marks mapping as illustrative. Authoritative mapping requires explicit columns or schema binding. |
+| **Do incidents need manual closing?** | **Self-healing:** when a subsequent pipeline run succeeds, the engine computes `HEALTHY` and automatically marks the incident `RESOLVED`. |
+| **Can viewers delete assets?** | No. Admin endpoints enforce `require_role("owner", "admin")`. Unauthorized requests return `HTTP 403 Forbidden`. |
+| **How does GitHub connect?** | Directly streams file trees and blobs via GitHub REST API in memory; never clones repositories to disk. |
+| **How is vector search isolated?** | `pgvector` similarity queries `<=>` strictly enforce RLS `workspace_id = current_setting(...)`. |
 
 ---
 *End of Master Context File. Use this authoritative specification to answer any inquiry regarding Kairos.*
