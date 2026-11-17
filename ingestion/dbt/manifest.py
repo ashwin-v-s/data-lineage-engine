@@ -100,6 +100,45 @@ def parse_dbt_manifest(
     if not isinstance(metadata, dict):
         errors.append(Diagnostic("INVALID_DBT_METADATA", "metadata must be an object.", "metadata"))
         metadata = {}
+
+    # ── Version gate: reject manifest schema versions < v7 ───────────────
+    # Must run before parsing resources so that an empty manifest from an old
+    # dbt version gets the correct diagnostic, not NO_SUPPORTED_DBT_RESOURCES.
+    _schema_version_url = metadata.get("dbt_schema_version", "")
+    _MANIFEST_URL_PREFIX = "https://schemas.getdbt.com/dbt/manifest/"
+    _SUPPORTED_MANIFEST_VERSIONS = {"v7", "v8", "v9", "v10", "v11", "v12", "v13"}
+    _early_version_warnings: list[Diagnostic] = []
+    if isinstance(_schema_version_url, str) and _MANIFEST_URL_PREFIX in _schema_version_url:
+        _vtok = _schema_version_url.split(_MANIFEST_URL_PREFIX, 1)[1].split("/")[0].strip()
+        if _vtok and _vtok not in _SUPPORTED_MANIFEST_VERSIONS:
+            try:
+                _vnum = int(_vtok.lstrip("v"))
+                if _vnum < 7:
+                    return MetadataGraphResult(None, (
+                        Diagnostic(
+                            "UNSUPPORTED_DBT_MANIFEST_VERSION",
+                            f"dbt manifest schema version {_vtok!r} (< v7) is not supported. "
+                            "Kairos supports v7 and later. Re-generate with dbt Core ≥ 1.0.",
+                            "metadata.dbt_schema_version",
+                        ),
+                    ))
+                else:
+                    # Newer than tested range — parse conservatively
+                    _early_version_warnings.append(Diagnostic(
+                        "UNTESTED_DBT_MANIFEST_VERSION",
+                        f"dbt manifest schema version {_vtok!r} is newer than the tested set "
+                        f"({', '.join(sorted(_SUPPORTED_MANIFEST_VERSIONS))}). "
+                        "Fields were parsed conservatively; some metadata may be missing.",
+                        "metadata.dbt_schema_version",
+                    ))
+            except ValueError:
+                _early_version_warnings.append(Diagnostic(
+                    "UNRECOGNISED_DBT_MANIFEST_VERSION",
+                    f"Could not parse version from dbt_schema_version {_schema_version_url!r}; "
+                    "parsed conservatively.",
+                    "metadata.dbt_schema_version",
+                ))
+
     nodes = _as_collection(document, "nodes", errors, required=True)
     sources = _as_collection(document, "sources", errors)
     exposures = _as_collection(document, "exposures", errors)
@@ -254,5 +293,5 @@ def parse_dbt_manifest(
     result.payload["provenance"]["content_sha256"] = hashlib.sha256(raw).hexdigest()
     if schema_version:
         result.payload["provenance"]["dbt_schema_version"] = schema_version
-    combined_warnings = tuple(warnings) + result.warnings
+    combined_warnings = tuple(_early_version_warnings) + tuple(warnings) + result.warnings
     return MetadataGraphResult(result.payload, (), combined_warnings)

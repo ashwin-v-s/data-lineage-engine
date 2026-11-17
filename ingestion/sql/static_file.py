@@ -21,7 +21,15 @@ def _table_name(table: exp.Table) -> str:
 def parse_sql_file(source: bytes | str, *, filename: str = "query.sql", dialect: str = "postgres") -> MetadataGraphResult:
     """Parse DDL/DML target dependencies into the canonical import envelope."""
     try:
-        sql = source.decode("utf-8-sig") if isinstance(source, bytes) else source
+        if isinstance(source, bytes):
+            sql = source.decode("utf-8-sig")
+        elif isinstance(source, str):
+            sql = source
+        else:
+            return MetadataGraphResult(
+                None,
+                (Diagnostic("SQL_PARSE_ERROR", f"SQL file content must be text; received {type(source).__name__}.", filename),),
+            )
         statements = [statement for statement in sqlglot.parse(sql, read=dialect) if statement is not None]
     except (UnicodeDecodeError, sqlglot.errors.ParseError, ValueError) as exc:
         return MetadataGraphResult(None, (Diagnostic("SQL_PARSE_ERROR", f"SQLGlot could not parse this file: {exc}", filename),))

@@ -8,7 +8,6 @@ from __future__ import annotations
 
 from typing import Any
 
-
 LAST_SUCCESSFUL_RUNTIME_ACTIVITY_SQL = """
 SELECT er.completed_at AS last_activity,
        e.id AS evidence_id,

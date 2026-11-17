@@ -5,3 +5,4 @@ python-dotenv>=1,<2
 pydantic[email]>=2,<3
 sqlalchemy>=2,<3
 sqlglot>=26
+cryptography>=42,<47

@@ -9,7 +9,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Protocol
 
-
 SCHEDULER_STATUS = "BLOCKED"
 SCHEDULER_BLOCK_REASON = "M2/M1 must approve a durable scheduler adapter before scheduled evaluations can run."
 

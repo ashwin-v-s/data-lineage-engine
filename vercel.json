@@ -1,26 +1,34 @@
 {
-    "outputDirectory": "frontend/dist",
-    "buildCommand": "npm --prefix frontend ci && npm --prefix frontend run build",
-    "rewrites": [
-        {
-            "destination": "/backend/api/index.py",
-            "source": "/healthz"
-        },
-        {
-            "destination": "/backend/api/index.py",
-            "source": "/api/(.*)"
-        },
-        {
-            "destination": "/backend/api/index.py",
-            "source": "/ingestion.html"
-        }
-    ],
-    "$schema": "https://openapi.vercel.sh/vercel.json",
-    "functions": {
-        "backend/api/index.py": {
-            "runtime": "python3.12",
-            "maxDuration": 30,
-            "excludeFiles": "{data/**,docs/**,tests/**,references/**,**/*.zip}"
-        }
+  "version": 2,
+  "builds": [
+    {
+      "src": "backend/api/index.py",
+      "use": "@vercel/python"
+    },
+    {
+      "src": "frontend/package.json",
+      "use": "@vercel/static-build",
+      "config": {
+        "distDir": "dist"
+      }
     }
+  ],
+  "routes": [
+    {
+      "src": "/healthz",
+      "dest": "backend/api/index.py"
+    },
+    {
+      "src": "/api/(.*)",
+      "dest": "backend/api/index.py"
+    },
+    {
+      "src": "/ingestion.html",
+      "dest": "backend/api/index.py"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "frontend/$1"
+    }
+  ]
 }
