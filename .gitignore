@@ -37,6 +37,8 @@ research/results/*
 # Temporary dumps and scratch files
 rea_*.json
 *.tsbuildinfo
+.kiro/
+current context
 
 # Dependencies and build outputs
 node_modules/

@@ -70,6 +70,20 @@ class MutationResult(BaseModel):
     deleted: Optional[int] = None
 
 
+_UNPROVISIONED_DETAIL = (
+    "Personalization storage is not installed (migration 0005 not applied). "
+    "Apply 0005_personalization.sql and restart the backend."
+)
+
+
+def _require_personalization_tables(cur) -> None:
+    """Raise HTTP 503 when migration 0005 tables are absent."""
+    cur.execute("SELECT to_regclass('public.asset_view'), to_regclass('public.asset_star')")
+    row = cur.fetchone()
+    if row is None or row[0] is None or row[1] is None:
+        raise HTTPException(status_code=503, detail=_UNPROVISIONED_DETAIL)
+
+
 def _resolve_dataset_id(cur, asset_id: str) -> str | None:
     """Resolve an asset UUID or dataset name to a workspace-scoped dataset id."""
     if _UUID_RE.match(asset_id):
@@ -119,6 +133,7 @@ def list_recently_viewed(
     """Return the caller's most recently opened assets, newest first."""
     with get_conn() as conn:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            _require_personalization_tables(cur)
             cur.execute(
                 f"""
                 SELECT {_ASSET_COLUMNS}, av.viewed_at AS recorded_at
@@ -144,6 +159,7 @@ def record_asset_view(asset_id: str, user: dict = Depends(require_user)):
     """Record that the caller opened an asset. Idempotent per (user, asset)."""
     with get_conn() as conn:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            _require_personalization_tables(cur)
             dataset_id = _require_dataset_id(cur, asset_id)
             cur.execute(
                 """
@@ -162,6 +178,7 @@ def clear_recently_viewed(user: dict = Depends(require_user)):
     """Clear the caller's recently viewed history."""
     with get_conn() as conn:
         with conn.cursor() as cur:
+            _require_personalization_tables(cur)
             cur.execute("DELETE FROM asset_view WHERE user_id = %s::uuid", (user["id"],))
             deleted = cur.rowcount
     return MutationResult(ok=True, deleted=int(deleted or 0))
@@ -172,6 +189,7 @@ def star_asset(asset_id: str, user: dict = Depends(require_user)):
     """Star an asset for the caller. Idempotent."""
     with get_conn() as conn:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            _require_personalization_tables(cur)
             dataset_id = _require_dataset_id(cur, asset_id)
             cur.execute(
                 """
@@ -189,6 +207,7 @@ def unstar_asset(asset_id: str, user: dict = Depends(require_user)):
     """Remove the caller's star from an asset. Idempotent."""
     with get_conn() as conn:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            _require_personalization_tables(cur)
             dataset_id = _resolve_dataset_id(cur, asset_id)
             if dataset_id is None:
                 # Nothing to unstar for an asset that does not exist here.
@@ -208,6 +227,7 @@ def list_starred_assets(user: dict = Depends(require_user)):
     """Return the caller's starred assets, most recently starred first."""
     with get_conn() as conn:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            _require_personalization_tables(cur)
             cur.execute(
                 f"""
                 SELECT {_ASSET_COLUMNS}, s.created_at AS recorded_at

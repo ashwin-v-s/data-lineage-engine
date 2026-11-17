@@ -23,6 +23,24 @@ from psycopg2.extras import Json, RealDictCursor
 
 from backend.app.db import get_conn
 
+_UNPROVISIONED_DETAIL = (
+    "GitHub connection storage is not installed (migration 0006 not applied). "
+    "Apply 0006_github_connections.sql and restart the backend."
+)
+
+
+def _require_github_connection_table(cur) -> None:
+    """Raise RuntimeError when migration 0006 is absent.
+
+    Callers (upsert_connection, list_connections, etc.) wrap DB access in
+    ``get_conn``. Raising RuntimeError here lets the route's exception handler
+    turn it into a 503 without coupling this service layer to FastAPI.
+    """
+    cur.execute("SELECT to_regclass('public.github_connection')")
+    row = cur.fetchone()
+    if row is None or row[0] is None:
+        raise RuntimeError(_UNPROVISIONED_DETAIL)
+
 # Columns safe to return to callers; token_ciphertext is deliberately absent.
 _PUBLIC_COLUMNS = """
     id::text            AS id,
@@ -67,6 +85,7 @@ def upsert_connection(
     """
     with get_conn() as conn:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            _require_github_connection_table(cur)
             cur.execute(
                 f"""
                 INSERT INTO github_connection (
@@ -107,6 +126,7 @@ def list_connections() -> list[dict]:
     """Return the workspace's connections, newest first, without token material."""
     with get_conn() as conn:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            _require_github_connection_table(cur)
             cur.execute(
                 f"""
                 SELECT {_PUBLIC_COLUMNS}
@@ -122,6 +142,7 @@ def get_connection(connection_id: str) -> dict | None:
     """Load one connection within the active workspace without credential data."""
     with get_conn() as conn:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            _require_github_connection_table(cur)
             cur.execute(
                 f"SELECT {_PUBLIC_COLUMNS} FROM github_connection WHERE id=%s::uuid LIMIT 1",
                 (connection_id,),
@@ -138,6 +159,7 @@ def delete_connection(connection_id: str) -> int:
     """
     with get_conn() as conn:
         with conn.cursor() as cur:
+            _require_github_connection_table(cur)
             cur.execute(
                 "DELETE FROM github_connection WHERE id = %s::uuid",
                 (connection_id,),
