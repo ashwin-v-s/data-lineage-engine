@@ -13,37 +13,33 @@
 Execute these commands before beginning the live demo:
 
 ```powershell
-# 1. Confirm the demo fixture files exist in docs/demo-fixtures/
-Get-ChildItem docs/demo-fixtures/ | Select-Object Name, Length
+# 1. Confirm the authenticated enterprise demo fixture files exist in demo-authenticated-ingestion/
+Get-ChildItem demo-authenticated-ingestion/ | Select-Object Name, Length
 
 # Verified output:
-#   demo_orders.csv        (CSV header and sample data)
-#   demo_revenue.sql       (CREATE TABLE AS SELECT + INSERT INTO SELECT)
-#   manifest.json          (dbt manifest: 1 model, 2 sources, 2 relationships)
-#   metadata_graph.json    (kairos.ingest.v1: 2 assets, 1 relationship)
-#   README.md
+#   customer_transactions_schema.csv (555 B, 10 columns)
+#   dbt_production_manifest.json      (5,711 B, 8 assets, 8 edges)
+#   enterprise_inventory.json         (946 B, 4 files cataloged)
+#   enterprise_lineage_pipeline.sql   (3,010 B, 8 assets, 6 edges)
+#   enterprise_metadata_graph.json    (16,489 B, 9 assets, 9 edges, column lineage)
+#   README.md                         (5,973 B)
 
-# 2. Confirm ingestion & parser test suite
+# 2. Run deterministic validation across all authenticated fixtures
+$env:PYTHONPATH='.'; python scripts/demo/verify_authenticated_fixtures.py
+# Verified output:
+# [PASS] enterprise_metadata_graph.json: OK=True assets=9 edges=9
+# [PASS] enterprise_lineage_pipeline.sql: OK=True assets=8 edges=6
+# [PASS] dbt_production_manifest.json: OK=True assets=8 edges=8
+# [PASS] customer_transactions_schema.csv: OK=True assets=1 columns=10
+# [PASS] enterprise_inventory.json: OK=True assets=4
+# All authenticated demo fixtures verified deterministically: 100% PASS.
+
+# 3. Confirm ingestion & parser test suite
 python -m pytest tests/test_ingestion_api.py tests/test_metadata_graph_adapter.py tests/test_sql_static_file_adapter.py tests/test_static_corpus.py tests/test_ingest_sql_dbt_route.py -q
-# Verified output: 68 passed, 7 warnings in 3.97s
+# Verified output: 68 passed, 7 warnings
 
-# 3. Confirm all 4 fixtures parse deterministically
-python -c "
-from ingestion.static_files import parse_static_file; import json
-r1 = parse_static_file('metadata_graph', json.load(open('docs/demo-fixtures/metadata_graph.json')), filename='metadata_graph.json')
-r2 = parse_static_file('sql_file', open('docs/demo-fixtures/demo_revenue.sql').read(), filename='demo_revenue.sql')
-r3 = parse_static_file('dbt_manifest', json.load(open('docs/demo-fixtures/manifest.json')), filename='manifest.json')
-r4 = parse_static_file('csv_headers', open('docs/demo-fixtures/demo_orders.csv').read(), filename='demo_orders.csv')
-print(f'metadata_graph : OK={r1.ok} assets={len(r1.payload[\"assets\"])} edges={len(r1.payload[\"relationships\"])}')
-print(f'demo_revenue   : OK={r2.ok} assets={len(r2.payload[\"assets\"])} edges={len(r2.payload[\"relationships\"])}')
-print(f'manifest       : OK={r3.ok} assets={len(r3.payload[\"assets\"])} edges={len(r3.payload[\"relationships\"])}')
-print(f'demo_orders    : OK={r4.ok} assets={len(r4.payload[\"assets\"])} edges={len(r4.payload[\"relationships\"])}')
-"
-# Verified output:
-# metadata_graph : OK=True assets=2 edges=1
-# demo_revenue   : OK=True assets=4 edges=2
-# manifest       : OK=True assets=3 edges=2
-# demo_orders    : OK=True assets=1 edges=0
+# 4. Optional: Pre-seed complete enterprise governance bindings (Glossary, Domains, Products, SLAs)
+$env:PYTHONPATH='.'; python scripts/demo/seed_authenticated_demo.py
 ```
 
 ---
@@ -61,67 +57,68 @@ print(f'demo_orders    : OK={r4.ok} assets={len(r4.payload[\"assets\"])} edges={
 ### Step 2 — Scan local demo folder via File System Access API
 
 1. In the "Scan a local folder" panel, click **"Choose a folder"**.
-2. The browser displays its native security prompt. Select `docs/demo-fixtures/` and grant read permission.
+2. The browser displays its native security prompt. Select `demo-authenticated-ingestion/` (or `docs/demo-fixtures/`) and grant read permission.
 3. Show the scan results in the file tree:
-   - Status: `Scanned 5 files in "demo-fixtures"; 4 have supported extensions. Files are still on this computer. Nothing has been uploaded.`
-   - The tree displays each file with its format badge and byte size.
+   - Status: `Scanned 6 files in "demo-authenticated-ingestion"; 5 have supported extensions. Files are still on this computer. Nothing has been uploaded.`
+   - The tree displays each file with its format badge and byte size (`enterprise_metadata_graph.json`, `enterprise_lineage_pipeline.sql`, `dbt_production_manifest.json`, `customer_transactions_schema.csv`, `enterprise_inventory.json`).
 4. **Key examiner point:** *"Kairos can only read the specific folder selected by the user. It cannot silently scan the disk or traverse parent directories."*
 
 ### Step 3 — Client-side local preview (Zero Network Leakage)
 
-1. Click on `metadata_graph.json` in the scanned file tree. The item highlights with a blue focus border.
+1. Click on `enterprise_metadata_graph.json` in the scanned file tree. The item highlights with a blue focus border.
 2. Click **"Preview selected file"**.
 3. Inspect the local preview card:
    - Displays file name, detected format, byte size, and SHA-256 content digest.
-   - The raw JSON content renders in a syntax-highlighted monospace viewer.
-   - Status banner: *"Previewing metadata_graph.json. Content remains local until you choose Ingest selected file."*
+   - The raw JSON content renders in a syntax-highlighted monospace viewer showing the 4-tier enterprise pipeline (`raw_enterprise`, `staging`, `analytics`, `executive`).
+   - Status banner: *"Previewing enterprise_metadata_graph.json. Content remains local until you choose Ingest selected file."*
 4. Open the DevTools Network tab to demonstrate to the examiner that **zero HTTP requests** were transmitted during preview.
 
 ### Step 4 — Ingest metadata graph via Two-Phase Preview & Commit
 
-1. With `metadata_graph.json` selected, click **"Ingest selected file"**.
+1. With `enterprise_metadata_graph.json` selected, click **"Ingest selected file"**.
 2. Explain the two-phase protocol:
-   - **Phase 1 (Validation):** `POST /api/v1/ingest/preview` sends the file content. The server parses the AST, validates constraints, and returns candidate asset/edge counts without writing to PostgreSQL.
+   - **Phase 1 (Validation):** `POST /api/v1/ingest/preview` sends the file content. The server parses the AST, validates constraints, and returns candidate asset (9) and edge (9) counts without writing to PostgreSQL.
    - **Phase 2 (Atomic Persistence):** `POST /api/v1/ingest/commit` sends the verified payload along with a client-generated UUID `idempotency_key`.
 3. The server commits the records within a single database transaction, inserting:
    - Raw immutable event in `raw_event`.
    - Asset definitions in `dataset` (RLS-scoped to current workspace).
-   - Declared relationships in `lineage_edge`.
-   - Evidence record in `evidence` with state `OBSERVED` for explicitly declared structure.
+   - Declared relationships in `lineage_edge` (4 architectural tiers).
+   - Evidence records in `evidence` with state `OBSERVED` for explicitly declared structure.
    - Run audit record in `import_run`.
 4. **Idempotency proof:** Clicking commit a second time with the same idempotency key returns `replayed: true` and writes 0 duplicate rows.
 
 ### Step 5 — Scan & import folder inventory
 
 1. Click **"Import folder inventory"**.
-2. Show that all 5 files from the selected directory are packaged into a file inventory envelope:
+2. Show that all files from the selected directory are packaged into a file inventory envelope:
    - Paths, sizes, SHA-256 hashes, and directory membership relationships.
-3. Status message: *"Imported folder inventory: 5 files from 'demo-fixtures'. Inventory records paths and metadata; it does not infer data lineage."*
+3. Status message: *"Imported folder inventory: 6 files from 'demo-authenticated-ingestion'. Inventory records paths and metadata; it does not infer data lineage."*
 4. **Honesty point:** *"An inventory lists existing files. Kairos does NOT manufacture speculative data-flow edges between files just because they live in the same directory."*
 
-### Step 6 — Ingest SQL static lineage (`demo_revenue.sql`)
+### Step 6 — Ingest SQL static lineage (`enterprise_lineage_pipeline.sql`)
 
-1. In the right-hand panel ("Import metadata artifact"):
-2. Select **Artifact format:** "SQL file (static lineage)".
-3. Select `docs/demo-fixtures/demo_revenue.sql`.
-4. Click **"Preview selected file"**:
-   - Server runs SQLGlot AST analysis.
-   - Extracts `CREATE TABLE revenue_summary AS SELECT ...` and `INSERT INTO revenue_summary SELECT ...`.
-   - Server preview card: `Assets: 4, Relationships: 2, Columns: 0`.
+1. In the right-hand panel ("Import metadata artifact") or directly from the local folder tree:
+2. Select `enterprise_lineage_pipeline.sql`.
+3. Click **"Preview selected file"**:
+   - Server runs SQLGlot AST analysis across 4 pipeline stages.
+   - Extracts `CREATE TABLE staging.stg_orders_enriched AS SELECT ...`, `CREATE TABLE staging.stg_customer_360 AS SELECT ...`, `INSERT INTO analytics.fct_daily_revenue ...`, and `INSERT INTO executive.daily_revenue_kpi ...`.
+   - Server preview card: `Assets: 8, Relationships: 6, Columns: 0`.
    - Status: `✓ Ready to commit to your isolated workspace`.
-5. Click **"Confirm import"**.
-6. Status: `Import saved. 4 assets and 2 declared relationships are now stored.`
-7. **Examiner point:** *"SQL parsing produces STATIC candidate lineage. Kairos classifies this evidence as POSSIBLE, preserving the full SQL text in raw evidence. A plain SELECT query without an INSERT/CREATE target produces 0 lineage edges."*
+4. Click **"Confirm import"**.
+5. Status: `Import saved. 8 assets and 6 declared relationships are now stored.`
+6. **Examiner point:** *"SQL parsing produces STATIC candidate lineage. Kairos classifies this evidence as POSSIBLE, preserving the full SQL text in raw evidence. A plain SELECT query without an INSERT/CREATE target produces 0 lineage edges."*
 
-### Step 7 — Catalog readback and evidence verification
+### Step 7 — Catalog readback and evidence verification across UI
 
 1. Click **"Refresh store status"** in the Metadata Store panel.
-2. The asset count increments to reflect the newly persisted assets.
-3. Click **"← Back to Kairos dashboard"** and open the Catalog:
-   - Show `revenue_summary` and its upstream source tables.
-   - Open the Asset Detail view: inspect the `source_system: upload`, `source_ref: demo_revenue.sql`, and raw import run ID.
-   - Open Lineage: show the directed edges linking the tables.
-   - Click the edge: open the Edge Inspector showing the evidence provenance, AST fingerprint, and static extraction rule.
+2. The asset count increments to reflect the newly persisted enterprise pipeline assets.
+3. Click **"← Back to Kairos dashboard"** and inspect the connected UI:
+   - **Lineage Explorer (`/lineage`):** Show the 4-tier directed DAG (`raw_enterprise` -> `staging` -> `analytics` -> `executive`). Click nodes to see upstream/downstream hop lists and blast radius.
+   - **Edge Inspector:** Click any edge to open the drawer: inspect `evidence_type: STATIC_DEPENDENCY`, `provenance: dbt_model_ref`, valid time, recorded time, and the sanitized raw event link.
+   - **Catalog & Schemas (`/assets`):** Inspect `customers`, `stg_orders_enriched`, and `fct_daily_revenue` schemas: show column data types, descriptions, and PII badges (`PII_SOURCE`, `PII_MASKED`).
+   - **Glossary & PII (`/glossary`, `/pii`):** Inspect enterprise glossary terms (`GMV`, `Net Recognized Revenue`, `Customer LTV`, `PII`) and their linked dataset assets.
+   - **Domains (`/domains`) & Data Products (`/products`):** Inspect `Executive Revenue Intelligence Product` and `Customer 360 Mart` with their active contracts and SLA clauses.
+   - **Freshness & Quality (`/freshness`):** Inspect the healthy 24-hour freshness SLA on `analytics.fct_daily_revenue`.
 
 ---
 

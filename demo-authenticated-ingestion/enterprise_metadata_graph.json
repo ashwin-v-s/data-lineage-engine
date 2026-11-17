@@ -1,0 +1,297 @@
+{
+  "contract_version": "kairos.ingest.v1",
+  "source": {
+    "kind": "upload",
+    "ref": "enterprise-data-pipeline:v3.2"
+  },
+  "assets": [
+    {
+      "id": "raw-cust-01",
+      "name": "customers",
+      "namespace": "raw_enterprise",
+      "type": "table",
+      "kind": "source",
+      "metadata": {
+        "description": "Raw customer account records synchronized from core enterprise ERP and authentication service.",
+        "owner": "data-engineering",
+        "steward": "data-governance-officer",
+        "tags": ["enterprise", "raw", "pii", "sox-in-scope"],
+        "domain": "Customer Management",
+        "compliance_context": "GDPR / CCPA Regulated",
+        "policies": "Role-Based Access Control (RBAC) + Column Masking",
+        "retention": "7 Years (Financial Audit Standard)",
+        "columns": [
+          {"name": "customer_id", "data_type": "uuid", "description": "Global unique identifier for customer account", "pii": false},
+          {"name": "email", "data_type": "text", "description": "Customer primary email address", "pii": true, "classification": "PII_SOURCE"},
+          {"name": "full_name", "data_type": "text", "description": "Full customer legal name", "pii": true, "classification": "PII_SOURCE"},
+          {"name": "phone_number", "data_type": "varchar", "description": "Customer mobile phone number with country code", "pii": true, "classification": "PII_SOURCE"},
+          {"name": "country_code", "data_type": "varchar", "description": "ISO-3166-1 alpha-2 country code", "pii": false},
+          {"name": "created_at", "data_type": "timestamptz", "description": "Account registration timestamp", "pii": false}
+        ]
+      }
+    },
+    {
+      "id": "raw-ord-02",
+      "name": "orders_feed",
+      "namespace": "raw_enterprise",
+      "type": "table",
+      "kind": "source",
+      "metadata": {
+        "description": "Raw immutable stream of e-commerce checkout events captured from store frontends.",
+        "owner": "data-engineering",
+        "steward": "finance-steward",
+        "tags": ["enterprise", "raw", "orders", "sox-in-scope"],
+        "domain": "Finance & Revenue",
+        "compliance_context": "SOX Section 404 In-Scope",
+        "policies": "Immutable append-only audit trail",
+        "retention": "7 Years (Financial Audit Standard)",
+        "columns": [
+          {"name": "order_id", "data_type": "uuid", "description": "Primary order transaction identifier", "pii": false},
+          {"name": "customer_id", "data_type": "uuid", "description": "Foreign key reference to customer record", "pii": false},
+          {"name": "order_status", "data_type": "varchar", "description": "Current lifecycle status (PENDING, PAID, FULFILLED, REFUNDED)", "pii": false},
+          {"name": "order_amount_usd", "data_type": "numeric", "description": "Gross order value in USD before discounts", "pii": false},
+          {"name": "tax_amount_usd", "data_type": "numeric", "description": "Sales tax or VAT assessed on order", "pii": false},
+          {"name": "order_timestamp", "data_type": "timestamptz", "description": "Timestamp when customer submitted order", "pii": false}
+        ]
+      }
+    },
+    {
+      "id": "raw-pay-03",
+      "name": "payments_feed",
+      "namespace": "raw_enterprise",
+      "type": "table",
+      "kind": "source",
+      "metadata": {
+        "description": "Raw payment webhook records received from global payment gateway acquirers.",
+        "owner": "payments-infra",
+        "steward": "finance-steward",
+        "tags": ["enterprise", "raw", "payments", "sox-in-scope"],
+        "domain": "Finance & Revenue",
+        "compliance_context": "PCI-DSS / SOX In-Scope",
+        "policies": "Tokenized settlement IDs; zero raw cardholder data stored",
+        "retention": "7 Years (Financial Audit Standard)",
+        "columns": [
+          {"name": "payment_id", "data_type": "uuid", "description": "Unique payment gateway authorization ID", "pii": false},
+          {"name": "order_id", "data_type": "uuid", "description": "Foreign key reference to order_feed.order_id", "pii": false},
+          {"name": "payment_method", "data_type": "varchar", "description": "Settlement tender type (CARD, WIRE, ACH)", "pii": false},
+          {"name": "payment_status", "data_type": "varchar", "description": "Gateway status (SETTLED, CAPTURED, FAILED, CHARGEBACK)", "pii": false},
+          {"name": "settled_amount_usd", "data_type": "numeric", "description": "Net currency funds received in bank settlement", "pii": false},
+          {"name": "settled_at", "data_type": "timestamptz", "description": "Bank ledger settlement timestamp", "pii": false}
+        ]
+      }
+    },
+    {
+      "id": "stg-ord-04",
+      "name": "stg_orders_enriched",
+      "namespace": "staging",
+      "type": "view",
+      "kind": "transform",
+      "metadata": {
+        "description": "Cleansed and reconciled order records joined with payment settlement status for downstream marts.",
+        "owner": "analytics-engineering",
+        "steward": "finance-steward",
+        "tags": ["enterprise", "staging", "dbt", "sox-in-scope"],
+        "domain": "Finance & Revenue",
+        "compliance_context": "SOX Section 404 In-Scope",
+        "policies": "Automated dbt test assertions on primary key and foreign keys",
+        "retention": "3 Years Rolling",
+        "columns": [
+          {"name": "order_id", "data_type": "uuid", "description": "Conformed order identifier", "pii": false},
+          {"name": "customer_id", "data_type": "uuid", "description": "Conformed customer reference identifier", "pii": false},
+          {"name": "order_status", "data_type": "varchar", "description": "Normalized order lifecycle status", "pii": false},
+          {"name": "gross_order_value", "data_type": "numeric", "description": "Order subtotal plus tax in USD", "pii": false},
+          {"name": "net_settled_value", "data_type": "numeric", "description": "Net settled payment funds received", "pii": false},
+          {"name": "is_settled", "data_type": "boolean", "description": "Flag indicating full payment settlement", "pii": false},
+          {"name": "order_timestamp", "data_type": "timestamptz", "description": "Order placement timestamp", "pii": false}
+        ],
+        "column_mappings": [
+          {"source_column": "raw_enterprise.orders_feed.order_id", "target_column": "staging.stg_orders_enriched.order_id", "transformation": "IDENTITY", "evidence_type": "dbt_ref"},
+          {"source_column": "raw_enterprise.orders_feed.customer_id", "target_column": "staging.stg_orders_enriched.customer_id", "transformation": "IDENTITY", "evidence_type": "dbt_ref"},
+          {"source_column": "raw_enterprise.orders_feed.order_amount_usd", "target_column": "staging.stg_orders_enriched.gross_order_value", "transformation": "COALESCE(order_amount_usd + tax_amount_usd, 0)", "evidence_type": "dbt_ref"},
+          {"source_column": "raw_enterprise.payments_feed.settled_amount_usd", "target_column": "staging.stg_orders_enriched.net_settled_value", "transformation": "COALESCE(settled_amount_usd, 0)", "evidence_type": "dbt_ref"}
+        ]
+      }
+    },
+    {
+      "id": "stg-cust-05",
+      "name": "stg_customer_360",
+      "namespace": "staging",
+      "type": "view",
+      "kind": "transform",
+      "metadata": {
+        "description": "Anonymized conformed customer dimension with SHA-256 masked emails and regional standardization.",
+        "owner": "analytics-engineering",
+        "steward": "data-governance-officer",
+        "tags": ["enterprise", "staging", "dbt", "pii-masked"],
+        "domain": "Customer Management",
+        "compliance_context": "GDPR Article 32 Masked View",
+        "policies": "Anonymized analytics access; unmasked view restricted to compliance auditor role",
+        "retention": "3 Years Rolling",
+        "columns": [
+          {"name": "customer_id", "data_type": "uuid", "description": "Conformed customer unique identifier", "pii": false},
+          {"name": "masked_email", "data_type": "text", "description": "One-way HMAC-SHA256 salted hash of customer email", "pii": true, "classification": "PII_MASKED"},
+          {"name": "country_code", "data_type": "varchar", "description": "Normalized ISO country code", "pii": false},
+          {"name": "customer_tier", "data_type": "varchar", "description": "Customer tier classification (STANDARD, GOLD, ENTERPRISE)", "pii": false},
+          {"name": "registered_date", "data_type": "date", "description": "Account creation date", "pii": false}
+        ],
+        "column_mappings": [
+          {"source_column": "raw_enterprise.customers.customer_id", "target_column": "staging.stg_customer_360.customer_id", "transformation": "IDENTITY", "evidence_type": "dbt_ref"},
+          {"source_column": "raw_enterprise.customers.email", "target_column": "staging.stg_customer_360.masked_email", "transformation": "SHA256_MASK(email)", "evidence_type": "dbt_ref"},
+          {"source_column": "raw_enterprise.customers.country_code", "target_column": "staging.stg_customer_360.country_code", "transformation": "UPPER(TRIM(country_code))", "evidence_type": "dbt_ref"}
+        ]
+      }
+    },
+    {
+      "id": "mrt-rev-06",
+      "name": "fct_daily_revenue",
+      "namespace": "analytics",
+      "type": "model",
+      "kind": "mart",
+      "metadata": {
+        "description": "Official certified daily aggregated revenue table used for executive reporting and financial audits.",
+        "owner": "finance-bi",
+        "steward": "finance-steward",
+        "tags": ["certified", "marts", "finance", "sox-critical"],
+        "domain": "Finance & Revenue",
+        "product": "Executive Revenue Intelligence Product",
+        "compliance_context": "SOX Section 404 Critical Financial Mart",
+        "policies": "Daily freshness SLA: 24h; strict schema immutability",
+        "retention": "7 Years (Statutory Reporting)",
+        "columns": [
+          {"name": "accounting_date", "data_type": "date", "description": "Financial accounting reporting date", "pii": false},
+          {"name": "gross_merchandise_value", "data_type": "numeric", "description": "Sum of all placed order values (GMV)", "pii": false},
+          {"name": "net_recognized_revenue", "data_type": "numeric", "description": "Net GAAP revenue recognized from settled transactions", "pii": false},
+          {"name": "total_orders_count", "data_type": "integer", "description": "Total count of order transactions processed", "pii": false},
+          {"name": "unique_customers_count", "data_type": "integer", "description": "Count of distinct active purchasers", "pii": false},
+          {"name": "calculated_at", "data_type": "timestamptz", "description": "ETL calculation execution timestamp", "pii": false}
+        ],
+        "column_mappings": [
+          {"source_column": "staging.stg_orders_enriched.gross_order_value", "target_column": "analytics.fct_daily_revenue.gross_merchandise_value", "transformation": "SUM(gross_order_value)", "evidence_type": "dbt_ref"},
+          {"source_column": "staging.stg_orders_enriched.net_settled_value", "target_column": "analytics.fct_daily_revenue.net_recognized_revenue", "transformation": "SUM(net_settled_value)", "evidence_type": "dbt_ref"},
+          {"source_column": "staging.stg_orders_enriched.order_id", "target_column": "analytics.fct_daily_revenue.total_orders_count", "transformation": "COUNT(DISTINCT order_id)", "evidence_type": "dbt_ref"}
+        ]
+      }
+    },
+    {
+      "id": "mrt-cust-07",
+      "name": "dim_customer_segments",
+      "namespace": "analytics",
+      "type": "model",
+      "kind": "mart",
+      "metadata": {
+        "description": "RFM and customer lifetime value segmentation mart for commercial intelligence and retention.",
+        "owner": "growth-analytics",
+        "steward": "data-governance-officer",
+        "tags": ["certified", "marts", "customer", "analytics"],
+        "domain": "Customer Management",
+        "product": "Customer 360 Intelligence Mart",
+        "compliance_context": "Pseudonymized Customer Dimensions",
+        "policies": "Weekly refresh; SLA: 7 days",
+        "retention": "3 Years Rolling",
+        "columns": [
+          {"name": "customer_id", "data_type": "uuid", "description": "Customer identifier foreign key", "pii": false},
+          {"name": "customer_segment", "data_type": "varchar", "description": "Commercial segment (HIGH_VALUE, RETURNING, AT_RISK, CHURNED)", "pii": false},
+          {"name": "lifetime_value_usd", "data_type": "numeric", "description": "Cumulative historical settled purchase value", "pii": false},
+          {"name": "order_frequency_tier", "data_type": "varchar", "description": "Purchasing velocity classification", "pii": false},
+          {"name": "last_order_date", "data_type": "date", "description": "Most recent completed purchase date", "pii": false}
+        ],
+        "column_mappings": [
+          {"source_column": "staging.stg_customer_360.customer_id", "target_column": "analytics.dim_customer_segments.customer_id", "transformation": "IDENTITY", "evidence_type": "dbt_ref"},
+          {"source_column": "staging.stg_orders_enriched.net_settled_value", "target_column": "analytics.dim_customer_segments.lifetime_value_usd", "transformation": "SUM(net_settled_value)", "evidence_type": "dbt_ref"}
+        ]
+      }
+    },
+    {
+      "id": "dsh-rev-08",
+      "name": "daily_revenue_kpi",
+      "namespace": "executive",
+      "type": "dashboard",
+      "kind": "consumption",
+      "metadata": {
+        "description": "CFO executive KPI dashboard monitoring daily run-rate, GMV, and net recognized revenue variance.",
+        "owner": "cfo-analytics",
+        "steward": "finance-steward",
+        "tags": ["executive", "cfo-reporting", "production", "certified"],
+        "domain": "Finance & Revenue",
+        "product": "Executive Revenue Intelligence Product",
+        "compliance_context": "Executive Board Pack Standard",
+        "policies": "Access restricted to Finance Leadership and Board of Directors",
+        "retention": "Permanent KPI Archive"
+      }
+    },
+    {
+      "id": "dsh-ret-09",
+      "name": "customer_retention_portal",
+      "namespace": "reporting",
+      "type": "dashboard",
+      "kind": "consumption",
+      "metadata": {
+        "description": "Commercial portal monitoring customer churn risk, retention cohorts, and segment lifetime value.",
+        "owner": "customer-success",
+        "steward": "data-governance-officer",
+        "tags": ["retention", "customer-portal", "production"],
+        "domain": "Customer Management",
+        "product": "Customer 360 Intelligence Mart",
+        "compliance_context": "Internal Commercial Access",
+        "policies": "Role-Based Access for Customer Success Management",
+        "retention": "Permanent KPI Archive"
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "source_id": "raw-ord-02",
+      "target_id": "stg-ord-04",
+      "edge_type": "dbt_model_ref",
+      "provenance": "dbt/models/staging/stg_orders_enriched.sql"
+    },
+    {
+      "source_id": "raw-pay-03",
+      "target_id": "stg-ord-04",
+      "edge_type": "dbt_model_ref",
+      "provenance": "dbt/models/staging/stg_orders_enriched.sql"
+    },
+    {
+      "source_id": "raw-cust-01",
+      "target_id": "stg-cust-05",
+      "edge_type": "dbt_model_ref",
+      "provenance": "dbt/models/staging/stg_customer_360.sql"
+    },
+    {
+      "source_id": "stg-ord-04",
+      "target_id": "mrt-rev-06",
+      "edge_type": "dbt_model_ref",
+      "provenance": "dbt/models/marts/fct_daily_revenue.sql"
+    },
+    {
+      "source_id": "stg-cust-05",
+      "target_id": "mrt-rev-06",
+      "edge_type": "dbt_model_ref",
+      "provenance": "dbt/models/marts/fct_daily_revenue.sql"
+    },
+    {
+      "source_id": "stg-ord-04",
+      "target_id": "mrt-cust-07",
+      "edge_type": "dbt_model_ref",
+      "provenance": "dbt/models/marts/dim_customer_segments.sql"
+    },
+    {
+      "source_id": "stg-cust-05",
+      "target_id": "mrt-cust-07",
+      "edge_type": "dbt_model_ref",
+      "provenance": "dbt/models/marts/dim_customer_segments.sql"
+    },
+    {
+      "source_id": "mrt-rev-06",
+      "target_id": "dsh-rev-08",
+      "edge_type": "dashboard_upstream_dataset",
+      "provenance": "Tableau / Looker Semantic Layer Model Ref"
+    },
+    {
+      "source_id": "mrt-cust-07",
+      "target_id": "dsh-ret-09",
+      "edge_type": "dashboard_upstream_dataset",
+      "provenance": "Customer Success BI Semantic Layer Ref"
+    }
+  ]
+}

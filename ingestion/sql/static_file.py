@@ -57,7 +57,12 @@ def parse_sql_file(source: bytes | str, *, filename: str = "query.sql", dialect:
             target = statement.this
             query = statement.expression
         elif isinstance(statement, exp.Insert):
-            target = statement.this if isinstance(statement.this, exp.Table) else None
+            if isinstance(statement.this, exp.Table):
+                target = statement.this
+            elif isinstance(statement.this, exp.Schema) and isinstance(statement.this.this, exp.Table):
+                target = statement.this.this
+            else:
+                target = None
             query = statement.expression
 
         if target is None or query is None:

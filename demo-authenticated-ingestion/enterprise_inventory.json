@@ -1,0 +1,31 @@
+{
+  "contract_version": "kairos.ingest.v1",
+  "source_system": "local_folder",
+  "source_revision": "2026-11-17T21:00:00Z",
+  "files": [
+    {
+      "path": "customer_transactions_schema.csv",
+      "size_bytes": 555,
+      "format": "csv",
+      "sha256": "f6f52f2f13599df44c4e95b135b8f2b45ac78e33099dfb99b5602efee08ec50e"
+    },
+    {
+      "path": "dbt_production_manifest.json",
+      "size_bytes": 5711,
+      "format": "json",
+      "sha256": "ad8d41cf812f3523f4304e1efe78a7d9f6e07dc71ae3c40f6873e69eace23eb0"
+    },
+    {
+      "path": "enterprise_lineage_pipeline.sql",
+      "size_bytes": 3010,
+      "format": "sql",
+      "sha256": "b5dace0e0648f5eb022059f0b0ecdfb9a0ed3b8b40339487deb872833bd262f0"
+    },
+    {
+      "path": "enterprise_metadata_graph.json",
+      "size_bytes": 16489,
+      "format": "json",
+      "sha256": "32c427d5cab31c43f6eb7b1466340cd60468b7020c03272ec820bae7e91f813a"
+    }
+  ]
+}

@@ -141,6 +141,7 @@
 
   function makeFileGraph(entry, content) {
     return {
+      contract_version: 'kairos.ingest.v1',
       source: { kind: 'local_file', ref: `${rootHandle.name}/${entry.path}` },
       assets: [{
         id: `local-file:${entry.sha256 || entry.path}`,
@@ -196,10 +197,42 @@
       if (!selectedFile.supported) throw new Error('Choose a .sql, .json, .yml, .yaml, .md, or .csv file.');
       if (selectedFile.size_bytes > MAX_INGEST_FILE_BYTES) throw new Error(`Files larger than ${formatBytes(MAX_INGEST_FILE_BYTES)} cannot be ingested in this demo because the authenticated API request has a size cap.`);
       const content = await selectedFile.file.text();
-      const kind = selectedFile.format === 'sql' ? 'sql_file' : 'metadata_graph';
-      const payload = kind === 'sql_file' ? content : makeFileGraph(selectedFile, content);
+      let kind = 'metadata_graph';
+      let payload;
+      if (selectedFile.format === 'sql') {
+        kind = 'sql_file';
+        payload = content;
+      } else if (selectedFile.format === 'json') {
+        try {
+          const parsed = JSON.parse(content);
+          if (parsed && typeof parsed === 'object') {
+            if (parsed.contract_version === 'kairos.ingest.v1' || Array.isArray(parsed.assets)) {
+              kind = 'metadata_graph';
+              payload = parsed;
+              if (!payload.contract_version) payload.contract_version = 'kairos.ingest.v1';
+            } else if (parsed.nodes && parsed.sources) {
+              kind = 'dbt_manifest';
+              payload = parsed;
+            } else if (Array.isArray(parsed.files)) {
+              kind = 'file_inventory';
+              payload = parsed;
+            } else {
+              payload = makeFileGraph(selectedFile, content);
+            }
+          } else {
+            payload = makeFileGraph(selectedFile, content);
+          }
+        } catch (_) {
+          payload = makeFileGraph(selectedFile, content);
+        }
+      } else if (selectedFile.format === 'csv') {
+        kind = 'csv_headers';
+        payload = content;
+      } else {
+        payload = makeFileGraph(selectedFile, content);
+      }
       const result = await postPreviewAndCommit(kind, selectedFile.path, payload);
-      status.textContent = `Imported ${selectedFile.path} into this workspace (${result.summary.persisted_assets} file asset). The original content is retained in the import's raw evidence.`;
+      status.textContent = `Imported ${selectedFile.path} into this workspace (${result.summary.persisted_assets} asset(s), ${result.summary.persisted_relationships || 0} relationship(s)). The original content is retained in the import's raw evidence.`;
       document.dispatchEvent(new CustomEvent('kairos:local-file-imported', { detail: { importId: result.import_id, path: selectedFile.path } }));
     } catch (error) {
       status.textContent = `File ingestion failed: ${error.message || 'Unknown server error.'} No fixture data was substituted.`;

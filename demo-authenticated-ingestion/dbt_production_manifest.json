@@ -1,0 +1,148 @@
+{
+  "metadata": {
+    "dbt_schema_version": "https://schemas.getdbt.com/dbt/manifest/v10.json",
+    "dbt_version": "1.8.0",
+    "generated_at": "2026-11-17T21:00:00.000000Z",
+    "invocation_id": "01933ba2-411a-7b3b-9e42-7ef54988a001",
+    "project_name": "enterprise_revenue_lakehouse"
+  },
+  "nodes": {
+    "model.enterprise.stg_orders_enriched": {
+      "raw_code": "select * from {{ source('raw_enterprise', 'orders_feed') }} join {{ source('raw_enterprise', 'payments_feed') }} ...",
+      "database": "enterprise_dw",
+      "schema": "staging",
+      "name": "stg_orders_enriched",
+      "resource_type": "model",
+      "unique_id": "model.enterprise.stg_orders_enriched",
+      "package_name": "enterprise_revenue_lakehouse",
+      "description": "Conformed order transactions enriched with payment settlement status",
+      "meta": {
+        "owner": "analytics-engineering",
+        "domain": "Finance & Revenue",
+        "tags": ["enterprise", "staging", "sox-in-scope"]
+      },
+      "tags": ["enterprise", "staging", "sox-in-scope"],
+      "depends_on": {
+        "nodes": [
+          "source.enterprise.raw_enterprise.orders_feed",
+          "source.enterprise.raw_enterprise.payments_feed"
+        ]
+      }
+    },
+    "model.enterprise.stg_customer_360": {
+      "raw_code": "select customer_id, sha256(email) as masked_email from {{ source('raw_enterprise', 'customers') }}",
+      "database": "enterprise_dw",
+      "schema": "staging",
+      "name": "stg_customer_360",
+      "resource_type": "model",
+      "unique_id": "model.enterprise.stg_customer_360",
+      "package_name": "enterprise_revenue_lakehouse",
+      "description": "Pseudonymized customer master dimension with hashed email addresses",
+      "meta": {
+        "owner": "analytics-engineering",
+        "domain": "Customer Management",
+        "tags": ["enterprise", "staging", "pii-masked"]
+      },
+      "tags": ["enterprise", "staging", "pii-masked"],
+      "depends_on": {
+        "nodes": [
+          "source.enterprise.raw_enterprise.customers"
+        ]
+      }
+    },
+    "model.enterprise.fct_daily_revenue": {
+      "raw_code": "select accounting_date, sum(gross_order_value) from {{ ref('stg_orders_enriched') }} ...",
+      "database": "enterprise_dw",
+      "schema": "analytics",
+      "name": "fct_daily_revenue",
+      "resource_type": "model",
+      "unique_id": "model.enterprise.fct_daily_revenue",
+      "package_name": "enterprise_revenue_lakehouse",
+      "description": "Certified daily GAAP revenue recognized by fiscal day",
+      "meta": {
+        "owner": "finance-bi",
+        "domain": "Finance & Revenue",
+        "product": "Executive Revenue Intelligence Product",
+        "tags": ["certified", "marts", "finance", "sox-critical"]
+      },
+      "tags": ["certified", "marts", "finance", "sox-critical"],
+      "depends_on": {
+        "nodes": [
+          "model.enterprise.stg_orders_enriched",
+          "model.enterprise.stg_customer_360"
+        ]
+      }
+    },
+    "model.enterprise.dim_customer_segments": {
+      "raw_code": "select customer_id, sum(net_settled_value) from {{ ref('stg_orders_enriched') }} ...",
+      "database": "enterprise_dw",
+      "schema": "analytics",
+      "name": "dim_customer_segments",
+      "resource_type": "model",
+      "unique_id": "model.enterprise.dim_customer_segments",
+      "package_name": "enterprise_revenue_lakehouse",
+      "description": "Commercial customer lifetime value and RFM segmentation mart",
+      "meta": {
+        "owner": "growth-analytics",
+        "domain": "Customer Management",
+        "product": "Customer 360 Intelligence Mart",
+        "tags": ["certified", "marts", "customer"]
+      },
+      "tags": ["certified", "marts", "customer"],
+      "depends_on": {
+        "nodes": [
+          "model.enterprise.stg_orders_enriched",
+          "model.enterprise.stg_customer_360"
+        ]
+      }
+    }
+  },
+  "sources": {
+    "source.enterprise.raw_enterprise.customers": {
+      "database": "enterprise_dw",
+      "schema": "raw_enterprise",
+      "name": "customers",
+      "source_name": "raw_enterprise",
+      "resource_type": "source",
+      "unique_id": "source.enterprise.raw_enterprise.customers",
+      "package_name": "enterprise_revenue_lakehouse",
+      "description": "Core ERP customer master table"
+    },
+    "source.enterprise.raw_enterprise.orders_feed": {
+      "database": "enterprise_dw",
+      "schema": "raw_enterprise",
+      "name": "orders_feed",
+      "source_name": "raw_enterprise",
+      "resource_type": "source",
+      "unique_id": "source.enterprise.raw_enterprise.orders_feed",
+      "package_name": "enterprise_revenue_lakehouse",
+      "description": "Raw e-commerce checkout order event log"
+    },
+    "source.enterprise.raw_enterprise.payments_feed": {
+      "database": "enterprise_dw",
+      "schema": "raw_enterprise",
+      "name": "payments_feed",
+      "source_name": "raw_enterprise",
+      "resource_type": "source",
+      "unique_id": "source.enterprise.raw_enterprise.payments_feed",
+      "package_name": "enterprise_revenue_lakehouse",
+      "description": "Global payment gateway settlement webhook records"
+    }
+  },
+  "exposures": {
+    "exposure.enterprise.daily_revenue_kpi": {
+      "name": "daily_revenue_kpi",
+      "resource_type": "exposure",
+      "type": "dashboard",
+      "unique_id": "exposure.enterprise.daily_revenue_kpi",
+      "package_name": "enterprise_revenue_lakehouse",
+      "description": "Executive revenue KPI board pack dashboard",
+      "owner": {"name": "cfo-analytics", "email": "cfo-analytics@enterprise.internal"},
+      "depends_on": {
+        "nodes": [
+          "model.enterprise.fct_daily_revenue"
+        ]
+      }
+    }
+  }
+}
