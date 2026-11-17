@@ -27,7 +27,11 @@ def _leaves(node) -> list:
 
 
 def _column_deps(
-    sql: str, schema: Dict[str, Dict[str, str]], targets: Sequence[str], dialect: str = "postgres"
+    sql: str,
+    schema: Dict[str, Dict[str, str]],
+    targets: Sequence[str],
+    dialect: str = "postgres",
+    diagnostics: Optional[list] = None,
 ) -> Dict[str, Sequence[str]]:
     """For each target column, return sorted list of source columns it depends on."""
     out = {}
@@ -36,7 +40,12 @@ def _column_deps(
             node = lineage(t, sql, schema=schema, dialect=dialect)
             out[t] = sorted(set(_leaves(node)))
         except Exception as e:
-            # Lineage extraction failed for this target; record as empty
+            # Never silently turn an extraction failure into an apparently
+            # complete result. Preserve other targets, but downgrade the
+            # overall extraction through an explicit diagnostic.
+            if diagnostics is None:
+                raise
+            diagnostics.append(f"Lineage extraction failed for target {t}: {e}")
             out[t] = []
     return out
 
@@ -152,8 +161,12 @@ class SQLGlotLineageProvider:
 
         # Check for LEFT/RIGHT/FULL OUTER JOINs (not supported in MVP)
         for join in tree.find_all(exp.Join):
-            join_type = join.kind
-            if join_type and any(x in str(join_type).upper() for x in ["LEFT", "RIGHT", "FULL", "OUTER"]):
+            # SQLGlot stores LEFT/RIGHT/FULL in side for common dialects,
+            # while kind may carry OUTER. Inspect both to catch each form.
+            join_type = " ".join(
+                str(value) for value in (join.args.get("side"), join.args.get("kind")) if value
+            )
+            if any(x in join_type.upper() for x in ("LEFT", "RIGHT", "FULL", "OUTER")):
                 diagnostics.append(f"Outer join ({join_type}) not supported in MVP")
                 return StaticExtraction(
                     evidence=tuple(),
@@ -162,7 +175,7 @@ class SQLGlotLineageProvider:
                 )
 
         # Check for dynamic SQL patterns
-        if "EXECUTE" in sql.upper() or "USING" in sql.upper():
+        if "EXECUTE" in sql.upper():
             diagnostics.append("Dynamic SQL not supported")
             return StaticExtraction(
                 evidence=tuple(),
@@ -217,7 +230,7 @@ class SQLGlotLineageProvider:
 
         # Step 6: Extract column dependencies via lineage
         try:
-            col_deps = _column_deps(sql, schema_dict, target_cols, dialect)
+            col_deps = _column_deps(sql, schema_dict, target_cols, dialect, diagnostics)
         except Exception as e:
             diagnostics.append(f"Lineage extraction failed: {str(e)}")
             col_deps = {}
