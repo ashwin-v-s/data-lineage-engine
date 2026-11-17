@@ -42,11 +42,19 @@ This workstream is format parsing only. Do not connect directly to Supabase or c
 
 The bounded metadata-graph v1 parser/validator is implemented in
 `ingestion/metadata_graph/`. `ingestion/static_files/` provides explicit
-format dispatch for metadata graphs, dbt manifests, file inventories, and CSV
-headers.
+format dispatch for metadata graphs, dbt manifests, file inventories, SQL files,
+and CSV headers.
 `ingestion/dbt/manifest.py` normalizes supported dbt resources and declared
 dependencies; `ingestion/static_files/inventory.py` emits file assets without
 inventing data-flow edges; `ingestion/static_files/csv_headers.py` reads only
-CSV headers and leaves column types unknown. All adapters return the shared v1
-envelope with diagnostics and provenance. They are ready for M3 to call, but
-are not wired to the authenticated Supabase import API.
+CSV headers and leaves column types unknown; `ingestion/sql/static_file.py` parses
+SQL DDL and DML using SQLGlot AST analysis.
+
+**Integration Status: 100% Complete & Wired.**
+All static adapters are integrated into `backend/app/api/routes/ingest.py` via
+the two-phase `POST /api/v1/ingest/preview` and `POST /api/v1/ingest/commit`
+pipeline. Persisted assets are scoped to the authenticated workspace in PostgreSQL
+with strict RLS enforcement (`kairos.workspace_id`), immutable raw events,
+and bitemporal edge evidence records. Verified by 68 static and route tests in
+`tests/test_ingestion_api.py`, `tests/test_metadata_graph_adapter.py`,
+`tests/test_sql_static_file_adapter.py`, and `tests/test_ingest_sql_dbt_route.py`.
