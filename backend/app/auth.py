@@ -1,18 +1,19 @@
 """Supabase access-token verification for protected Kairos API routes."""
 from __future__ import annotations
 
-import os
 from typing import Any, AsyncGenerator
 
 import httpx
 from fastapi import Depends, HTTPException, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
+from backend.app.settings import supabase_publishable_key, supabase_url
+
 _bearer = HTTPBearer(auto_error=False)
 
 
 def supabase_auth_url() -> str | None:
-    return (os.getenv("SUPABASE_URL") or os.getenv("VITE_SUPABASE_URL") or "").rstrip("/") or None
+    return supabase_url()
 
 
 def auth_disabled() -> bool:
@@ -33,7 +34,7 @@ async def require_user(
     if not url:
         raise HTTPException(status_code=503, detail="Authentication is not configured")
     headers = {"Authorization": f"Bearer {credentials.credentials}"}
-    key = os.getenv("SUPABASE_PUBLISHABLE_KEY") or os.getenv("VITE_SUPABASE_PUBLISHABLE_KEY")
+    key = supabase_publishable_key()
     if key:
         headers["apikey"] = key
     try:

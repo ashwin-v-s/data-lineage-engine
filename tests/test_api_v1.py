@@ -46,6 +46,37 @@ def test_auth_config_is_public_and_fails_closed():
     assert body["auth_disabled"] is False
 
 
+def test_auth_config_reads_hosting_integration_aliases(monkeypatch):
+    """A hosted deployment may export Supabase settings under other names.
+
+    Vercel's Supabase integration provides ``NEXT_PUBLIC_SUPABASE_URL`` and
+    ``SUPABASE_ANON_KEY`` rather than this repository's documented names; the
+    sign-in page breaks if those are ignored and the config comes back empty.
+    """
+    for name in (
+        "SUPABASE_URL",
+        "SUPABASE_PUBLISHABLE_KEY",
+        "VITE_SUPABASE_URL",
+        "VITE_SUPABASE_PUBLISHABLE_KEY",
+        "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
+        "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+        "SUPABASE_ANON_KEY",
+        "NEXT_PUBLIC_SUPABASE_URL",
+    ):
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setenv("NEXT_PUBLIC_SUPABASE_URL", "https://alias.supabase.co/")
+    monkeypatch.setenv("SUPABASE_ANON_KEY", "alias-anon-key")
+
+    res = client.get("/api/v1/auth/config")
+
+    assert res.status_code == 200
+    assert res.json() == {
+        "url": "https://alias.supabase.co",
+        "publishable_key": "alias-anon-key",
+        "auth_disabled": False,
+    }
+
+
 def test_liveness_healthz_is_public_and_needs_no_credentials():
     """GET /healthz is the unauthenticated probe hosting platforms poll."""
     res = client.get("/healthz")
@@ -155,3 +186,33 @@ def test_openapi_exposes_the_expected_route_inventory():
     }
     missing = expected - set(paths)
     assert not missing, f"Routes missing from the OpenAPI schema: {sorted(missing)}"
+
+
+def _fake_verified_session(monkeypatch, seen):
+    """Stand in for require_user with the real dependency signature."""
+    import backend.app.main as main_module
+
+    async def fake_require_user(request, credentials=None):
+        seen.append((request.url.path, getattr(credentials, "credentials", None)))
+        yield {"id": "00000000-0000-0000-0000-000000000001"}
+
+    monkeypatch.setattr(main_module, "require_user", fake_require_user)
+
+
+def test_ingestion_page_redirects_a_signed_out_navigation():
+    response = client.get("/ingestion.html", follow_redirects=False)
+    assert response.status_code == 302
+    assert response.headers["location"] == "/?signin_required=1"
+
+
+def test_ingestion_page_serves_html_for_a_verified_session(monkeypatch):
+    seen = []
+    _fake_verified_session(monkeypatch, seen)
+    response = client.get(
+        "/ingestion.html",
+        headers={"Authorization": "Bearer header-token"},
+        follow_redirects=False,
+    )
+    assert response.status_code == 200
+    assert "Ingestion &amp; sources" in response.text or "Ingestion & sources" in response.text
+    assert seen == [("/ingestion.html", "header-token")]

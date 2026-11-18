@@ -1,0 +1,28 @@
+# Local-only assets. Without this file Vercel bundles the entire working tree
+# into the Python function, and the Playwright browser download alone pushes it
+# past the 500 MB function limit (LAMBDA_SIZE_EXCEEDED).
+.pw-browsers/
+.cloud-attachments/
+.demo-sources/
+data_lineage_engine.egg-info/
+.pytest_cache/
+.ruff_cache/
+.coverage
+test-results/
+restore-points/
+.github/
+.kiro/
+.freebuff/
+docs/
+tests/
+scripts/
+references/
+
+# Dependencies and build output are produced during the deployment build.
+**/node_modules/
+frontend/dist/
+
+# Never upload local secrets.
+.env
+.env.local
+.env.*.local

@@ -165,6 +165,16 @@
     };
   }
 
+  const describeFailure = (detail, fallback) => {
+    if (typeof detail === 'string' && detail.trim()) return detail;
+    const message = detail && typeof detail === 'object' ? detail.message : '';
+    const diagnostics = Array.isArray(detail?.diagnostics) ? detail.diagnostics : [];
+    const reasons = diagnostics
+      .map((item) => (typeof item === 'string' ? item : item?.message || item?.code || ''))
+      .filter(Boolean).slice(0, 3);
+    return [message || fallback, reasons.length ? `(${reasons.join('; ')})` : ''].filter(Boolean).join(' ');
+  };
+
   async function postPreviewAndCommit(kind, filename, content) {
     const common = { kind, filename, content };
     const previewResponse = await fetch('/api/v1/ingest/preview', {
@@ -173,8 +183,7 @@
     });
     const previewResult = await previewResponse.json().catch(() => ({}));
     if (!previewResponse.ok || !previewResult.ok) {
-      const detail = previewResult.detail;
-      throw new Error(typeof detail === 'string' ? detail : detail?.message || `Preview failed (${previewResponse.status}).`);
+      throw new Error(describeFailure(previewResult.detail, `Preview failed (${previewResponse.status}).`));
     }
     if (!previewResult.commit_ready) throw new Error(previewResult.commit_blocker || 'Import storage is not installed.');
     status.textContent = `Preview found ${previewResult.preview.assets} asset(s). Saving selected file evidence…`;
@@ -184,8 +193,7 @@
     });
     const result = await response.json().catch(() => ({}));
     if (!response.ok || !result.ok) {
-      const detail = result.detail;
-      throw new Error(typeof detail === 'string' ? detail : detail?.message || `Import failed (${response.status}).`);
+      throw new Error(describeFailure(result.detail, `Import failed (${response.status}).`));
     }
     return result;
   }
@@ -205,16 +213,16 @@
       } else if (selectedFile.format === 'json') {
         try {
           const parsed = JSON.parse(content);
-          if (parsed && typeof parsed === 'object') {
-            if (parsed.contract_version === 'kairos.ingest.v1' || Array.isArray(parsed.assets)) {
+          if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+            if (Array.isArray(parsed.files) && !Array.isArray(parsed.assets)) {
+              kind = 'file_inventory';
+              payload = parsed;
+            } else if (parsed.contract_version === 'kairos.ingest.v1' || Array.isArray(parsed.assets)) {
               kind = 'metadata_graph';
               payload = parsed;
               if (!payload.contract_version) payload.contract_version = 'kairos.ingest.v1';
             } else if (parsed.nodes && parsed.sources) {
               kind = 'dbt_manifest';
-              payload = parsed;
-            } else if (Array.isArray(parsed.files)) {
-              kind = 'file_inventory';
               payload = parsed;
             } else {
               payload = makeFileGraph(selectedFile, content);

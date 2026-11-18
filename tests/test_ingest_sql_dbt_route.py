@@ -594,3 +594,50 @@ class TestEvidenceClassification:
             assert ev_type not in ("RUNTIME_POSITIVE", "RUNTIME_NEGATIVE_EVALUATION"), (
                 f"Static import must not produce runtime evidence, got type={ev_type!r}"
             )
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# FILE INVENTORY submitted under the metadata_graph kind (folder ingest)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+INVENTORY_FIXTURE = {
+    "contract_version": "kairos.ingest.v1",
+    "source_system": "local_folder",
+    "source_revision": "2026-11-17T21:00:00Z",
+    "files": [
+        {"path": "schema.csv", "size_bytes": 10, "format": "csv", "sha256": "a" * 64},
+        {"path": "pipeline.sql", "size_bytes": 20, "format": "sql", "sha256": "b" * 64},
+    ],
+}
+
+
+class TestFileInventoryKindFallback:
+    """A `files` array with no `assets` is always an inventory, whatever the label."""
+
+    def test_inventory_sent_as_metadata_graph_is_read_as_inventory(self):
+        with patch("backend.app.api.routes.ingest.get_conn", side_effect=_preview_conn):
+            resp = _preview("metadata_graph", INVENTORY_FIXTURE, "enterprise_inventory.json")
+
+        assert resp.status_code == 200, resp.text
+        body = resp.json()
+        assert body["ok"] is True
+        assert body["preview"]["assets"] == len(INVENTORY_FIXTURE["files"])
+
+    def test_inventory_sent_as_inventory_is_unchanged(self):
+        with patch("backend.app.api.routes.ingest.get_conn", side_effect=_preview_conn):
+            resp = _preview("file_inventory", INVENTORY_FIXTURE, "enterprise_inventory.json")
+
+        assert resp.status_code == 200, resp.text
+        assert resp.json()["preview"]["assets"] == len(INVENTORY_FIXTURE["files"])
+
+    def test_metadata_graph_with_assets_keeps_its_kind(self):
+        graph = {
+            "contract_version": "kairos.ingest.v1",
+            "assets": [{"id": "a", "name": "orders", "namespace": "demo", "type": "table"}],
+            "relationships": [],
+        }
+        with patch("backend.app.api.routes.ingest.get_conn", side_effect=_preview_conn):
+            resp = _preview("metadata_graph", graph, "graph.json")
+
+        assert resp.status_code == 200, resp.text
+        assert resp.json()["preview"]["assets"] == 1

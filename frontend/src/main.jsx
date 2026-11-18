@@ -219,7 +219,7 @@ function DashboardShell() {
   const dataMode = useDataMode();
   const demoMode = dataMode === DATA_MODES.DEMO_FIXTURE;
   return (
-    <div className="app-shell" hidden>
+    <div className="app-shell" id="appShell" hidden>
       <Sidebar />
       <div className="main-area">
         <header className="topbar">
@@ -249,7 +249,7 @@ function DashboardShell() {
 function App() {
   useEffect(() => {
     const script = document.createElement('script');
-    script.src = '/auth.js?v=4';
+    script.src = '/auth.js?v=5';
     script.async = true;
     script.onerror = () => console.error('Kairos authentication bootstrap could not be loaded.');
     document.body.appendChild(script);

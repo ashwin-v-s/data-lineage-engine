@@ -139,6 +139,29 @@ Set these for the **Production** (and Preview, as needed) environment:
 `DATABASE_URL` and the pooler password are secrets â€” store them as Vercel
 encrypted environment variables and never commit them.
 
+#### Environment names are resolved leniently, environment scope is not
+
+`backend/app/settings.py` reads the first non-empty name from a small alias
+list, so the names a hosting integration injects also work without renaming:
+
+| Setting | Accepted names (first match wins) |
+| --- | --- |
+| Supabase URL | `SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_URL`, `VITE_SUPABASE_URL` |
+| Publishable key | `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_ANON_KEY`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `VITE_SUPABASE_PUBLISHABLE_KEY`, `VITE_SUPABASE_ANON_KEY` |
+| Database URL | `DATABASE_URL`, `POSTGRES_URL`, `POSTGRES_PRISMA_URL`, `SUPABASE_DB_URL`, `POSTGRES_URL_NON_POOLING` |
+
+Vercel's own Supabase integration exports `NEXT_PUBLIC_SUPABASE_URL`,
+`SUPABASE_ANON_KEY` and `POSTGRES_URL`, so connecting that integration is
+enough. Only public keys are accepted: `service_role` is never read.
+
+Aliases do not cross environment scopes. A deployment URL of the form
+`<project>-<hash>-<team>.vercel.app` is a **Preview** deployment and receives
+only Preview variables; Production variables are not visible to it. If
+`GET /api/v1/auth/config` returns `{"url": null, "publishable_key": null}`,
+set the variables for the environment you are actually viewing (Production,
+Preview, or both) and redeploy â€” changing variables does not affect an
+already-built deployment.
+
 ### Deploying
 
 ```bash

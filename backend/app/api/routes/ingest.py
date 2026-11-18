@@ -371,9 +371,35 @@ class CommitInput(ImportInput):
     idempotency_key: str = Field(min_length=1, max_length=256)
 
 
+def _resolve_kind(kind: str, content: Any) -> str:
+    """Accept a file inventory that a client labelled as a metadata graph.
+
+    Clients detect the format from the file itself at the calling site, so an
+    inventory document that also carries ``contract_version`` can be submitted
+    as ``metadata_graph``.  When the payload has a ``files`` array and no
+    ``assets`` array only the inventory adapter can read it, so use that rather
+    than rejecting the import with ASSETS_REQUIRED.
+    """
+    if kind != "metadata_graph":
+        return kind
+    data: Any = content
+    if isinstance(data, (bytes, bytearray, str)):
+        try:
+            data = json.loads(data)
+        except (TypeError, ValueError):
+            return kind
+    if (
+        isinstance(data, dict)
+        and isinstance(data.get("files"), list)
+        and not isinstance(data.get("assets"), list)
+    ):
+        return "file_inventory"
+    return kind
+
+
 def _parse(request: ImportInput):
     result = parse_static_file(
-        request.kind, request.content, filename=request.filename,
+        _resolve_kind(request.kind, request.content), request.content, filename=request.filename,
         source_revision=request.source_revision,
     )
     if not result.ok:

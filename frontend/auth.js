@@ -3,6 +3,10 @@
   const appShell = document.querySelector('.app-shell');
   const frame = document.getElementById('authFrame');
   const sessionKey = 'kairos_supabase_session';
+  // An invitation token has to survive the whole auth round-trip: the signup
+  // verification and OAuth redirects both land back on '/', which drops the
+  // ?invite= query string before the invitee is actually signed in.
+  const pendingInviteKey = 'kairos_pendingInviteToken';
   const appScripts = [
     '/vendors/three.min.js',
     '/vendors/chart.umd.min.js',
@@ -10,7 +14,7 @@
     '/stewardship.js?v=304',
     '/evidence-semantics.js?v=1',
     '/lineage-investigation.js?v=1',
-    '/app.js?v=311',
+    '/app.js?v=312',
     '/asset-removal.js?v=1',
   ];
   let config = null;
@@ -278,6 +282,58 @@
       window.dispatchEvent(new CustomEvent('kairos:email-status', { detail }));
     }
   }
+  function reportInviteStatus(detail) {
+    window.kairosPendingInviteStatus = detail;
+    window.dispatchEvent(new CustomEvent('kairos:invite-status', { detail }));
+  }
+  function capturePendingInvite() {
+    const token = new URLSearchParams(location.search).get('invite');
+    if (!token) return;
+    try {
+      localStorage.setItem(pendingInviteKey, token);
+    } catch (_) {
+      // Storage is unavailable, so leave the query string in place to keep the token.
+      return;
+    }
+    const params = new URLSearchParams(location.search);
+    params.delete('invite');
+    history.replaceState({}, '', location.pathname + (params.toString() ? `?${params.toString()}` : '') + location.hash);
+  }
+  async function acceptPendingInvite() {
+    let token = null;
+    try { token = localStorage.getItem(pendingInviteKey); } catch (_) { token = null; }
+    if (!token || !hasActiveSession()) return false;
+    const forgetToken = () => { try { localStorage.removeItem(pendingInviteKey); } catch (_) { /* Nothing else to clear. */ } };
+    // Accept in the user's own workspace context: a header left over from a
+    // different workspace is rejected before the invitation is ever read.
+    try { localStorage.removeItem('kairos_activeWorkspaceId'); } catch (_) { /* Nothing to clear. */ }
+    try {
+      const response = await fetch('/api/v1/members/invites/accept', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token }),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        const error = new Error(result?.error?.message || result?.detail || result?.message || `Invitation could not be accepted (${response.status}).`);
+        // Only server-side failures are worth retrying on the next load;
+        // expired, revoked and wrong-account invitations never recover.
+        error.retryable = response.status >= 500;
+        throw error;
+      }
+      if (!result?.workspace_id) throw new Error('The server accepted the invitation but returned no workspace.');
+      localStorage.setItem('kairos_activeWorkspaceId', result.workspace_id);
+      forgetToken();
+      reportInviteStatus({ ok: true, message: `Invitation accepted — opening the workspace as ${result.role || 'member'}.` });
+      setTimeout(() => location.reload(), 600);
+      return true;
+    } catch (error) {
+      if (!error.retryable) forgetToken();
+      reportInviteStatus({ ok: false, message: error.message || 'Invitation could not be accepted.' });
+      return false;
+    }
+  }
   async function startApp(session) {
     if (session?.access_token) {
       activeSession = session;
@@ -304,6 +360,9 @@
     sendLoginWelcomeEmail(session);
     authScreen.hidden = true;
     appShell.hidden = false;
+    // Accept the invitation before the dashboard reads the workspace header;
+    // accepting reloads the page so the new workspace becomes the active one.
+    if (await acceptPendingInvite()) return;
     if (appStarted) return;
     appStarted = true;
     try {
@@ -422,8 +481,15 @@
     scheduleRefresh(session);
     const response = await fetch('/ingestion.html');
     if (!response.ok) throw new Error('The ingestion page could not be loaded.');
+    const html = await response.text();
+    // A rejected session makes the server answer with a redirect to the
+    // dashboard. Writing that document over this one leaves an empty page, so
+    // bail out with a visible message instead of a blank screen.
+    if (response.redirected || !html.includes('ingest-page')) {
+      throw new Error('The server did not accept this session for the ingestion workspace. Reload Kairos and sign in again.');
+    }
     document.open();
-    document.write(await response.text());
+    document.write(html);
     document.close();
     const header = document.querySelector('.ingest-head');
     if (header) {
@@ -434,6 +500,7 @@
     }
   }
   async function boot() {
+    capturePendingInvite();
     window.addEventListener('message', handleFrameMessage);
     try {
       await loadAuthConfig();

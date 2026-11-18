@@ -18,7 +18,6 @@ as a context manager – the connection is returned to the pool automatically.
 """
 from __future__ import annotations
 
-import os
 import logging
 from contextvars import ContextVar
 from contextlib import contextmanager
@@ -28,6 +27,8 @@ from typing import Generator
 import psycopg2
 from psycopg2 import pool as pg_pool
 from psycopg2.extras import RealDictCursor
+
+from backend.app.settings import database_url
 
 # ── Load .env (no-op if already in environment) ──────────────────────────────
 # Walk up from this file's directory until we find a .env file (or run out of parents)
@@ -48,7 +49,9 @@ if _env_file:
         pass  # python-dotenv not installed; rely on real env vars
 
 # ── Read connection string ────────────────────────────────────────────────────
-DATABASE_URL: str | None = os.getenv("DATABASE_URL")
+# Accepts the aliases hosting integrations use (e.g. Vercel's Supabase
+# integration exports POSTGRES_URL rather than DATABASE_URL).
+DATABASE_URL: str | None = database_url()
 
 # ── Connection pool (lazy singleton) ─────────────────────────────────────────
 _pool: pg_pool.ThreadedConnectionPool | None = None

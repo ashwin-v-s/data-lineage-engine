@@ -1,6 +1,7 @@
 ﻿import logging
 import os
 import uuid
+from contextlib import aclosing
 from pathlib import Path
 
 from fastapi import FastAPI, Request
@@ -32,6 +33,19 @@ from backend.app.api.routes.sources import router as sources_router
 from backend.app.api.routes.vector_search import router as vector_search_router
 from backend.app.api.routes.workspaces import router as workspaces_router
 from backend.app.auth import auth_disabled, require_user, supabase_auth_url
+from backend.app.settings import supabase_publishable_key
+
+# A deployment with no Supabase settings serves an empty sign-in config, which
+# the browser cannot fix.  Say so once in the platform log, naming the accepted
+# variables, so the cause is visible in the hosting dashboard.
+if not supabase_auth_url() or not supabase_publishable_key():
+    logging.getLogger("kairos.config").warning(
+        "Supabase sign-in is not configured for this deployment. Set SUPABASE_URL "
+        "(or NEXT_PUBLIC_SUPABASE_URL / VITE_SUPABASE_URL) and "
+        "SUPABASE_PUBLISHABLE_KEY (or SUPABASE_ANON_KEY / "
+        "NEXT_PUBLIC_SUPABASE_ANON_KEY / VITE_SUPABASE_PUBLISHABLE_KEY) in the "
+        "environment used by this deployment."
+    )
 
 # Largest request body the API will accept, in bytes.  Import payloads are
 # untrusted input; capping the body keeps an oversized upload from consuming
@@ -175,8 +189,7 @@ def auth_config():
     """Expose only the public Supabase client settings needed by the sign-in page."""
     return {
         "url": supabase_auth_url(),
-        "publishable_key": os.getenv("SUPABASE_PUBLISHABLE_KEY")
-        or os.getenv("VITE_SUPABASE_PUBLISHABLE_KEY"),
+        "publishable_key": supabase_publishable_key(),
         "auth_disabled": auth_disabled(),
     }
 
@@ -203,8 +216,12 @@ async def authenticated_ingestion_page(request: Request):
         creds = None
 
     try:
-        async for _user in require_user(credentials=creds):  # type: ignore[arg-type]
-            break
+        # require_user is a dependency generator that also takes the request
+        # (workspace header handling), so it must be invoked with `request`.
+        # aclosing() runs its cleanup instead of leaving it suspended at yield.
+        async with aclosing(require_user(request, credentials=creds)) as user_stream:  # type: ignore[arg-type]
+            async for _user in user_stream:
+                break
     except _HTTPException:
         return RedirectResponse(url="/?signin_required=1", status_code=302)
     except Exception:
