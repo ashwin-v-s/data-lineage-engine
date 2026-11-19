@@ -119,6 +119,41 @@ def provision_personal_workspace(user_id: str) -> str:
         pool.putconn(conn)
 
 
+def authenticate_api_key(secret_hash: str) -> dict | None:
+    """Resolve a hashed API key before any workspace scope exists.
+
+    Key authentication happens before sign-in has named a workspace, so this is
+    the one deliberately unscoped lookup in the layer.  It calls the
+    SECURITY DEFINER function created by migration 0016, which returns only the
+    key's own workspace, scopes and last-use timestamp.
+    """
+    pool = _get_pool()
+    conn = pool.getconn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT key_id::text, workspace_id::text, key_name, scopes, last_used_at "
+                "FROM kairos_authenticate_api_key(%s)",
+                (secret_hash,),
+            )
+            row = cur.fetchone()
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        pool.putconn(conn)
+    if not row:
+        return None
+    return {
+        "key_id": row[0],
+        "workspace_id": row[1],
+        "name": row[2],
+        "scopes": list(row[3] or []),
+        "last_used_at": row[4],
+    }
+
+
 def _get_pool() -> pg_pool.ThreadedConnectionPool:
     """Return (and lazily create) the shared connection pool."""
     global _pool

@@ -226,7 +226,6 @@ def parse_postgres_query_log(
     relationships: list[dict[str, Any]] = []
     seen_edges: set[tuple[str, str]] = set()
     errors: list[Diagnostic] = []
-    parse_errors = 0
     skipped_no_target = 0
 
     for index, record in enumerate(records):

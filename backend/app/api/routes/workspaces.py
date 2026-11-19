@@ -17,6 +17,7 @@ from __future__ import annotations
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException
+from psycopg2.extras import RealDictCursor
 from pydantic import BaseModel
 
 from backend.app.auth import require_user
@@ -54,28 +55,33 @@ def get_my_workspace(user: dict = Depends(require_user)):
         )
     
     with get_conn() as conn:
-        with conn.cursor() as cur:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            # kairos_workspace is deliberately unreadable (migration 0003: RLS
+            # policy USING(false) plus REVOKE ALL), so a direct SELECT raises
+            # "permission denied" for the application role. The sanctioned read
+            # path is the SECURITY DEFINER function, which also proves
+            # membership: a workspace the caller does not belong to is absent.
             cur.execute(
-                "SELECT id::text, workspace_name, owner_id::text, created_at "
-                "FROM kairos_workspace "
-                "WHERE id = %s::uuid",
-                (workspace_id,)
+                "SELECT workspace_id::text AS id, workspace_name AS name, role, is_current "
+                "FROM kairos_list_user_workspaces(%s::uuid) "
+                "WHERE workspace_id = %s::uuid",
+                (user["id"], workspace_id),
             )
             row = cur.fetchone()
-    
+
     if not row:
         raise HTTPException(
             status_code=404,
             detail="Workspace not found or you do not have access to it"
         )
-    
+
     return {
         "ok": True,
         "workspace": {
-            "id": row[0],
-            "name": row[1] or "My Workspace",
-            "owner_id": row[2],
-            "created_at": row[3].isoformat() if row[3] else None,
+            "id": row["id"],
+            "name": row["name"] or "My Workspace",
+            "role": row["role"],
+            "current": bool(row["is_current"]),
         }
     }
 
@@ -176,34 +182,34 @@ def send_login_welcome_email(body: WelcomeEmailRequest, user: dict = Depends(req
 @router.get("/workspaces/{workspace_id}")
 def get_workspace(workspace_id: str, user: dict = Depends(require_user)):
     """Return workspace details by UUID.
-    
-    Only accessible to workspace members (enforced by RLS policy).
+
+    Only members can read a workspace: the membership function returns an
+    empty set for anyone else, which this handler reports as 404.
     """
-    from backend.app import db as _db
-    
     with get_conn() as conn:
-        with conn.cursor() as cur:
-            # Query the workspace with RLS — will deny if user is not a member
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            # Same privacy rule as /me/workspace: read through the membership
+            # function instead of the revoked table.
             cur.execute(
-                "SELECT id::text, workspace_name, owner_id::text, created_at "
-                "FROM kairos_workspace "
-                "WHERE id = %s::uuid",
-                (workspace_id,)
+                "SELECT workspace_id::text AS id, workspace_name AS name, role, is_current "
+                "FROM kairos_list_user_workspaces(%s::uuid) "
+                "WHERE workspace_id = %s::uuid",
+                (user["id"], workspace_id),
             )
             row = cur.fetchone()
-    
+
     if not row:
         raise HTTPException(
             status_code=404,
             detail="Workspace not found or you do not have access to it"
         )
-    
+
     return {
         "ok": True,
         "workspace": {
-            "id": row[0],
-            "name": row[1] or "Workspace",
-            "owner_id": row[2],
-            "created_at": row[3].isoformat() if row[3] else None,
+            "id": row["id"],
+            "name": row["name"] or "Workspace",
+            "role": row["role"],
+            "current": bool(row["is_current"]),
         }
     }

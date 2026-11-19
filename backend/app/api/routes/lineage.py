@@ -552,21 +552,28 @@ def get_column_lineage(
                        sc.column_name AS source_column,
                        td.database_name || '.' || td.schema_name || '.' || td.name AS target_asset,
                        tc.column_name AS target_column,
-                       le.id::text AS edge_id,
-                       etv.valid_from,
-                       etv.valid_to,
-                       etv.transaction_from,
-                       etv.transaction_to,
+                       le.edge_id,
+                       le.valid_from,
+                       le.valid_to,
+                       le.transaction_from,
+                       le.transaction_to,
                        e.diagnostics
                 FROM evidence e
                 JOIN column_record sc ON sc.id = e.source_column_id
                 JOIN dataset sd ON sd.id = sc.dataset_id
                 JOIN column_record tc ON tc.id = e.target_column_id
                 JOIN dataset td ON td.id = tc.dataset_id
-                WHERE e.source_column_id IS NOT NULL
-                  AND e.target_column_id IS NOT NULL
-                  AND EXISTS (
-                    SELECT 1
+                /* The edge and its bitemporal version must be read in the outer
+                   query: an EXISTS subquery cannot project them, which made this
+                   endpoint fail with "missing FROM-clause entry for table le".
+                   LATERAL keeps one row per evidence record, pinned to the
+                   version valid at the requested valid/recorded time. */
+                JOIN LATERAL (
+                    SELECT le.id::text AS edge_id,
+                           etv.valid_from,
+                           etv.valid_to,
+                           etv.transaction_from,
+                           etv.transaction_to
                     FROM lineage_edge le
                     JOIN edge_temporal_version etv
                       ON etv.edge_id = le.id AND etv.evidence_id = e.id
@@ -577,7 +584,11 @@ def get_column_lineage(
                       AND (etv.valid_to IS NULL OR %(valid)s::timestamptz < etv.valid_to)
                       AND etv.transaction_from <= %(recorded)s::timestamptz
                       AND (etv.transaction_to IS NULL OR %(recorded)s::timestamptz < etv.transaction_to)
-                  )
+                    ORDER BY etv.transaction_from DESC
+                    LIMIT 1
+                ) le ON TRUE
+                WHERE e.source_column_id IS NOT NULL
+                  AND e.target_column_id IS NOT NULL
                 ORDER BY sd.database_name, sd.schema_name, sd.name, sc.column_name
             """, {"valid": ts_as_of, "recorded": ts_recorded})
             rows = [dict(row) for row in cur.fetchall()]

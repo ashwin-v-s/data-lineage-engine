@@ -12,6 +12,7 @@ const runtimeFiles = [
   'auth.css',
   'assets.css',
   'layout.css',
+  'mobile.css',
   'styles.css',
   'styles.neo.css',
   'stewardship.css',

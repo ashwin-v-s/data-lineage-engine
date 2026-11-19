@@ -90,7 +90,7 @@ def validate_uuid(value: str, field_name: str = "ID") -> UUID:
     """
     try:
         return UUID(value)
-    except (ValueError, TypeError) as e:
+    except (ValueError, TypeError):
         logger.warning(f"Invalid UUID format for {field_name}: {value}")
         raise ValueError(f"Invalid {field_name} format. Must be valid UUID.")
 

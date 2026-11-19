@@ -10,6 +10,7 @@ from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 from backend.app.api.errors import api_error
+from backend.app.api.routes.api_keys import router as api_keys_router
 from backend.app.api.routes.assets import router as assets_router
 from backend.app.api.routes.audit import router as audit_router
 from backend.app.api.routes.capabilities import router as capabilities_router
@@ -31,6 +32,8 @@ from backend.app.api.routes.rea import router as rea_router
 from backend.app.api.routes.search import router as search_router
 from backend.app.api.routes.sources import router as sources_router
 from backend.app.api.routes.vector_search import router as vector_search_router
+from backend.app.api.routes.webhooks import router as webhooks_router
+from backend.app.api.routes.stewardship import router as stewardship_router
 from backend.app.api.routes.workspaces import router as workspaces_router
 from backend.app.auth import auth_disabled, require_user, supabase_auth_url
 from backend.app.settings import supabase_publishable_key
@@ -170,6 +173,9 @@ app.include_router(quality_router, prefix="/api/v1")
 app.include_router(notifications_router, prefix="/api/v1")
 app.include_router(capabilities_router, prefix="/api/v1")
 app.include_router(workspaces_router, prefix="/api/v1")
+app.include_router(api_keys_router,   prefix="/api/v1")
+app.include_router(webhooks_router,   prefix="/api/v1")
+app.include_router(stewardship_router, prefix="/api/v1")
 app.include_router(vector_search_router, prefix="/api/v1")
 
 

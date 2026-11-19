@@ -7,6 +7,7 @@ import httpx
 from fastapi import Depends, HTTPException, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
+from backend.app.services.api_keys import hash_secret, is_api_key, key_principal, path_allowed
 from backend.app.settings import supabase_publishable_key, supabase_url
 
 _bearer = HTTPBearer(auto_error=False)
@@ -21,6 +22,25 @@ def auth_disabled() -> bool:
     return False
 
 
+def _authenticate_api_key(raw_key: str, request: Request) -> dict[str, Any]:
+    """Resolve a Kairos API key into a workspace-scoped read-only principal."""
+    from backend.app.db import authenticate_api_key
+
+    try:
+        record = authenticate_api_key(hash_secret(raw_key))
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail="API key storage is not available") from exc
+    if not record:
+        raise HTTPException(status_code=401, detail="API key is invalid or revoked")
+    # Keys are read-only by construction: no workspace-mutating route may be
+    # reached with one, whatever its scopes say.
+    if request.method not in ("GET", "HEAD"):
+        raise HTTPException(status_code=403, detail="API keys are read-only")
+    if not path_allowed(request.url.path):
+        raise HTTPException(status_code=403, detail="This API key cannot access this endpoint")
+    return key_principal(record)
+
+
 async def require_user(
     request: Request,
     credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
@@ -29,6 +49,20 @@ async def require_user(
     # FAIL FAST ON MISSING CREDENTIALS before checking infrastructure
     if credentials is None or credentials.scheme.lower() != "bearer":
         raise HTTPException(status_code=401, detail="Sign in is required")
+
+    # Machine clients present a Kairos API key instead of a Supabase session.
+    # It is resolved against its hash, scoped to the key's own workspace, and
+    # restricted to the catalog read surface before any route code runs.
+    if is_api_key(credentials.credentials):
+        principal = _authenticate_api_key(credentials.credentials, request)
+        from backend.app.db import reset_workspace_id, set_workspace_id
+
+        token = set_workspace_id(principal["workspace_id"])
+        try:
+            yield principal
+        finally:
+            reset_workspace_id(token)
+        return
     
     url = supabase_auth_url()
     if not url:

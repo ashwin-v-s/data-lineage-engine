@@ -1,0 +1,310 @@
+/* ==========================================================================
+   KAIROS mobile application layer (loads after every desktop stylesheet)
+
+   Scope: tablet (769-1023px) and phone (320-768px) only. Nothing in this file
+   applies above 1023px, so the desktop interface keeps the exact layout,
+   spacing, typography and colours it already ships.
+
+   Design goals
+   - One codebase, two presentations: the desktop shell is reused verbatim; the
+     sidebar becomes an off-canvas drawer, the topbar is replaced by a native
+     app bar (rendered by MobileShell), and a bottom tab bar owns primary
+     navigation.
+   - Everything is built from the existing design system tokens (ink outlines,
+     yellow/blue/green tints, Outfit display type, mono labels).
+   - Touch first: 44px+ targets, 16px form text (no iOS zoom), safe-area insets,
+     no page-level horizontal scroll, bottom sheets instead of centred dialogs.
+   ========================================================================== */
+
+/* ==========================================================================
+   1. Tablet + phone: the sidebar is a drawer, never a fixed column
+   ========================================================================== */
+@media (max-width:1023px){
+  .sidebar{width:min(84vw,320px);border-radius:0 22px 22px 0;box-shadow:6px 0 0 var(--ink);padding-bottom:calc(14px + env(safe-area-inset-bottom))}
+  /* Off-canvas at every width below the desktop breakpoint, whether or not the
+     desktop collapse class is set: the main column no longer reserves space. */
+  .sidebar:not(.open){transform:translateX(-100%)}
+  .sidebar.open{transform:none}
+  .main-area,.sidebar.collapsed~.main-area{margin-left:0;width:100%}
+  .menu-toggle{display:grid}
+  .mobile-scrim{display:none;position:fixed;inset:0;z-index:29;background:rgba(11,11,12,.5);-webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px)}
+  .sidebar.open~.mobile-scrim{display:block}
+  html:has(.sidebar.open){overflow:hidden}
+}
+
+/* ==========================================================================
+   2. Phone shell (320-768px)
+   ========================================================================== */
+/* The second condition keeps a phone in landscape on the mobile experience:
+   rotating a 390x844 handset gives a 844x390 viewport, which is wider than the
+   phone breakpoint but too short for the desktop shell. Pointer type keeps it
+   to touch devices, so a short desktop window is unaffected. */
+@media (max-width:768px), (max-height:520px) and (pointer:coarse){
+  :root{--pad:16px;--gap:16px}
+
+  html,body{max-width:100%;overflow-x:clip}
+  body{font-size:15px;-webkit-tap-highlight-color:transparent;overscroll-behavior-y:contain}
+  .app-shell{min-height:100dvh}
+  .main-area{min-height:100dvh}
+
+  /* The desktop topbar is replaced by the app bar; it stays in the DOM so its
+     mode/help/avatar handlers keep working for the controls we delegate to. */
+  .topbar{display:none}
+  .footer{display:none}
+
+  .sidebar{width:min(88vw,340px);padding:calc(env(safe-area-inset-top) + 14px) 12px 14px}
+
+  /* ---- App bar ---- */
+  .mobile-header{position:fixed;top:0;left:0;right:0;z-index:26;display:flex;align-items:center;gap:8px;min-height:calc(58px + env(safe-area-inset-top));padding:calc(env(safe-area-inset-top) + 6px) 12px 8px;background:var(--surface);border-bottom:2px solid var(--ink);box-shadow:0 2px 0 rgba(11,11,12,.06)}
+  .mobile-header-btn{display:grid;place-items:center;flex:none;width:40px;height:40px;padding:0;border:2px solid var(--ink);border-radius:50%;background:var(--surface);color:var(--ink);font-size:1rem;line-height:1}
+  .mobile-header-btn:active{transform:translateY(2px);background:var(--hl)}
+  .mobile-title{display:grid;flex:1 1 auto;min-width:0;line-height:1.15}
+  .mobile-brand{font:500 .58rem var(--font-mono);letter-spacing:.16em;color:var(--muted)}
+  .mobile-title strong{overflow:hidden;font:800 1rem/1.2 var(--font-display);letter-spacing:-.02em;text-overflow:ellipsis;white-space:nowrap}
+  .mobile-mode{flex:none;min-height:32px;padding:0 10px;border:2px solid var(--ink);border-radius:999px;background:var(--yellow);color:var(--on-yellow);font:600 .58rem var(--font-mono);letter-spacing:.08em}
+  .mobile-mode:active{transform:translateY(2px)}
+
+  /* ---- Bottom tab bar ---- */
+  .mobile-tabbar{position:fixed;left:0;right:0;bottom:0;z-index:27;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:2px;padding:6px 6px calc(6px + env(safe-area-inset-bottom));background:var(--surface);border-top:2px solid var(--ink);box-shadow:0 -2px 0 rgba(11,11,12,.06)}
+  .mobile-tab{display:grid;justify-items:center;align-content:center;gap:3px;min-height:50px;padding:4px 2px;border:2px solid transparent;border-radius:14px;background:transparent;color:var(--muted);font:500 .6rem var(--font-mono);letter-spacing:.04em;text-transform:uppercase;transition:background-color .12s,color .12s,transform .1s}
+  .mobile-tab-icon{font-size:1.05rem;line-height:1}
+  .mobile-tab[aria-current="page"]{background:var(--yellow);border-color:var(--ink);color:var(--on-yellow);box-shadow:0 2px 0 var(--ink)}
+  .mobile-tab[aria-current="page"] .mobile-tab-label{font-weight:700}
+  .mobile-tab:active{transform:scale(.97)}
+
+  /* ---- Content frame: clears the app bar and the tab bar ---- */
+  .content{max-width:none;padding:calc(76px + env(safe-area-inset-top)) 16px calc(84px + env(safe-area-inset-bottom))}
+  .divider{border-top:1px solid var(--line);margin:16px 0}
+
+  /* ---- Page header becomes an app section header ---- */
+  .page-heading{align-items:flex-start;gap:12px;margin-bottom:18px}
+  .page-heading h1{font-size:1.55rem;line-height:1.12;letter-spacing:-.03em}
+  .page-heading h1::after{width:44px;height:4px;margin-top:8px}
+  .page-heading p{font-size:.9rem;line-height:1.5}
+  .heading-actions{width:100%;display:flex;flex-wrap:wrap;gap:8px}
+  .heading-actions>.btn,.heading-actions>.panel-link{flex:1 1 auto;justify-content:center}
+  .heading-actions .btn.primary{padding:6px 6px 6px 18px}
+
+  /* ---- Cards ---- */
+  .panel{border-radius:16px;box-shadow:0 4px 0 var(--ink)}
+  .panel-head{padding:14px 16px 10px;gap:10px}
+  .panel-head>div{flex:1 1 100%}
+  .panel-head h2{font-size:1.08rem}
+  .panel-head p{font-size:.82rem}
+  .panel-head>.panel-link,.panel-head>.btn{max-width:100%}
+  .panel-body{padding:14px 16px 16px}
+  .panel>.panel-head+.panel-body{padding-top:4px}
+  .content>.panel,.content>.notice,.content>.data-source-banner{margin-bottom:14px}
+
+  .stat-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-bottom:14px}
+  .stat-card{padding:14px 14px 12px;border-radius:16px;box-shadow:0 4px 0 var(--ink)}
+  .stat-value{margin:8px 0 4px;font-size:1.6rem}
+  .stat-card.lead .stat-value{font-size:1.95rem}
+  .stat-foot{font-size:.76rem;line-height:1.35}
+
+  .grid-2,.grid-equal,.two-col-layout,.lineage-layout,.observatory-layout,.profile-cols{grid-template-columns:minmax(0,1fr)!important;gap:14px}
+  .side-stack,.lineage-layout>.side-stack{position:static;max-height:none;overflow:visible;padding:0}
+  .room-grid{grid-template-columns:minmax(0,1fr);gap:12px}
+  .room-card{padding:16px;border-radius:16px;box-shadow:0 4px 0 var(--ink)}
+  .reasoning-item{padding:13px 14px;border-radius:14px}
+  .reasoning-item .reason-head{flex-wrap:wrap;gap:8px}
+  .metadata-attention-metrics,.metadata-attention-gaps{grid-template-columns:minmax(0,1fr)}
+  .metadata-attention-metrics .metric-line{padding:12px 14px}
+  .asset-catalog-overview{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:10px}
+  .asset-catalog-intro{grid-column:1/-1}
+  .asset-catalog-intro,.asset-overview-metric{padding:14px;border-radius:14px}
+  .asset-catalog-controls{padding:12px}
+  .asset-catalog-controls>.toolbar:first-child,
+  .asset-catalog-controls>.toolbar:nth-child(2),
+  .asset-catalog-controls>.toolbar:nth-child(3){display:grid;grid-template-columns:minmax(0,1fr);gap:10px}
+  .asset-catalog-controls>.toolbar:first-child>.search-box{grid-column:1/-1}
+  .asset-catalog-table{border-radius:14px}
+
+  /* ---- Toolbars, fields, buttons ---- */
+  .toolbar{display:grid;grid-template-columns:minmax(0,1fr);align-items:stretch;gap:10px;margin-bottom:16px}
+  .toolbar .search-box,.search-box{width:100%;min-width:0;max-width:none;flex:1 1 100%}
+  .toolbar select{width:100%;border-radius:12px}
+  .toolbar .btn{width:100%}
+  .filter-count{margin:0;text-align:left}
+  /* Keep labels on one line: a wrapped label inside a narrow table column
+     makes the whole row tall. Long labels are handled by the containers. */
+  .btn{min-height:46px;padding:10px 18px;text-align:center}
+  /* A borderless ghost button reads as plain text on a touch screen. */
+  .btn.ghost{border-color:var(--ink);background:var(--surface)}
+  .heading-actions .btn.ghost{border-color:var(--ink)}
+  .btn.small{min-height:42px;padding:8px 14px}
+  .node-actions,.empty-state-actions{display:grid;grid-template-columns:minmax(0,1fr);gap:10px}
+  .node-actions .btn,.empty-state-actions .btn{width:100%}
+  .empty-state{padding:28px 16px}
+  .empty-state>strong{font-size:1.05rem}
+  .empty-state p{font-size:.88rem}
+
+  select,.field-input,.field input,.field select,.field textarea,.time-controls input,.search-box input,.graph-control select,.graph-control input{font-size:16px;min-height:46px}
+  .field{gap:6px}
+  .field label{font-size:.62rem}
+  .field textarea{min-height:110px}
+  .form-grid{grid-template-columns:minmax(0,1fr);gap:14px}
+  .switch-row{gap:12px}
+  .settings-section{padding:16px 0}
+  .notice,.data-source-banner{gap:10px;padding:10px 14px 10px 10px;border-radius:14px;font-size:.86rem;margin-bottom:14px}
+  .notice-icon{width:28px;height:28px;font-size:.95rem}
+
+  /* ---- Tables: scroll inside their card, never the page ---- */
+  .table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain;max-width:100%}
+  table{font-size:.84rem}
+  th,td{padding:10px 12px}
+  .asset-catalog-table .table-wrap table{min-width:640px}
+  .asset-tab-content .table-wrap{max-height:none}
+  .pill{padding:2px 9px;font-size:.6rem}
+  /* Row actions stay on one line so a two-action row does not double in height. */
+  .asset-row-actions{flex-wrap:nowrap;gap:6px}
+  .asset-row-actions .btn.small{min-height:38px;padding:6px 11px;font-size:.74rem}
+  .metric-line{padding:9px 0;font-size:.88rem;flex-wrap:wrap}
+  .metric-line strong{font-size:.9rem}
+  /* Long status pills (e.g. "CONNECTED · persisted catalog") are nowrap by
+     default and overflowed their 286px row on a 320px screen. */
+  .metric-line .pill{white-space:normal}
+
+  /* ---- Tabs: one swipeable row ---- */
+  .asset-tabs,.panel>.asset-tabs{display:flex;flex-wrap:nowrap;gap:6px;overflow-x:auto;padding:2px 2px 10px;scroll-snap-type:x proximity;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+  .asset-tabs::-webkit-scrollbar{display:none}
+  .asset-tab{flex:none;scroll-snap-align:start;padding:8px 14px;min-height:40px}
+  .panel>.asset-tab-content{padding:4px 16px 18px}
+  .asset-tab-content .grid-equal,.asset-tab-content .modal-grid{grid-template-columns:minmax(0,1fr)}
+  .asset-tab-content .node-actions{display:grid;grid-template-columns:minmax(0,1fr)}
+  .asset-tab-content .node-actions .btn{width:100%}
+
+  /* ---- Lineage / observatory: usable canvas, stacked controls ---- */
+  .graph-stage,.observatory-stage{height:clamp(300px,52vh,440px)}
+  .graph-toolbar{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;padding:12px 14px}
+  .graph-toolbar .search-box{grid-column:1/-1}
+  .graph-toolbar .graph-control{min-width:0}
+  .graph-toolbar .graph-control select,.graph-toolbar .graph-control input{width:100%;min-width:0;min-height:42px}
+  .graph-time-control{grid-column:1/-1}
+  .graph-time-control input{width:100%}
+  .graph-toolbar.action-row{grid-template-columns:minmax(0,1fr);padding-top:10px}
+  .graph-toolbar.action-row .graph-actions-group{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;width:100%}
+  .graph-toolbar.action-row .graph-zoom-controls{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;width:100%;margin-left:0}
+  .graph-toolbar .btn{height:auto;min-height:42px;padding:8px 10px}
+  .graph-legend{flex-wrap:wrap;gap:8px 14px;font-size:.78rem}
+  .legend-separator{display:none}
+  .lineage-minimap{width:104px;height:66px;top:auto;bottom:12px;right:10px}
+  .graph-hint{display:none}
+  .graph-overlay{left:10px;top:10px;padding:4px 10px;font-size:.62rem}
+  .graph-stage>svg{min-height:260px}
+  .time-context-note{padding:0 14px 12px;font-size:.8rem}
+  .node-detail{padding:16px}
+  .node-detail h3{font-size:1.1rem}
+  .node-actions{margin-top:16px;padding-top:14px}
+
+  /* ---- Modals become bottom sheets ---- */
+  .modal-backdrop{align-items:flex-end;padding:0}
+  .modal{width:100%;max-width:none;max-height:92dvh;border-radius:22px 22px 0 0;border-bottom:0;box-shadow:0 -4px 0 var(--ink);padding:20px 18px calc(20px + env(safe-area-inset-bottom));animation:kairos-sheet-in .18s ease-out}
+  .modal::before{content:"";display:block;width:44px;height:5px;margin:-8px auto 12px;border-radius:999px;background:var(--line)}
+  .modal-head{gap:10px;margin-bottom:14px}
+  .modal-head h2{font-size:1.25rem}
+  .modal-grid{grid-template-columns:minmax(0,1fr);gap:10px}
+  .modal-tile{padding:11px 13px;border-radius:12px}
+  .modal .btn{width:100%;margin-top:8px}
+  .modal pre{font-size:.76rem;padding:12px}
+  .modal p{font-size:.88rem}
+
+  /* ---- Toasts sit above the tab bar ---- */
+  .toast-region{left:12px;right:12px;bottom:calc(88px + env(safe-area-inset-bottom));justify-items:stretch}
+  .toast{max-width:none;padding:12px 16px;font-size:.88rem}
+  .toast.error{border-color:var(--ink)}
+
+  /* ---- Charts, greeting, misc ---- */
+  .chart-wrap{height:230px}
+  .chart-wrap.compact{height:190px}
+  .welcome-greeting{padding:18px 16px;border-radius:16px;box-shadow:3px 3px 0 var(--ink)}
+  .welcome-greeting h1{font-size:1.6rem}
+  .welcome-greeting span{font-size:.86rem}
+  .sql-editor textarea{min-height:210px;font-size:.8rem}
+  .timeline{padding:18px 16px}
+  .timeline-labels{font-size:.6rem}
+  .health-card{margin-bottom:10px}
+  .sidebar .nav-sublist[hidden]{display:grid!important}
+  .sidebar .nav-primary .nav-chevron{display:none}
+  .sidebar .nav-item{min-height:46px}
+  .sidebar .nav-item.nav-child{min-height:42px}
+
+  /* ---- Drawer tools: the desktop topbar's Help and theme controls ---- */
+  .mobile-drawer-tools{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:0 0 12px;padding:0 4px}
+  .mobile-drawer-tools .btn{min-height:42px;padding:8px 10px;font-size:.78rem;gap:6px;background:var(--surface)}
+  .mobile-account{font:700 .68rem var(--font-mono);letter-spacing:.04em;text-transform:uppercase}
+
+  /* ---- Wide tables: row actions stay on screen while the table scrolls ----
+     A 9-column catalog table cannot fit 390px, so the actions column is pinned
+     to the right edge instead of hiding off-canvas with the rest of the row. */
+  .table-wrap table tr td:last-child:has(.asset-row-actions){position:sticky;right:0;z-index:1;background:var(--surface);box-shadow:-8px 0 10px -8px rgba(11,11,12,.55)}
+
+  /* ---- React live views (freshness, incidents, governance) ----
+     These screens are rendered by React with their own `kv-` classes, so the
+     legacy selectors above never reached them: their forms kept 25px inputs and
+     their filter row stayed 29px tall. */
+  .kv-view{gap:14px;padding:0 0 8px}
+  .kv-view-head{flex-direction:column;align-items:flex-start;gap:6px}
+  .kv-view-head h1{font-size:1.55rem;line-height:1.12;letter-spacing:-.03em}
+  .kv-sub{font-size:.9rem;line-height:1.5}
+  .kv-card{padding:16px;border:2px solid var(--ink);border-radius:16px;box-shadow:0 4px 0 var(--ink)}
+  .kv-card h2{font-size:1.05rem}
+  .kv-grid,.kv-form{grid-template-columns:minmax(0,1fr);gap:14px}
+  .kv-toolbar,.kv-actions{display:grid;grid-template-columns:minmax(0,1fr);gap:10px;align-items:stretch}
+  .kv-btn{min-height:44px;justify-content:center;padding:8px 14px;font-size:.86rem}
+  .kv-input,.kv-select{min-height:46px;padding:10px 12px;border-radius:12px;font-size:16px}
+  .kv-note{font-size:.86rem}
+  .kv-freshness-counts{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+  .kv-freshness-count{padding:12px 14px;border-radius:12px}
+  .kv-freshness-count span{font-size:.6rem;letter-spacing:.06em}
+  .kv-freshness-count strong{font-size:1.45rem}
+  .kv-freshness-section-head{flex-direction:column;align-items:stretch;gap:10px;margin-bottom:12px}
+  .kv-freshness-section-head .btn{width:100%;min-height:46px}
+  .kv-freshness-form{grid-template-columns:minmax(0,1fr);gap:12px}
+  .kv-freshness-form input,.kv-freshness-form select{min-height:46px;padding:10px 12px;border-radius:12px;font-size:16px}
+  /* "Pause evaluations" is a checkbox row, not a field: it must not stretch. */
+  .kv-freshness-form label:has(>input[type="checkbox"]){display:flex;flex-direction:row;align-items:center;gap:10px;min-height:46px;font-weight:500}
+  .kv-freshness-form input[type="checkbox"]{flex:none;width:22px;height:22px;min-height:0;margin:0}
+  .kv-freshness-form .btn{width:100%}
+  .kv-table-wrap{max-width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain}
+  .kv-table{min-width:600px;font-size:.84rem}
+  .kv-table th,.kv-table td{padding:10px 12px}
+  .kv-incidents-filter{min-height:40px}
+  .kv-preference-row{display:grid;grid-template-columns:minmax(0,1fr);gap:8px;padding:10px 0}
+}
+
+/* Narrow phones: the graph filters need the full row, not a clipped label */
+@media (max-width:480px){
+  .graph-toolbar{grid-template-columns:minmax(0,1fr)}
+  .graph-toolbar .graph-actions-group,
+  .graph-toolbar.action-row .graph-actions-group,
+  .graph-toolbar.action-row .graph-zoom-controls{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+
+/* Very narrow phones: drop the least critical app-bar control */
+@media (max-width:360px){
+  .mobile-header{gap:6px;padding-inline:10px}
+  .mobile-header-btn{width:36px;height:36px}
+  .mobile-brand{display:none}
+  .stat-value{font-size:1.45rem}
+  .mobile-tab-label{font-size:.56rem}
+}
+
+/* Phone held sideways: keep the chrome shallow so content keeps its height */
+@media (max-width:900px) and (max-height:520px) and (orientation:landscape){
+  .mobile-header{min-height:calc(48px + env(safe-area-inset-top));padding:calc(env(safe-area-inset-top) + 2px) 12px 4px}
+  .mobile-brand{display:none}
+  .mobile-tabbar{padding-block:4px}
+  .mobile-tab{min-height:44px}
+  .mobile-tab-label{display:none}
+  .content{padding-top:calc(58px + env(safe-area-inset-top));padding-bottom:calc(64px + env(safe-area-inset-bottom))}
+  .graph-stage,.observatory-stage{height:clamp(240px,70vh,380px)}
+  .modal{max-height:96dvh}
+}
+
+@media (prefers-reduced-motion:reduce){
+  .mobile-tab,.mobile-header-btn,.mobile-mode{transition:none}
+  .modal{animation:none}
+}
+
+@keyframes kairos-sheet-in{from{transform:translateY(18px);opacity:.6}to{transform:translateY(0);opacity:1}}
