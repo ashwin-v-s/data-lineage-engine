@@ -205,8 +205,9 @@ input::placeholder,textarea::placeholder{color:var(--muted)}
 /* Tables */
 .table-wrap{overflow:auto}
 table{width:100%;border-collapse:collapse;font-size:.93rem;font-variant-numeric:tabular-nums}
-th{padding:13px 26px;border-bottom:2px solid var(--ink);background:var(--surface);font:500 .7rem var(--font-mono);letter-spacing:.08em;text-transform:uppercase;text-align:left;white-space:nowrap;color:var(--muted)}
-td{padding:15px 26px;border-bottom:1px solid var(--line);vertical-align:middle;white-space:nowrap;color:var(--ink)}
+th{padding:13px 26px;border-bottom:2px solid var(--ink);background:var(--surface);font:500 .7rem var(--font-mono);letter-spacing:.08em;text-transform:uppercase;text-align:left;white-space:normal;overflow-wrap:break-word;text-wrap:balance;line-height:1.4;vertical-align:bottom;color:var(--muted)}
+td{padding:15px 26px;border-bottom:1px solid var(--line);vertical-align:middle;white-space:normal;overflow-wrap:break-word;color:var(--ink)}
+td .btn,td .pill,td .tag,td time,td .row-actions{white-space:nowrap}
 th.num,td.num{text-align:right}
 tbody tr{transition:background-color .1s}tbody tr:hover{background:var(--hl)}
 tr:last-child td{border-bottom:0}

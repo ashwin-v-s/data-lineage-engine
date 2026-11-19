@@ -182,8 +182,11 @@ td{padding:11px 16px}
 .form-grid>.field,.form-grid>.toolbar{min-width:0}
 .table-wrap{width:100%;max-width:100%;overflow-x:auto;overscroll-behavior-inline:contain}
 table{max-width:100%}
-td,th{overflow-wrap:anywhere}
+td,th{overflow-wrap:break-word}
 .asset-path,.qualified-name,.uuid,.identifier,.mono{overflow-wrap:anywhere}
+.break-any{overflow-wrap:anywhere;word-break:break-word}
+.table-wrap .asset-cell .subline{overflow-wrap:anywhere;word-break:break-word}
+.table-wrap .asset-cell{min-width:0}
 .footer{flex-wrap:wrap;align-items:center}
 
 @media(max-width:1180px){
