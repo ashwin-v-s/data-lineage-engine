@@ -248,6 +248,9 @@ function DashboardContent() {
 function DashboardShell() {
   const dataMode = useDataMode();
   const demoMode = dataMode === DATA_MODES.DEMO_FIXTURE;
+  // This build ships the persisted catalog only; no fixture dataset is bundled,
+  // so offering a working demo switch would promise data the app cannot show.
+  const demoFixturesAvailable = Boolean(window.kairosDemoFixtures);
   return (
     <div className="app-shell" id="appShell" hidden>
       <Sidebar />
@@ -259,7 +262,7 @@ function DashboardShell() {
             <div aria-label="Data source mode" className="data-mode-control" role="group">
               <span>DATA</span>
               <strong>{dataMode}</strong>
-              <button aria-pressed={demoMode} className="data-mode-switch" data-mode-switch="demo" type="button">Demo preview</button>
+              <button aria-pressed={demoMode} className="data-mode-switch" data-mode-switch="demo" disabled={!demoFixturesAvailable} title={demoFixturesAvailable ? 'Show synthetic sample records' : 'Demo fixtures are not included in this build — this workspace shows persisted catalog data.'} type="button">Demo preview</button>
               <button aria-pressed={!demoMode} className="data-mode-switch" data-mode-switch="postgresql" disabled={Boolean(window.kairosDemoPreview)} type="button">Live catalog</button>
             </div>
             <div className="environment" id="environmentBadge"><span className="status-dot" />{dataMode}</div>
