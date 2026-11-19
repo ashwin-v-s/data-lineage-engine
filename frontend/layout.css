@@ -209,3 +209,403 @@ td,th{overflow-wrap:anywhere}
   .panel-head>.btn,.panel-head>.panel-link{max-width:100%}
   .footer{align-items:flex-start;overflow-wrap:anywhere}
 }
+
+/* ==========================================================================
+   DASHBOARD POLISH (overview + shared dashboard chrome)
+   Loads last. Scope: KPI cards, panel headings, wide tables, sidebar labels,
+   the workspace-health block, welcome greeting and phone bottom spacing.
+   Visual language is unchanged: 2px ink outlines, hard offset shadows,
+   Google-tint surfaces, Outfit/Instrument Sans.
+   ========================================================================== */
+
+/* ---- KPI cards: equal height, values aligned, footers pinned to the base ---- */
+.stat-grid>.metric-card-link{display:flex;height:100%}
+.stat-grid>.metric-card-link>.stat-card{display:flex;flex:1;flex-direction:column;min-height:134px}
+.stat-card .stat-foot{margin-top:auto;padding-top:8px;line-height:1.45}
+.stat-value{letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+
+/* ---- Heading actions: the secondary action must read as a control ---- */
+.page-heading .btn.ghost{border-color:var(--ink);background:var(--surface)}
+.page-heading .btn.ghost:hover{background:var(--hl)}
+
+/* ---- Wide dashboard tables: visible scroll affordance + frozen identity column ---- */
+/* Keep the horizontal scrollbar reachable: tall head tables scroll inside a
+   capped panel with a sticky header, so the last column is never silently cut. */
+#mainContent .panel>.table-wrap{max-height:min(560px,72vh);overflow:auto;box-shadow:inset 0 -12px 12px -12px rgba(11,11,12,.55)}
+#mainContent .panel>.table-wrap>table>thead>tr>th{position:sticky;top:0;z-index:4;background:var(--surface)}
+#mainContent .panel>.table-wrap>table>thead>tr>th:first-child{z-index:5}
+
+.table-wrap{scrollbar-width:thin;scrollbar-color:var(--ink) transparent}
+.table-wrap::-webkit-scrollbar{height:9px}
+.table-wrap::-webkit-scrollbar-track{background:transparent}
+.table-wrap::-webkit-scrollbar-thumb{background:var(--ink);border-radius:999px}
+.panel .table-wrap>table>tbody>tr>td:first-child{background:inherit}
+@media(max-width:1200px) and (min-width:641px){
+  .panel>.table-wrap{position:relative}
+  .panel .table-wrap>table>thead>tr>th:first-child,
+  .panel .table-wrap>table>tbody>tr>td:first-child{
+    position:sticky;left:0;z-index:2;background:var(--surface);
+    box-shadow:7px 0 9px -9px rgba(11,11,12,.85);
+  }
+  .panel .table-wrap>table>thead>tr>th:first-child{z-index:3}
+  .panel .table-wrap>table>tbody>tr:hover>td:first-child{background:inherit}
+}
+
+/* ---- Workspace health: grouped sections instead of KPI cells inside a grid ---- */
+/* The health column is the taller one; letting the runs panel stretch next to it
+   produced a large empty bordered box, so both columns size to their content. */
+#mainContent .grid-equal{align-items:start}
+.home-health{display:grid;gap:16px}
+.home-health-group>h3{margin:0 0 10px;font:800 .95rem/1.2 var(--font-display);letter-spacing:-.01em}
+.home-health-group .stat-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.home-health-group .metric-card-link{display:flex;height:auto}
+.home-health-group .stat-card{min-height:0;height:auto;padding:11px 13px;border-radius:14px;box-shadow:0 3px 0 var(--ink)}
+.home-health-group .stat-card .stat-foot{margin-top:6px}
+.home-health-group .stat-card .stat-top span{font:600 .68rem/1.2 var(--font-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.home-health-group .stat-value{margin:3px 0 2px;font-size:1.45rem}
+.home-health-group .stat-foot{padding-top:2px;font-size:.74rem}
+.home-health-note{margin-top:0}
+
+/* ---- Metadata attention: three coverage tiles instead of three sparse rows ---- */
+.metadata-attention-metrics{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-bottom:12px}
+.metadata-attention-metrics .metric-line{flex-direction:column;align-items:flex-start;gap:2px;padding:10px 12px;border:2px solid var(--ink);border-radius:12px;background:var(--surface)}
+.metadata-attention-metrics .metric-line span{font-size:.78rem;color:var(--muted)}
+.metadata-attention-metrics .metric-line strong{font:800 1.25rem/1.1 var(--font-display)}
+
+/* ---- Empty states inside dashboard panels: compact, still legible ---- */
+.empty-state.compact{padding:18px 10px}
+.empty-state.compact strong{display:block;margin-bottom:4px;color:var(--ink)}
+
+/* ---- Sidebar navigation: labels never wrap or clip the group chevron ---- */
+.nav-item{padding-inline:11px}
+:root{--sidebar:256px}
+.nav-text{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.nav-primary,.nav-item{min-width:0}
+.nav-chevron,.nav-count,.nav-tag{flex:none}
+.sidebar{scrollbar-width:thin;scrollbar-gutter:stable}
+
+/* ---- Welcome greeting: a compact hero rather than a full band ---- */
+.welcome-greeting{margin-bottom:18px;padding:20px 24px}
+.welcome-greeting h1{font-size:clamp(26px,3.1vw,38px)}
+
+/* ---- Metadata attention: gap chips pair up, asset rows stay dense ---- */
+.metadata-attention-gaps{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,230px),1fr));gap:8px}
+.metadata-attention-gaps .reasoning-item{height:100%}
+.metadata-attention-assets .reasoning-item{padding:12px 14px}
+.metadata-attention-assets .reason-head{flex-wrap:wrap;gap:8px}
+.metadata-attention-assets .reason-head .pill{flex:none;white-space:nowrap}
+
+/* ---- Catalog filter toolbar: label/control pairs line up instead of ragging ---- */
+.asset-catalog-controls .toolbar{gap:12px}
+.asset-catalog-controls .toolbar:first-of-type{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,190px),1fr));align-items:end}
+.asset-catalog-controls .toolbar:first-of-type>.search-box{grid-column:span 2}
+.asset-catalog-controls .field{display:grid;gap:5px;min-width:0}
+.asset-catalog-controls .field>span{font:500 .72rem var(--font-mono);letter-spacing:.07em;text-transform:uppercase;color:var(--muted)}
+.asset-catalog-controls select,.asset-catalog-controls .search-box input{width:100%;min-width:0}
+
+/* ---- Dashboard toolbar rows (quick actions, filters) keep a consistent rhythm ---- */
+.panel-body>.toolbar{gap:10px}
+.panel-body>.toolbar>.btn{min-height:42px}
+
+@media(min-width:1181px){
+  /* four KPI tiles on desktop: auto-fit would add a fifth, empty track */
+  #mainContent .kpi-grid{grid-template-columns:repeat(4,minmax(0,1fr))}
+}
+
+@media(max-width:1180px) and (min-width:641px){
+  .page-heading{gap:14px;margin-bottom:18px}
+  .heading-actions{width:100%;justify-content:flex-start}
+  /* four KPI tiles stay balanced instead of leaving a lonely orphan */
+  #mainContent .kpi-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+
+@media(max-width:640px){
+  /* Frozen row actions need a seam so they never look like they float over data */
+  #mainContent .table-wrap td:last-child:has(.asset-row-actions){
+    box-shadow:-12px 0 14px -10px rgba(11,11,12,.6);
+    border-left:2px solid var(--line);
+  }
+}
+
+@media(max-width:640px){
+  /* Narrow screens: denser table type so more columns stay visible before scrolling */
+  #mainContent .table-wrap table{font-size:.82rem}
+  #mainContent .table-wrap th,#mainContent .table-wrap td{padding-inline:9px;padding-block:9px}
+  #mainContent .table-wrap .asset-cell{gap:8px}
+  #mainContent .table-wrap .asset-glyph{width:26px;height:26px;font-size:.9rem}
+}
+
+@media(max-width:768px){
+  .content{padding-bottom:calc(30px + 74px + env(safe-area-inset-bottom))}
+  .stat-grid>.metric-card-link>.stat-card{min-height:118px}
+  .home-health-group .stat-grid{gap:9px}
+  .home-health-group .stat-value{font-size:1.3rem}
+  .table-wrap::-webkit-scrollbar{height:7px}
+}
+
+@media(max-width:420px){
+  .home-health-group .stat-grid{grid-template-columns:minmax(0,1fr)}
+  .stat-grid>.metric-card-link>.stat-card{min-height:0}
+}
+
+/* ==========================================================================
+   WORKSPACE ADMINISTRATION
+   The invite form is the only dashboard form rendered straight into a panel,
+   so it had no card padding; role/invite controls also need to stay reachable
+   when the member tables are wider than the panel.
+   ========================================================================== */
+#mainContent .form-grid>.toolbar{grid-column:1/-1;justify-content:flex-start;margin-top:2px}
+#createdInviteLink{margin-top:14px}
+#createdInviteLink .reasoning-item{padding:14px 16px}
+#createdInviteLink code{overflow-wrap:anywhere;font-size:.82rem}
+#workspaceMembers .table-wrap td .btn,#workspaceInvites .table-wrap td .btn{white-space:nowrap}
+#workspaceMembers .table-wrap td select,#workspaceInvites .table-wrap td select{min-height:38px}
+
+@media(max-width:1200px){
+  #workspaceMembers .table-wrap th:last-child,
+  #workspaceMembers .table-wrap td:last-child,
+  #workspaceInvites .table-wrap th:last-child,
+  #workspaceInvites .table-wrap td:last-child{
+    position:sticky;right:0;z-index:2;background:var(--surface);
+    border-left:2px solid var(--line);
+    box-shadow:-11px 0 12px -10px rgba(11,11,12,.6);
+  }
+  #workspaceMembers .table-wrap thead th:last-child,
+  #workspaceInvites .table-wrap thead th:last-child{z-index:3}
+}
+
+.admin-row-actions{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+
+@media(max-width:900px){
+  /* slightly denser admin tables so fewer columns fall behind the frozen actions */
+  #workspaceMembers .table-wrap table,
+  #workspaceInvites .table-wrap table,
+  #workspaceAudit .table-wrap table{font-size:.84rem}
+  #workspaceMembers .table-wrap th,#workspaceMembers .table-wrap td,
+  #workspaceInvites .table-wrap th,#workspaceInvites .table-wrap td,
+  #workspaceAudit .table-wrap th,#workspaceAudit .table-wrap td{padding-inline:11px}
+}
+
+@media(max-width:640px){
+  /* Phone: each row becomes a labelled card, so no column hides behind a
+     frozen cell and every control is reachable without sideways scrolling. */
+  #workspaceMembers .table-wrap>table,
+  #workspaceInvites .table-wrap>table,
+  #workspaceAudit .table-wrap>table{width:100%;min-width:0}
+  #workspaceMembers .table-wrap thead,
+  #workspaceInvites .table-wrap thead,
+  #workspaceAudit .table-wrap thead{display:none}
+  #workspaceMembers .table-wrap tbody tr,
+  #workspaceInvites .table-wrap tbody tr,
+  #workspaceAudit .table-wrap tbody tr{display:grid;gap:5px;padding:14px 2px;border-bottom:1px solid var(--line)}
+  #workspaceMembers .table-wrap tbody tr:last-child,
+  #workspaceInvites .table-wrap tbody tr:last-child,
+  #workspaceAudit .table-wrap tbody tr:last-child{border-bottom:0}
+  #workspaceMembers .table-wrap tbody td,
+  #workspaceInvites .table-wrap tbody td,
+  #workspaceAudit .table-wrap tbody td{
+    display:grid;grid-template-columns:86px minmax(0,1fr);align-items:center;gap:10px;
+    width:auto;padding:3px 0!important;border:0;white-space:normal;
+    position:static!important;background:transparent;box-shadow:none!important;
+  }
+  #workspaceMembers .table-wrap tbody td::before,
+  #workspaceInvites .table-wrap tbody td::before,
+  #workspaceAudit .table-wrap tbody td::before{
+    content:attr(data-label);font:500 .66rem/1.3 var(--font-mono);
+    letter-spacing:.07em;text-transform:uppercase;color:var(--muted);
+  }
+  #workspaceMembers .table-wrap tbody td[data-label="Actions"],
+  #workspaceInvites .table-wrap tbody td[data-label="Action"]{grid-template-columns:minmax(0,1fr);gap:4px;padding-top:8px!important}
+  #workspaceMembers .table-wrap tbody td[data-label="Actions"]::before,
+  #workspaceInvites .table-wrap tbody td[data-label="Action"]::before{content:attr(data-label)}
+  .admin-row-actions{gap:8px}
+  .admin-row-actions select{flex:1 1 110px;min-width:0}
+  .admin-row-actions .btn{flex:1 1 auto;justify-content:center}
+}
+
+/* ---------------------------------------------------------------------------
+   ADMIN PAGE SPACING
+   The workspace-administration view stacks plain panels, which carry no outer
+   margin, so consecutive cards touched border-to-border and their tables sat
+   flush against the card edges. A flex stack restores the page rhythm and each
+   panel gets a padded body.
+   ========================================================================== */
+.page-stack{display:flex;flex-direction:column;gap:var(--gap)}
+.page-stack>.panel{overflow:visible}
+#workspaceMembers,#workspaceInvites,#workspaceAudit{min-width:0}
+#workspaceMembers>.table-wrap,#workspaceInvites>.table-wrap,#workspaceAudit>.table-wrap{margin:0}
+
+/* 641–1200px: keep each row's controls on one line inside the frozen action
+   column, otherwise the wrap made neighbouring rows different heights. */
+@media(min-width:641px) and (max-width:1200px){
+  #workspaceMembers .table-wrap th:last-child,
+  #workspaceMembers .table-wrap td:last-child{min-width:214px}
+  #workspaceInvites .table-wrap th:last-child,
+  #workspaceInvites .table-wrap td:last-child{min-width:200px}
+  #workspaceMembers .table-wrap td:last-child .admin-row-actions,
+  #workspaceInvites .table-wrap td:last-child .admin-row-actions{flex-wrap:nowrap}
+  #workspaceMembers .table-wrap td:last-child select{min-width:92px}
+}
+
+/* ---------------------------------------------------------------------------
+   WORKSPACE PICKER (sidebar)
+   The switcher was previously sized only by inline styles, so the native
+   <select> kept its intrinsic min-content width and hung past the sidebar
+   border over the main column, clipping its own caret. A grid child needs an
+   explicit min-width:0 to be allowed to shrink.
+   ========================================================================== */
+.workspace-picker{display:grid;gap:7px;min-width:0;margin:0 0 16px;padding:0 2px}
+.workspace-picker>span{font:500 .68rem/1.2 var(--font-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.workspace-picker select{
+  width:100%;min-width:0;max-width:100%;min-height:40px;
+  padding:8px 30px 8px 12px;border:2px solid var(--ink);border-radius:12px;
+  background:var(--surface);color:var(--ink);
+  font:600 .86rem/1.2 var(--font-body);text-overflow:ellipsis;
+}
+@media(max-width:1180px){
+  .workspace-picker select{font-size:.82rem;padding:8px 26px 8px 10px}
+}
+
+/* ---------------------------------------------------------------------------
+   SOURCES & CONNECTIONS
+   Five summary tiles have to share one row (the 220px auto-fit minimum broke
+   them 4+1 and left a hole), and the "Access scope" cell is a note rather than
+   a form control, so it needs the same label treatment as its siblings.
+   ========================================================================== */
+#sourcesSummary{grid-template-columns:repeat(auto-fit,minmax(min(100%,190px),1fr))}
+#sourcesSummary .stat-card{padding:18px 20px}
+#sourceCreateForm .field>span{font:500 .68rem var(--font-mono);letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:2px}
+#sourceCreateForm .field .small-note{margin:0}
+#sourcesList .empty-state{padding:36px 20px}
+
+/* ---------------------------------------------------------------------------
+   INTEGRATIONS & API
+   The two GitHub panels had no page rhythm, 1px notes and small sans labels
+   that did not match the rest of the dashboard's form language.
+   ========================================================================== */
+.github-connector-panel .panel-body{gap:20px}
+.github-connector-note{padding:16px 18px;border:2px solid var(--ink);border-radius:16px}
+.github-connector-note strong{font:700 1rem/1.3 var(--font-display);letter-spacing:-.01em}
+.github-connector-note p{margin:6px 0 0;font-size:.9rem;line-height:1.6}
+.github-repo-form{grid-template-columns:minmax(260px,1fr) minmax(170px,.45fr) auto;gap:18px 16px}
+.github-repo-form .field{gap:8px}
+.github-repo-form .field>span{font:500 .68rem/1.2 var(--font-mono);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.github-repo-form .field>span small{font:500 .68rem var(--font-body);letter-spacing:0;text-transform:none}
+.github-repo-form input,.github-repo-form select{min-height:44px}
+.github-connector-panel .small-note{margin:0}
+/* An empty connector row must not leave a gap-only band: when every control in
+   the private form is hidden, or the result region has no content, drop the
+   row entirely instead of rendering its 20px gaps. */
+.github-repo-form:not(:has(> :not([hidden]))),
+.github-repo-results:empty{display:none}
+
+/* ---------------------------------------------------------------------------
+   WORKSPACE ADMIN — API KEYS & WEBHOOKS
+   The reveal-once secret box and the multi-select event picker need their own
+   treatment; everything else reuses the admin table and pill primitives.
+   ========================================================================== */
+.secret-reveal{margin:16px 0 0;border:2px solid var(--ink);border-radius:16px;background:var(--tint-green)}
+.secret-reveal .reason-head{align-items:center;gap:10px}
+.secret-reveal .secret-value{margin:10px 0;padding:10px 12px;border:2px dashed var(--ink);border-radius:12px;background:var(--surface);font:500 .82rem/1.5 var(--font-mono);overflow-wrap:anywhere;user-select:all}
+#webhookEvents{min-height:150px;padding:6px}
+#webhookEvents option{padding:4px 6px}
+#webhookHistory{margin-top:18px}
+#webhookHistory .reason-head{align-items:center;gap:10px;flex-wrap:wrap}
+#webhooksList .table-wrap td:first-child{white-space:normal;overflow-wrap:anywhere;min-width:200px}
+#webhookHistory .table-wrap td:last-child{white-space:normal;overflow-wrap:anywhere;min-width:180px}
+@media(max-width:640px){#webhookEvents{min-height:120px}}
+#webhooksList .table-wrap td:last-child .admin-row-actions{flex-wrap:nowrap}
+#webhooksList .table-wrap th:last-child,#webhooksList .table-wrap td:last-child{min-width:226px}
+#webhooksList .table-wrap td:first-child{min-width:196px}
+#webhooksList .admin-row-actions .btn.small{padding-inline:12px}
+
+@media(max-width:640px){
+  /* Phone: the API-key, webhook and delivery-history tables follow the same
+     labelled-card rows as members/invites, so no cell hides behind a
+     horizontal scroll. */
+  #apiKeysList .table-wrap>table,
+  #webhooksList .table-wrap>table,
+  #webhookHistory .table-wrap>table{width:100%;min-width:0}
+  #apiKeysList .table-wrap thead,
+  #webhooksList .table-wrap thead,
+  #webhookHistory .table-wrap thead{display:none}
+  #apiKeysList .table-wrap tbody tr,
+  #webhooksList .table-wrap tbody tr,
+  #webhookHistory .table-wrap tbody tr{display:grid;gap:5px;padding:14px 2px;border-bottom:1px solid var(--line)}
+  #apiKeysList .table-wrap tbody td,
+  #webhooksList .table-wrap tbody td,
+  #webhookHistory .table-wrap tbody td{
+    display:grid;grid-template-columns:86px minmax(0,1fr);align-items:center;gap:10px;
+    width:auto;min-width:0!important;padding:3px 0!important;border:0;white-space:normal;
+    position:static!important;background:transparent;box-shadow:none!important;overflow-wrap:anywhere;
+  }
+  #apiKeysList .table-wrap tbody td::before,
+  #webhooksList .table-wrap tbody td::before,
+  #webhookHistory .table-wrap tbody td::before{
+    content:attr(data-label);font:500 .66rem/1.3 var(--font-mono);
+    letter-spacing:.07em;text-transform:uppercase;color:var(--muted);
+  }
+  #apiKeysList .table-wrap tbody td[data-label="Actions"],
+  #webhooksList .table-wrap tbody td[data-label="Actions"]{grid-template-columns:minmax(0,1fr);padding-top:8px!important}
+  #apiKeysList .table-wrap tbody td[data-label="Actions"] .admin-row-actions,
+  #webhooksList .table-wrap tbody td[data-label="Actions"] .admin-row-actions{flex-wrap:wrap}
+}
+
+/* ---------------------------------------------------------------------------
+   WORKSPACE OVERVIEW — DISCOVERED FIELDS / RELATIONSHIPS
+   The discovered-field and relationship chips were unflexed inline spans, so
+   they sat shoulder-to-shoulder and the panels below them touched. A real flex
+   tag cloud plus the page stack gives each group its own breathing room.
+   ========================================================================== */
+.tag-cloud{display:flex;flex-wrap:wrap;align-items:center;gap:14px;margin-top:20px;margin-bottom:2px}
+.tag-cloud>.pill{margin:0}
+.panel-body>.tag-cloud+.btn,.panel-body>.tag-cloud+.small-note{margin-top:22px}
+.panel-body>.small-note+.tag-cloud{margin-top:18px}
+
+/* ---------------------------------------------------------------------------
+   EVIDENCE DETAIL — SELECTION FEEDBACK
+   Long qualified names ("db:…/model.stg_customer_360") have no break
+   opportunities, so the detail heading used to overflow its 320px panel. Every
+   row then looked identical where it was cut off, which made a working
+   "Inspect" click look like a dead button. Names now wrap inside the card and
+   the selected row is marked in the table.
+   ========================================================================== */
+.node-detail h3,.node-detail .asset-path,.side-stack .metric-line strong{overflow-wrap:anywhere;word-break:break-word}
+.node-detail h3{max-width:100%}
+.lineage-layout>section.panel .table-wrap tbody tr.is-selected td{background:var(--hl,rgba(251,188,4,.18))}
+.lineage-layout>section.panel .table-wrap tbody tr.is-selected td:first-child{box-shadow:inset 3px 0 0 var(--yellow,#FBBC04)}
+.lineage-layout>section.panel .table-wrap tbody tr.is-selected td strong{color:var(--ink)}
+
+/* ---------------------------------------------------------------------------
+   STEWARDSHIP REQUESTS
+   The request form is a two-column grid (type, asset, term, reason) and the
+   table stacks into labelled rows on phones, matching the admin tables.
+   ========================================================================== */
+.stewardship-detail{grid-column:1/-1}
+#stewardshipList .table-wrap td[data-label="Asset / term"]{min-width:0;white-space:normal}
+#stewardshipList .table-wrap td[data-label="Resolution"]{min-width:0;white-space:normal}
+#stewardshipList .table-wrap td[data-label="Actions"] .admin-row-actions{flex-wrap:nowrap}
+/* Queue tones: pending is the amber state, approved mint, rejected red. */
+#stewardshipSummary .stat-card:nth-child(1){background:var(--hl)}
+#stewardshipSummary .stat-card:nth-child(1) .stat-top::after{background:var(--yellow)}
+#stewardshipSummary .stat-card:nth-child(2){background:var(--tint-green)}
+#stewardshipSummary .stat-card:nth-child(2) .stat-top::after{background:var(--green,#1E8E3E)}
+#stewardshipSummary .stat-card:nth-child(3){background:var(--tint-red)}
+#stewardshipSummary .stat-card:nth-child(3) .stat-top::after{background:var(--red)}
+
+@media(max-width:640px){
+  #stewardshipList .table-wrap>table{width:100%;min-width:0}
+  #stewardshipList .table-wrap thead{display:none}
+  #stewardshipList .table-wrap tbody tr{display:grid;gap:5px;padding:14px 2px;border-bottom:1px solid var(--line)}
+  #stewardshipList .table-wrap tbody td{
+    display:grid;grid-template-columns:86px minmax(0,1fr);align-items:center;gap:10px;
+    width:auto;min-width:0!important;padding:3px 0!important;border:0;white-space:normal;
+    position:static!important;background:transparent;box-shadow:none!important;overflow-wrap:anywhere;
+  }
+  #stewardshipList .table-wrap tbody td::before{
+    content:attr(data-label);font:500 .66rem/1.3 var(--font-mono);
+    letter-spacing:.07em;text-transform:uppercase;color:var(--muted);
+  }
+  #stewardshipList .table-wrap tbody td[data-label="Actions"]{grid-template-columns:minmax(0,1fr);padding-top:8px!important}
+  #stewardshipList .table-wrap tbody td[data-label="Actions"] .admin-row-actions{flex-wrap:wrap}
+}

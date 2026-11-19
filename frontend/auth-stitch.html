@@ -580,7 +580,6 @@
     const provider = ({Google:'google', GitHub:'github', Microsoft:'azure'})[providerName];
     if (!provider) { showToast('This sign-in option is unavailable.', 'error'); return; }
     btnElement.disabled = true;
-    showToast(`Connecting to ${providerName}…`, 'info');
     window.parent.postMessage({source:'kairos-auth-stitch', type:'oauth', provider}, window.location.origin);
   }
 

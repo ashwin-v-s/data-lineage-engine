@@ -85,7 +85,8 @@ describe('dashboard shell contract', () => {
     // URL (?view=admin) and keep its dashboard renderer and loader.
     expect(appCode).toContain("admin:'Workspace administration'");
     expect(appCode).toContain('admin:adminPage');
-    expect(appCode).toContain("if(S.view==='admin')loadMembers()");
+    // The admin renderer loads membership, API keys and webhooks together.
+    expect(appCode).toContain("if(S.view==='admin'){loadMembers();loadApiKeys();loadWebhooks()}");
   });
 
   it('loads asset capabilities when the asset detail view renders', () => {

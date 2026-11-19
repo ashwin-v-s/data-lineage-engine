@@ -207,3 +207,49 @@ psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f backend/migrations/0012_m3_pgvector_e
 ```
 
 **Note:** This migration skips 0011 (reserved for M4 governance per D16). Migration 0010 (M2 source_connection_lifecycle) exists but awaits application.
+
+### 0016_api_keys_webhooks.sql
+
+**Status:** 📝 PROPOSAL (not yet applied)
+**Naming:** `{number}_{feature}.sql`
+
+Adds the workspace credential surfaces the admin screen used to mark as
+unavailable:
+
+- `workspace_api_key` — read-only machine credentials. Stores a SHA-256 hash and
+  a display prefix only; the secret is returned once at creation.
+- `workspace_webhook` — outbound HTTPS endpoints with a per-endpoint signing
+  secret stored as an AES-256-GCM envelope (`token_crypto`).
+- `workspace_webhook_delivery` — the auditable outcome of every delivery attempt.
+- `kairos_authenticate_api_key(text)` — the single SECURITY DEFINER lookup that
+  resolves a key hash to its workspace before RLS scope exists.
+
+**Requires:**
+- `KAIROS_TOKEN_ENCRYPTION_KEY` on the API server (webhook signing secrets)
+- `kairos_app` role from migration 0008
+
+**To apply:**
+```sql
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f backend/migrations/0016_api_keys_webhooks.sql
+```
+
+### 0017_stewardship_requests.sql
+
+**Status:** applied to shared Supabase (2026-11-19)
+**Naming:** `{number}_{feature}.sql`
+
+Adds the stewardship queue the Trust & governance screen used to mark as
+unavailable:
+
+- `stewardship_request` — one row per access request or glossary proposal,
+  with the asset identity frozen at submission time, a PENDING/APPROVED/REJECTED
+  lifecycle, and the resolving owner/admin plus note.
+
+**Requires:**
+- `kairos_app` role from migration 0008
+- nothing else; no encryption key and no external service
+
+**To apply:**
+```sql
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f backend/migrations/0017_stewardship_requests.sql
+```

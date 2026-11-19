@@ -90,7 +90,7 @@ function WorkspaceSwitcher() {
   if (workspaces.length < 2) return null;
   const stored = localStorage.getItem('kairos_activeWorkspaceId');
   const selected = workspaces.some((row) => row.id === stored) ? stored : workspaces.find((row) => row.current)?.id || workspaces[0]?.id;
-  return <label className="workspace-picker" style={{ display: 'grid', gap: 5, padding: '8px 14px', fontSize: 12 }}>
+  return <label className="workspace-picker">
     <span>Active workspace{error ? ` · ${error}` : ''}</span>
     <select aria-label="Active workspace" value={selected} onChange={(event) => {
       const next = workspaces.find((row) => row.id === event.target.value);
@@ -145,9 +145,9 @@ function Sidebar() {
       </div>
       <WorkspaceSwitcher />
       <nav aria-label="Main navigation" className="nav-list nav-groups">
-        <button className="nav-item nav-primary active" data-view="overview"><span className="nav-icon">▫</span>Home</button>
+        <button className="nav-item nav-primary active" data-view="overview"><span className="nav-icon">▫</span><span className="nav-text">Home</span></button>
         <div className="nav-group" data-nav-group="catalog">
-          <button aria-expanded={expanded} className="nav-item nav-primary" data-view="assets"><span className="nav-icon">▤</span>Catalog<span aria-hidden="true" className="nav-chevron">⌄</span></button>
+          <button aria-expanded={expanded} className="nav-item nav-primary" data-view="assets"><span className="nav-icon">▤</span><span className="nav-text">Catalog</span><span aria-hidden="true" className="nav-chevron">⌄</span></button>
           <div className="nav-sublist" hidden>
             <button className="nav-item nav-child" data-action="open-all-assets">All assets</button>
             <button className="nav-item nav-child" data-view="catalog">Catalog structure</button>
@@ -156,7 +156,7 @@ function Sidebar() {
           </div>
         </div>
         <div className="nav-group" data-nav-group="lineage">
-          <button aria-expanded={expanded} className="nav-item nav-primary" data-view="lineage"><span className="nav-icon">⌘</span>Lineage<span aria-hidden="true" className="nav-chevron">⌄</span></button>
+          <button aria-expanded={expanded} className="nav-item nav-primary" data-view="lineage"><span className="nav-icon">⌘</span><span className="nav-text">Lineage</span><span aria-hidden="true" className="nav-chevron">⌄</span></button>
           <div className="nav-sublist" hidden>
             <button className="nav-item nav-child" data-view="lineage">Visual explorer</button>
             <button className="nav-item nav-child" data-view="history">Time travel</button>
@@ -165,7 +165,7 @@ function Sidebar() {
           </div>
         </div>
         <div className="nav-group" data-nav-group="operations">
-          <button aria-expanded={expanded} className="nav-item nav-primary" data-view="runs"><span className="nav-icon">↻</span>Operations<span aria-hidden="true" className="nav-chevron">⌄</span></button>
+          <button aria-expanded={expanded} className="nav-item nav-primary" data-view="runs"><span className="nav-icon">↻</span><span className="nav-text">Operations</span><span aria-hidden="true" className="nav-chevron">⌄</span></button>
           <div className="nav-sublist" hidden>
             <button className="nav-item nav-child" data-view="sources">Sources &amp; connections</button>
             <a className="nav-item nav-child" data-authenticated-ingestion-link href="/ingestion.html">Import metadata</a>
@@ -173,7 +173,7 @@ function Sidebar() {
           </div>
         </div>
         <div className="nav-group" data-nav-group="trust">
-          <button aria-expanded={expanded} className="nav-item nav-primary" data-view="evidence"><span className="nav-icon">🛡</span>Trust &amp; governance<span aria-hidden="true" className="nav-chevron">⌄</span></button>
+          <button aria-expanded={expanded} className="nav-item nav-primary" data-view="evidence"><span className="nav-icon">🛡</span><span className="nav-text">Trust &amp; governance</span><span aria-hidden="true" className="nav-chevron">⌄</span></button>
           <div className="nav-sublist" hidden>
             <button className="nav-item nav-child" data-view="evidence">Evidence &amp; reasoning</button>
             <button className="nav-item nav-child" data-view="quality">Data quality</button>

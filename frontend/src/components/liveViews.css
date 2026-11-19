@@ -1,10 +1,12 @@
 /*
  * Shared presentation primitives for the React live views
- * (Sources, Freshness, Incidents, asset capabilities).
+ * (Sources, Freshness, Incidents, Governance, asset capabilities).
  *
  * These views render inside `#mainContent` in place of the legacy `app.js`
- * markup, so they only use design tokens that `styles.neo.css` already defines
- * (both themes included) and never restyle the legacy shell.
+ * markup, so they must look like the shell they sit in: 2px ink borders, 24px
+ * card radius, the hard 6px card shadow, mono uppercase labels and pill
+ * buttons. Values below mirror `styles.neo.css` (.panel, .btn, .pill, .notice,
+ * .field, table) so a live view and an app.js view cannot drift apart.
  *
  * Class prefix: `kv-` (Kairos view). View-specific rules belong in that view's
  * own stylesheet, never here.
@@ -13,8 +15,8 @@
 .kv-view {
   display: flex;
   flex-direction: column;
-  gap: 18px;
-  padding: 4px 2px 32px;
+  gap: var(--gap);
+  padding: 0 0 32px;
   color: var(--ink);
   font-family: var(--font-body);
 }
@@ -22,56 +24,111 @@
 .kv-view-head {
   display: flex;
   flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px 24px;
+}
+
+.kv-view-head > div:first-child {
+  min-width: 0;
+}
+
+/* Row layout on wide screens; the flex basis must never apply to the stacked
+   (column) mobile layout, where it would become a 320px-tall empty heading. */
+@media (min-width: 641px) {
+  .kv-view-head > div:first-child {
+    flex: 1 1 320px;
+  }
+}
+
+.kv-view-head > div:last-child {
+  display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
 }
 
 .kv-view-head h1 {
   margin: 0;
-  font-family: var(--font-display);
-  font-size: 22px;
-  font-weight: 600;
-  letter-spacing: -0.01em;
+  font: 800 clamp(1.6rem, 2.4vw, 2.1rem)/1.05 var(--font-display);
+  letter-spacing: -0.03em;
+  text-wrap: balance;
+}
+
+.kv-view-head h1::after {
+  content: "";
+  display: block;
+  width: 56px;
+  height: 5px;
+  margin-top: 10px;
+  border-radius: 999px;
+  background: var(--tone);
 }
 
 .kv-sub {
-  margin: 0;
-  max-width: 78ch;
+  margin: 8px 0 0;
+  max-width: 70ch;
   color: var(--muted);
-  font-size: 12.5px;
+  font-size: 0.95rem;
   line-height: 1.55;
 }
 
 .kv-card {
-  border: 1px solid var(--line);
-  border-radius: 12px;
+  min-width: 0;
+  border: 2px solid var(--ink);
+  border-radius: 24px;
   background: var(--surface);
-  padding: 16px;
+  box-shadow: 0 6px 0 var(--ink);
+  padding: 22px 26px 26px;
 }
 
 .kv-card h2 {
-  margin: 0 0 4px;
-  font-size: 14px;
-  font-weight: 600;
+  margin: 0 0 12px;
+  font: 800 1.3rem/1.15 var(--font-display);
+  letter-spacing: -0.025em;
+}
+
+.kv-card h2::before {
+  content: "";
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  margin-right: 10px;
+  border: 2px solid var(--ink);
+  border-radius: 50%;
+  background: var(--tone);
+  vertical-align: -1px;
+}
+
+.kv-card h3 {
+  margin: 0 0 6px;
+  font: 700 1rem/1.2 var(--font-display);
+}
+
+.kv-card p {
+  margin: 0 0 12px;
+  font-size: 0.93rem;
+  line-height: 1.55;
+  color: var(--muted);
 }
 
 .kv-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 12px;
+  gap: 16px;
 }
 
 .kv-toolbar {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
 }
 
 .kv-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 8px;
 }
 
 .kv-spacer {
@@ -82,45 +139,53 @@
 
 .kv-form {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
 }
 
 .kv-field {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
+  display: grid;
+  gap: 8px;
+  min-width: 0;
 }
 
 .kv-label {
   color: var(--muted);
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
+  font: 500 0.68rem/1.2 var(--font-mono);
+  letter-spacing: 0.1em;
   text-transform: uppercase;
 }
 
 .kv-input,
-.kv-select {
+.kv-select,
+.kv-textarea {
   width: 100%;
+  min-width: 0;
   box-sizing: border-box;
-  padding: 7px 9px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
+  min-height: 42px;
+  padding: 8px 14px;
+  border: 2px solid var(--ink);
+  border-radius: 12px;
   background: var(--surface);
   color: var(--ink);
-  font: 13px var(--font-body);
+  font: 500 0.92rem/1.35 var(--font-body);
+}
+
+.kv-textarea {
+  min-height: 92px;
+  resize: vertical;
 }
 
 .kv-input:focus,
-.kv-select:focus {
-  outline: 2px solid var(--link);
-  outline-offset: -1px;
+.kv-select:focus,
+.kv-textarea:focus {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
 }
 
 .kv-hint {
   color: var(--muted);
-  font-size: 11px;
+  font-size: 0.82rem;
   line-height: 1.45;
 }
 
@@ -129,72 +194,96 @@
 .kv-btn {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 6px 11px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
+  justify-content: center;
+  gap: 10px;
+  width: auto;
+  min-height: 42px;
+  padding: 8px 20px;
+  border: 2px solid var(--ink);
+  border-radius: 999px;
   background: var(--surface);
   color: var(--ink);
-  font: 600 12px var(--font-body);
+  font: 600 0.92rem/1 var(--font-body);
+  white-space: nowrap;
   cursor: pointer;
+  transition: transform 0.12s, box-shadow 0.12s, background-color 0.12s;
 }
 
 .kv-btn:hover:not(:disabled) {
-  border-color: var(--link);
-  color: var(--link);
+  background: var(--hl);
 }
 
 .kv-btn:disabled {
-  opacity: 0.5;
+  opacity: 0.55;
   cursor: not-allowed;
 }
 
 .kv-btn--primary {
-  border-color: var(--link);
-  background: var(--link);
-  color: #ffffff;
+  border-color: var(--ink);
+  background: var(--yellow);
+  color: var(--on-yellow);
+  box-shadow: 0 5px 0 var(--ink);
 }
 
 .kv-btn--primary:hover:not(:disabled) {
-  color: #ffffff;
-  filter: brightness(1.06);
+  background: var(--yellow);
+  transform: translateY(2px);
+  box-shadow: 0 3px 0 var(--ink);
+}
+
+.kv-btn--danger {
+  background: var(--tint-red);
+  color: var(--warn-ink);
 }
 
 .kv-btn--danger:hover:not(:disabled) {
-  border-color: var(--red);
-  color: var(--red);
+  background: var(--tint-red);
 }
 
 /* ────────────────────────────────── tables ───────────────────────────────── */
 
 .kv-table-wrap {
   overflow-x: auto;
-  border: 1px solid var(--line);
-  border-radius: 12px;
+  border: 2px solid var(--ink);
+  border-radius: 16px;
   background: var(--surface);
 }
 
 .kv-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 12.5px;
+  font-size: 0.93rem;
+  font-variant-numeric: tabular-nums;
 }
 
-.kv-table th,
-.kv-table td {
-  padding: 9px 12px;
-  border-bottom: 1px solid var(--line);
-  text-align: left;
-  vertical-align: top;
-}
-
-.kv-table thead th {
+.kv-table th {
+  padding: 13px 18px;
+  border-bottom: 2px solid var(--ink);
+  background: var(--surface);
   color: var(--muted);
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
+  font: 500 0.7rem var(--font-mono);
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-align: left;
   text-transform: uppercase;
   white-space: nowrap;
+}
+
+.kv-table td {
+  padding: 15px 18px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  vertical-align: middle;
+  color: var(--ink);
+  white-space: nowrap;
+}
+
+.kv-table tbody tr {
+  transition: background-color 0.1s;
+}
+
+.kv-table tbody tr:hover {
+  background: var(--hl);
 }
 
 .kv-table tbody tr:last-child td {
@@ -203,7 +292,7 @@
 
 .kv-mono {
   font-family: var(--font-mono);
-  font-size: 11.5px;
+  font-size: 0.8rem;
 }
 
 .kv-muted {
@@ -217,72 +306,69 @@
 /* ─────────────────────────────── state chips ─────────────────────────────── */
 
 .kv-chip {
-  display: inline-block;
-  padding: 1px 8px;
-  border: 1px solid var(--line);
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+  padding: 2px 11px;
+  border: 1.5px solid var(--ink);
   border-radius: 999px;
-  color: var(--muted);
-  font: 600 10px var(--font-mono);
-  letter-spacing: 0.06em;
+  background: var(--surface);
+  color: var(--ink);
+  font: 500 0.66rem/1.7 var(--font-mono);
+  letter-spacing: 0.05em;
   text-transform: uppercase;
   white-space: nowrap;
 }
 
 .kv-chip--ok {
-  border-color: var(--edge-ok);
-  color: var(--edge-ok);
+  background: var(--tint-green);
 }
 
 .kv-chip--warn {
-  border-color: var(--edge-maybe);
-  color: var(--edge-maybe);
+  background: var(--hl);
 }
 
 .kv-chip--bad {
-  border-color: var(--edge-no);
-  color: var(--edge-no);
+  background: var(--tint-red);
+  color: var(--warn-ink);
 }
 
 .kv-chip--info {
-  border-color: var(--link);
-  color: var(--link);
+  background: var(--tint-blue);
 }
 
 .kv-chip--muted {
-  border-color: var(--edge-unknown);
-  color: var(--edge-unknown);
+  background: var(--code-bg);
 }
 
 /* ──────────────────────────── empty / error states ───────────────────────── */
 
 .kv-note {
-  padding: 10px 12px;
-  border: 1px solid var(--line);
-  border-left: 3px solid var(--edge-unknown);
-  border-radius: 8px;
-  background: var(--code-bg);
-  color: var(--muted);
-  font-size: 12px;
+  padding: 12px 20px 12px 14px;
+  border: 2px solid var(--ink);
+  border-radius: 16px;
+  background: var(--hl);
+  color: var(--ink);
+  font-size: 0.93rem;
   line-height: 1.5;
 }
 
 .kv-note--error {
-  border-left-color: var(--red);
   background: var(--warn-bg);
   color: var(--warn-ink);
 }
 
 .kv-note--ok {
-  border-left-color: var(--green);
   background: var(--tint-green);
 }
 
 .kv-empty {
-  padding: 22px 16px;
-  border: 1px dashed var(--line);
-  border-radius: 12px;
+  padding: 40px 24px;
+  border: 2px dashed var(--ink);
+  border-radius: 16px;
   color: var(--muted);
-  font-size: 12.5px;
+  font-size: 0.93rem;
+  line-height: 1.6;
   text-align: center;
 }
 
@@ -292,7 +378,7 @@
 .kv-freshness-view {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: var(--gap);
 }
 
 .kv-freshness-section-head {
@@ -300,7 +386,7 @@
   align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
-  margin-bottom: 12px;
+  margin-bottom: 14px;
 }
 
 .kv-freshness-section-head h2,
@@ -310,48 +396,91 @@
 
 .kv-freshness-section-head p,
 .kv-freshness-placeholder {
-  margin: 5px 0 0;
+  margin: 6px 0 0;
   color: var(--muted);
-  font-size: 12.5px;
+  font-size: 0.88rem;
   line-height: 1.5;
 }
 
+/* Inside a card body the form is a divider-separated block (FreshnessView);
+   when the form *is* the card (GovernanceView) it keeps the card's own box. */
 .kv-freshness-form {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  align-items: start;
+  gap: 18px;
   margin-top: 18px;
   padding-top: 16px;
   border-top: 1px solid var(--line);
 }
 
+.kv-card.kv-freshness-form {
+  margin: 0;
+  padding: 22px 26px 26px;
+  border: 2px solid var(--ink);
+}
+
+.kv-freshness-form h2,
 .kv-freshness-form h3,
 .kv-freshness-form .kv-note,
+.kv-freshness-form .kv-freshness-placeholder,
 .kv-freshness-form button {
   grid-column: 1 / -1;
 }
 
+.kv-freshness-form p {
+  /* Help copy belongs on its own line: inside the auto-fit grid it used to be
+     squeezed into one 190px column beside the fields. */
+  grid-column: 1 / -1;
+  margin: 0;
+}
+
+.kv-freshness-form button {
+  justify-self: start;
+  width: auto;
+}
+
 .kv-freshness-form label {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  font-size: 12px;
-  font-weight: 600;
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  color: var(--muted);
+  font: 500 0.68rem/1.2 var(--font-mono);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
 }
 
 .kv-freshness-form input,
-.kv-freshness-form select {
+.kv-freshness-form select,
+.kv-freshness-form textarea {
   width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  min-height: 42px;
+  padding: 8px 14px;
+  border: 2px solid var(--ink);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--ink);
+  font: 500 0.92rem/1.35 var(--font-body);
+  letter-spacing: normal;
+  text-transform: none;
+}
+
+.kv-freshness-form textarea {
+  min-height: 92px;
+  resize: vertical;
 }
 
 /* preference row inside the settings governance panel */
 .kv-preference-row {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 16px;
-  padding: 6px 0;
+  gap: 8px 16px;
+  padding: 10px 0;
   border-bottom: 1px solid var(--line);
-  font-size: 12.5px;
+  font-size: 0.93rem;
 }
 
 .kv-preference-row:last-child {
@@ -361,5 +490,25 @@
 @media (max-width: 640px) {
   .kv-freshness-section-head {
     flex-direction: column;
+  }
+
+  .kv-card,
+  .kv-card.kv-freshness-form {
+    padding: 18px 16px 20px;
+    border-radius: 18px;
+    box-shadow: 0 4px 0 var(--ink);
+  }
+}
+
+/* Multi-selects (e.g. "catalog assets") need a taller box than a single-line
+   control, otherwise the whole form row stretches to the option list. */
+.kv-freshness-form select[multiple] {
+  min-height: 132px;
+  padding: 6px;
+}
+
+@media (min-width: 900px) {
+  .kv-freshness-form select[multiple] {
+    grid-column: span 2;
   }
 }
