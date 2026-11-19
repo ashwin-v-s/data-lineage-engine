@@ -7,6 +7,7 @@ import AssetCapabilitiesPanel from './components/AssetCapabilitiesPanel.jsx';
 import FreshnessView from './components/FreshnessView.jsx';
 import GovernanceView from './components/GovernanceView.jsx';
 import IncidentsView from './components/IncidentsView.jsx';
+import MobileShell from './components/MobileShell.jsx';
 import { DATA_MODES, resolveDataMode, dataModeDescription } from './components/dataMode.js';
 import './components/dataMode.css';
 import './components/liveViews.css';
@@ -103,8 +104,37 @@ function WorkspaceSwitcher() {
   </label>;
 }
 
+function useIsMobileLayout() {
+  const query = '(max-width: 768px)';
+  // Matches the phone block in mobile.css. The width check is the fallback for
+  // browsers/emulators that report a stale matchMedia result at first paint.
+  const readMobile = () => {
+    try { return window.matchMedia(query).matches || window.innerWidth <= 768; } catch (_) { return window.innerWidth <= 768; }
+  };
+  const [mobile, setMobile] = useState(readMobile);
+  useEffect(() => {
+    const sync = () => setMobile(readMobile());
+    let media = null;
+    try { media = window.matchMedia(query); } catch (_) { /* width fallback below */ }
+    media?.addEventListener?.('change', sync);
+    window.addEventListener('resize', sync);
+    window.addEventListener('orientationchange', sync);
+    sync();
+    return () => {
+      media?.removeEventListener?.('change', sync);
+      window.removeEventListener('resize', sync);
+      window.removeEventListener('orientationchange', sync);
+    };
+  }, []);
+  return mobile;
+}
+
 function Sidebar() {
   const dataMode = useDataMode();
+  // Phones force every group's children open (mobile.css cannot use the
+  // disclosure), so the disclosure buttons must not claim to be collapsed.
+  const mobileLayout = useIsMobileLayout();
+  const expanded = mobileLayout ? 'true' : 'false';
   return (
     <aside className="sidebar" id="sidebar">
       <div className="brand">
@@ -117,7 +147,7 @@ function Sidebar() {
       <nav aria-label="Main navigation" className="nav-list nav-groups">
         <button className="nav-item nav-primary active" data-view="overview"><span className="nav-icon">▫</span>Home</button>
         <div className="nav-group" data-nav-group="catalog">
-          <button aria-expanded="false" className="nav-item nav-primary" data-view="assets"><span className="nav-icon">▤</span>Catalog<span aria-hidden="true" className="nav-chevron">⌄</span></button>
+          <button aria-expanded={expanded} className="nav-item nav-primary" data-view="assets"><span className="nav-icon">▤</span>Catalog<span aria-hidden="true" className="nav-chevron">⌄</span></button>
           <div className="nav-sublist" hidden>
             <button className="nav-item nav-child" data-action="open-all-assets">All assets</button>
             <button className="nav-item nav-child" data-view="catalog">Catalog structure</button>
@@ -126,7 +156,7 @@ function Sidebar() {
           </div>
         </div>
         <div className="nav-group" data-nav-group="lineage">
-          <button aria-expanded="false" className="nav-item nav-primary" data-view="lineage"><span className="nav-icon">⌘</span>Lineage<span aria-hidden="true" className="nav-chevron">⌄</span></button>
+          <button aria-expanded={expanded} className="nav-item nav-primary" data-view="lineage"><span className="nav-icon">⌘</span>Lineage<span aria-hidden="true" className="nav-chevron">⌄</span></button>
           <div className="nav-sublist" hidden>
             <button className="nav-item nav-child" data-view="lineage">Visual explorer</button>
             <button className="nav-item nav-child" data-view="history">Time travel</button>
@@ -135,7 +165,7 @@ function Sidebar() {
           </div>
         </div>
         <div className="nav-group" data-nav-group="operations">
-          <button aria-expanded="false" className="nav-item nav-primary" data-view="runs"><span className="nav-icon">↻</span>Operations<span aria-hidden="true" className="nav-chevron">⌄</span></button>
+          <button aria-expanded={expanded} className="nav-item nav-primary" data-view="runs"><span className="nav-icon">↻</span>Operations<span aria-hidden="true" className="nav-chevron">⌄</span></button>
           <div className="nav-sublist" hidden>
             <button className="nav-item nav-child" data-view="sources">Sources &amp; connections</button>
             <a className="nav-item nav-child" data-authenticated-ingestion-link href="/ingestion.html">Import metadata</a>
@@ -143,7 +173,7 @@ function Sidebar() {
           </div>
         </div>
         <div className="nav-group" data-nav-group="trust">
-          <button aria-expanded="false" className="nav-item nav-primary" data-view="evidence"><span className="nav-icon">🛡</span>Trust &amp; governance<span aria-hidden="true" className="nav-chevron">⌄</span></button>
+          <button aria-expanded={expanded} className="nav-item nav-primary" data-view="evidence"><span className="nav-icon">🛡</span>Trust &amp; governance<span aria-hidden="true" className="nav-chevron">⌄</span></button>
           <div className="nav-sublist" hidden>
             <button className="nav-item nav-child" data-view="evidence">Evidence &amp; reasoning</button>
             <button className="nav-item nav-child" data-view="quality">Data quality</button>
@@ -157,7 +187,7 @@ function Sidebar() {
           </div>
         </div>
         <div className="nav-group" data-nav-group="settings">
-          <button aria-expanded="false" className="nav-item nav-primary" data-view="integrations"><span className="nav-icon">⚙</span>System<span aria-hidden="true" className="nav-chevron">⌄</span></button>
+          <button aria-expanded={expanded} className="nav-item nav-primary" data-view="integrations"><span className="nav-icon">⚙</span>System<span aria-hidden="true" className="nav-chevron">⌄</span></button>
           <div className="nav-sublist" hidden>
             <button className="nav-item nav-child" data-view="integrations">Integrations &amp; API</button>
             <button className="nav-item nav-child" data-view="settings">Settings &amp; preferences</button>
@@ -242,6 +272,9 @@ function DashboardShell() {
         <DashboardContent />
         <footer className="footer"><span><i className="status-dot" /> Kairos metadata engine <b>·</b> <span id="footerModeLabel">{sourceLabel(dataMode)}</span></span><span>Evidence-first lineage <b>·</b> v0.1 prototype <b>·</b> build v305</span></footer>
       </div>
+      {/* Mobile-only chrome: app bar, drawer scrim and bottom tabs. Renders
+          nothing above 768px, so the desktop shell is unchanged. */}
+      <MobileShell />
     </div>
   );
 }
@@ -249,7 +282,7 @@ function DashboardShell() {
 function App() {
   useEffect(() => {
     const script = document.createElement('script');
-    script.src = '/auth.js?v=5';
+    script.src = '/auth.js?v=6';
     script.async = true;
     script.onerror = () => console.error('Kairos authentication bootstrap could not be loaded.');
     document.body.appendChild(script);

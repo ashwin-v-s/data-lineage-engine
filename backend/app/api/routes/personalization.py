@@ -78,9 +78,16 @@ _UNPROVISIONED_DETAIL = (
 
 def _require_personalization_tables(cur) -> None:
     """Raise HTTP 503 when migration 0005 tables are absent."""
-    cur.execute("SELECT to_regclass('public.asset_view'), to_regclass('public.asset_star')")
+    cur.execute(
+        "SELECT to_regclass('public.asset_view') AS asset_view, "
+        "       to_regclass('public.asset_star') AS asset_star"
+    )
     row = cur.fetchone()
-    if row is None or row[0] is None or row[1] is None:
+    # This helper is called with both tuple and RealDict cursors, so read the
+    # values through whichever interface the row exposes (indexing a
+    # RealDictRow raised KeyError: 0 and turned these routes into 500s).
+    values = row.values() if hasattr(row, "values") else (row or ())
+    if row is None or any(value is None for value in values):
         raise HTTPException(status_code=503, detail=_UNPROVISIONED_DETAIL)
 
 

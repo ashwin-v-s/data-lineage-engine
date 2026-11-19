@@ -14,7 +14,7 @@
     '/stewardship.js?v=304',
     '/evidence-semantics.js?v=1',
     '/lineage-investigation.js?v=1',
-    '/app.js?v=312',
+    '/app.js?v=315',
     '/asset-removal.js?v=1',
   ];
   let config = null;

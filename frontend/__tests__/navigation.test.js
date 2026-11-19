@@ -86,9 +86,13 @@ describe('catalog data modes', () => {
 
   it('still labels the retained demo code path as synthetic', () => {
     const app = read('app.js');
-    expect(app).toContain("S.dataMode==='demo'?'DEMO PREVIEW'");
     expect(app).toContain("S.dataMode==='demo'?'Synthetic example workspace'");
     expect(app).toContain("S.dataMode==='demo'?'DEMO DATA'");
+    // The top-bar label is rendered by React and names the data mode; the
+    // Demo/Live buttons already express the selection. Writing a catalog status
+    // phrase into that node duplicated it, contradicted the React-owned value
+    // and widened the header until the page scrolled sideways at 1024px.
+    expect(app).not.toContain("$('.data-mode-control strong')");
   });
 
   it('renders lineage from catalog rows without the retired mapper', () => {
