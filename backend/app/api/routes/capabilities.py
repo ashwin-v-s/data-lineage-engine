@@ -202,9 +202,17 @@ def get_asset_capabilities(asset_id: str, user: dict = Depends(require_user)):
             if dataset_id is None:
                 raise HTTPException(status_code=404, detail=f"Asset '{asset_id}' not found.")
 
+            # Columns may live on an equivalent variant of the same asset created by
+            # another importer, so look through the workspace-equivalent assets too.
             cur.execute(
-                "SELECT EXISTS (SELECT 1 FROM column_record WHERE dataset_id = %s::uuid) AS has_columns",
-                (dataset_id,),
+                """SELECT EXISTS (SELECT 1 FROM column_record WHERE dataset_id = %s::uuid)
+                       OR EXISTS (
+                         SELECT 1 FROM column_record cr
+                         JOIN dataset sibling ON sibling.id = cr.dataset_id
+                         JOIN dataset requested ON requested.id = %s::uuid
+                         WHERE sibling.name = requested.name AND sibling.namespace = requested.namespace
+                       ) AS has_columns""",
+                (dataset_id, dataset_id),
             )
             has_columns = bool(cur.fetchone()["has_columns"])
 

@@ -262,6 +262,23 @@ class TestManifestVersionPinning:
         r = parse_dbt_manifest(_manifest_node("model.test_proj.revenue", schema_version="https://schemas.getdbt.com/dbt/manifest/v7/manifest.json"))
         assert r.ok is True
 
+    def test_m2b_json_suffixed_schema_url_is_accepted(self):
+        # Real dbt artefacts point at .../manifest/v10.json rather than .../v10/manifest.json.
+        r = parse_dbt_manifest(_manifest_node(
+            "model.test_proj.revenue",
+            schema_version="https://schemas.getdbt.com/dbt/manifest/v10.json",
+        ))
+        assert r.ok is True, f"Expected ok, got {r.diagnostics}"
+        assert not any(w.code == "UNRECOGNISED_DBT_MANIFEST_VERSION" for w in r.warnings)
+
+    def test_m2c_json_suffixed_pre_v7_url_is_rejected(self):
+        r = parse_dbt_manifest({
+            "metadata": {"dbt_schema_version": "https://schemas.getdbt.com/dbt/manifest/v5.json"},
+            "nodes": {}, "sources": {}, "exposures": {},
+        })
+        assert r.ok is False
+        assert r.diagnostics[0].code == "UNSUPPORTED_DBT_MANIFEST_VERSION"
+
     def test_m4_future_version_emits_warning_but_parses(self):
         r = parse_dbt_manifest(_manifest_node("model.test_proj.revenue", schema_version="https://schemas.getdbt.com/dbt/manifest/v99/manifest.json"))
         assert r.ok is True
