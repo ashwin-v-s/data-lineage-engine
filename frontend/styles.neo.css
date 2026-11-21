@@ -98,8 +98,9 @@ b,strong{font-weight:600}
 .nav-count,.nav-tag{margin-left:auto;padding:1px 9px;border:1.5px solid var(--ink);border-radius:999px;background:var(--surface);color:var(--ink);font:500 .62rem var(--font-mono);letter-spacing:.06em}
 .sidebar-bottom{margin-top:auto;padding-top:18px}
 .health-card{margin-bottom:10px;padding:12px 14px;border:2px solid var(--ink);border-radius:14px;background:var(--tint-green)}
-.health-top{display:flex;align-items:center;gap:8px}.health-top strong{font:700 .9rem var(--font-display)}
-.health-live{margin-left:auto;padding:1px 10px;border:1.5px solid var(--ink);border-radius:999px;background:var(--yellow);color:var(--on-yellow);font:500 .62rem var(--font-mono);letter-spacing:.08em}
+.health-top{display:flex;align-items:center;flex-wrap:wrap;gap:6px 8px;min-width:0}.health-top strong{font:700 .9rem var(--font-display)}
+.health-live{display:inline-flex;align-items:center;max-width:100%;margin-left:auto;padding:1px 10px;border:1.5px solid var(--ink);border-radius:999px;background:var(--yellow);color:var(--on-yellow);font:500 .62rem var(--font-mono);letter-spacing:.08em;white-space:nowrap}
+.health-live.is-connecting{background:var(--surface);color:var(--muted)}
 .health-card p{margin:8px 0 10px;font-size:.82rem;line-height:1.45;color:var(--muted)}
 .health-meter{display:none}
 .health-foot{display:flex;justify-content:space-between;font:400 .68rem var(--font-mono);letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}.health-foot b{font-weight:500;color:var(--ink)}

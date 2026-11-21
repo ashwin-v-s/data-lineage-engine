@@ -191,11 +191,24 @@ describe('React provenance ownership and data-mode consumption', () => {
 
   it('renders provenance labels from data-mode state, not from window.kairosDemoPreview', () => {
     expect(shell).toContain('dataModeDescription(dataMode)');
-    expect(shell).toContain('sourceLabel(dataMode)');
+    expect(shell).toContain('sourceLabel(dataMode, connecting)');
     // No hardcoded window.kairosDemoPreview ternaries for provenance labels
     expect(shell).not.toContain('window.kairosDemoPreview ? "DEMO FIXTURE"');
     expect(shell).not.toContain('window.kairosDemoPreview ? "Demo fixture"');
     expect(shell).not.toContain('window.kairosDemoPreview ? "Not connected"');
+  });
+
+  it('animates a connecting state instead of claiming NOT CONNECTED on load', () => {
+    const badge = read('src/components/DataModeLabel.jsx');
+    // The badge renders a looping ring and the CONNECTING word while in flight.
+    expect(badge).toContain('data-mode-spinner');
+    expect(badge).toContain('CONNECTING');
+    expect(badge).toContain('connecting = false');
+    // A saved session starts the shell in loading, so the first paint is progress.
+    expect(shell).toContain("catalogStatus: hasStoredSession() ? 'loading' : 'idle'");
+    expect(shell).toContain("window.addEventListener('kairos:auth-ready', onAuthReady)");
+    // The spinner has a reduced-motion fallback.
+    expect(read('src/components/dataMode.css')).toContain('prefers-reduced-motion');
   });
 
   it('React owns the five provenance label nodes; app.js does not write to them', () => {

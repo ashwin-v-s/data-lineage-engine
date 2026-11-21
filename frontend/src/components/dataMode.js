@@ -27,6 +27,12 @@ export const DATA_MODES = {
   ERROR: 'CATALOG ERROR',
 };
 
+/**
+ * Copy for the transient request state. It is not a provenance mode: the
+ * catalog status still decides the label once the request settles.
+ */
+export const CONNECTING_DESCRIPTION = 'Requesting the persisted catalog from this workspace; the result decides the provenance label.';
+
 const DESCRIPTIONS = {
   [DATA_MODES.LIVE]: 'Read live from the connected catalog API.',
   [DATA_MODES.IMPORTED]: 'Committed into this workspace by a Kairos import run.',
