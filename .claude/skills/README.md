@@ -9,6 +9,7 @@ guidance without a marketplace step.
 | --- | --- |
 | [`frontend-design`](./frontend-design/SKILL.md) | UI work: layout, type, colour, interaction states, and interface copy. |
 | [`webapp-testing`](./webapp-testing/SKILL.md) | Driving the local app with Playwright to reproduce or verify a behaviour. |
+| [`bug-hunter`](./bug-hunter/SKILL.md) | Adversarial Hunter/Skeptic/Referee code audit across the backend and frontend. |
 
 ## How they apply here
 
@@ -25,5 +26,15 @@ what happened and what to do next), and restraint.
 `frontend/e2e/**/*.spec.js` and run under Playwright. Never let one runner
 collect the other's files — the root `vitest.config.mjs` exists for that reason.
 
-Both skills read local state only. Do not point them at production or at a
+`bug-hunter` is vendored from [`codexstar69/bug-hunter`](https://github.com/codexstar69/bug-hunter)
+v3.2.1 (MIT). It was installed into this path with
+`npx --yes https://github.com/codexstar69/bug-hunter/archive/refs/heads/main.tar.gz install --path .claude/skills/bug-hunter`
+so the runtime and schemas travel with the repository. Its defaults are
+**scan-only and single-pass**: it writes schema-validated JSON plus `report.md`
+under `.bug-hunter/` (git-ignored) and never edits source, commits or changes
+permissions unless a run is explicitly given `--fix`, `--autonomous` or
+`--auto-commit`. Re-run `node .claude/skills/bug-hunter/scripts/triage.cjs scan <path> --output .bug-hunter/triage.json`
+before trusting a scope number in an older report.
+
+All three skills read local state only. Do not point them at production or at a
 signed-in session you were not asked to use.

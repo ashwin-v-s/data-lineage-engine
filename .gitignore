@@ -1,3 +1,6 @@
+# Bug Hunter scan artifacts (regenerate with the bug-hunter skill)
+.bug-hunter/
+
 # Byte-compiled / optimized / test caches
 __pycache__/
 *.py[cod]
