@@ -65,8 +65,8 @@ Status vocabulary used below:
 | Edge evidence inspector | `GET /api/v1/lineage/edges/{id}/evidence` | **Verified** | Returns evidence rows for edge `5a9abd50-…` |
 | Four-state reasoning (OBSERVED/POSSIBLE/REFUTED/UNKNOWN) | `evidence-semantics.js`, evidence view | **Verified** | 6,487 chars; states composed from stored evidence |
 | Downstream impact | `GET /api/v1/assets/{id}/downstream-impact` | **Verified** | `customers` → `total_affected: 4` across depth levels |
-| Column-level lineage | `GET /api/v1/column-lineage` | **Blocked** | `{"total":0}` — no adapter emits COLUMN-granularity evidence (BUG-03) |
-| Bitemporal / as-of lineage | `?view=history`, `?as_of=`/`recorded_as_of=` | **Partial** | `evidence-at-time` returns `included: 0, undated_valid_time: 23` (BUG-04) |
+| Column-level lineage | `GET /api/v1/column-lineage` | **Blocked (data, not code)** | `{"total":0}` — the 12 COLUMN edges live in the seeded workspace, this workspace has dataset-level evidence only (BUG-03) |
+| Bitemporal / as-of lineage | `?view=history`, `?as_of=`/`recorded_as_of=` | **Partial** | `evidence-at-time` returns `included: 0, undated_valid_time: 23` — all rows are `effective_time_status='UNKNOWN'`, reported honestly (BUG-04) |
 | Time-travel comparison UI | `?view=history` | **Partial** | Renders, but compares an empty dated set |
 | 3D observatory | `?view=observatory` | **Verified** | Loads with persisted graph, no null-node error |
 

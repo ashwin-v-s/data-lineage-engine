@@ -118,7 +118,17 @@ Presenters should navigate by clicking, not by editing the URL.
 
 ## 7. Defects
 
-### BUG-01 — One logical dataset becomes 2–3 catalog assets (High, demo-blocking)
+### BUG-01 — One logical dataset becomes 2–3 catalog assets (High, demo-blocking) — **READ SIDE FIXED, DEPLOYED**
+
+The demo-blocking *symptom* is fixed (PR #15): the asset variant the UI opens may
+carry no `column_record` rows, so `GET /governance/datasets/{id}/columns` and
+`capabilities.schema` now fall back to the columns of the equivalent variant
+(`workspace, name, namespace`), and `POST /governance/classifications` attaches a
+classification to the asset that owns the column. Verified live: the SQL-file
+variant of `customers` returns 6 columns, `capabilities.schema.available` is
+true, and a `PII_SOURCE` classification was created on `customers.email` with
+`dataset_id` resolved to the owning asset. Merging the duplicate rows is still
+open and needs a migration plus a data decision.
 
 `kairos_upsert_dataset` keys identity on
 `(source_system, namespace, database_name, schema_name, name, asset_type)` and
@@ -191,7 +201,18 @@ against production:
 "Average score: 0.00" instead of "not scored" (`frontend/app.js`
 `qualityPage()` computes the mean over an empty scored set). Not fixed yet.
 
-### BUG-03 — Column-level lineage cannot be produced (High for the brief)
+### BUG-03 — Column-level lineage cannot be produced (High for the brief) — **NOT A QUERY BUG; DATA IS IN ANOTHER WORKSPACE**
+
+Investigated 2026-11-21 after the demo deployment: the endpoint is correct. The
+twelve COLUMN-granularity edges and their twelve column-level evidence rows
+exist, but they belong to workspace `00000000-0000-4000-8000-000000000001` (the
+seeded workspace), not to the demo account's workspace
+`d91f7d80-dc3e-401e-9df4-e7670e4d3ba1`, whose 23 evidence rows are all
+dataset-granularity. Under the workspace RLS the demo account therefore
+genuinely has no column-level evidence, and `total: 0` is the honest answer.
+To show column lineage in the demo workspace, column-level evidence has to be
+produced *there* (static SQL analysis or OpenLineage ingest); no code change
+will invent it.
 
 Every adapter creates `granularity = 'DATASET'` evidence only. The metadata
 graph contract has no column-endpoint fields, SQLGlot output is not expanded to
@@ -204,7 +225,16 @@ backed by the stored data.
 exposes column lineage in its qualifier output). Until then, present dataset
 lineage and say column lineage is not yet implemented.
 
-### BUG-04 — Static evidence is undated, so time travel returns nothing (Medium)
+### BUG-04 — Static evidence is undated, so time travel returns nothing (Medium) — **BY DESIGN, NOT SILENT**
+
+All 23 `edge_temporal_version` rows in the demo workspace carry
+`effective_time_status = 'UNKNOWN'`, so `evidence-at-time` reports
+`included: 0, undated_valid_time: 23` — it counts the undated rows instead of
+pretending they were valid at the requested instant. Stamping an import time as
+a business effective time would make the timeline look populated but wrong;
+the fix is an ingest contract that records `event_time`/`effective_time` when a
+source provides them. Edge travel itself works: every covered edge has a
+`valid_from`.
 
 `evidence.event_time` / `effective_time` are NULL for imports; the demo
 workspace shows `included: 0, undated_valid_time: 23`. The bitemporal endpoint
@@ -219,13 +249,28 @@ and the server then fetches that URL
 response. Add private/loopback/link-local/metadata blocking after DNS
 resolution, or an allowlist.
 
-### BUG-06 — dbt manifest version parser misses the canonical URL (Low)
+### BUG-06 — dbt manifest version parser misses the canonical URL (Low) — **FIXED, DEPLOYED AND VERIFIED**
+
+The parser now strips the `.json` suffix, so
+`https://schemas.getdbt.com/dbt/manifest/v10.json` is recognised (pre-v7 URLs are
+still rejected). Verified against production: previewing
+`dbt_production_manifest.json` (schema URL `…/v10.json`) returns 8 assets, 8
+relationships and **no warnings**; previously it emitted
+`UNRECOGNISED_DBT_MANIFEST_VERSION`. New tests:
+`test_m2b_json_suffixed_schema_url_is_accepted`,
+`test_m2c_json_suffixed_pre_v7_url_is_rejected`.
 
 A manifest declaring `"dbt_schema_version": "https://schemas.getdbt.com/dbt/manifest/v10.json"`
 imports successfully but warns `UNRECOGNISED_DBT_MANIFEST_VERSION`. The parser
 expects a bare version token. Accept the `/v<N>.json` URL form.
 
-### BUG-07 — Committed test credentials (Medium, security, carried from the audit)
+### BUG-07 — Committed test credentials (Medium, security, carried from the audit) — **CODE FIXED, PASSWORD STILL MUST BE ROTATED**
+
+`scripts/get_test_token.py` now reads `KAIROS_TEST_USER_EMAIL` /
+`KAIROS_TEST_USER_PASSWORD` from the environment and exits with a clear message
+when they are missing; no credential literal remains in the file. The value that
+was already committed to history is still exposed, so it has to be rotated in
+Supabase regardless of this change.
 
 `scripts/get_test_token.py:39-40` contains a working account email and password
 for the shared Supabase project. Rotate the password and read the values from
