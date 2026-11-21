@@ -473,6 +473,9 @@ body[data-tone="green"]{--tone:var(--green)}body[data-tone="yellow"]{--tone:var(
 .stat-card:nth-child(1){background:var(--tint-green)}.stat-card:nth-child(2){background:var(--tint-red)}.stat-card:nth-child(3){background:var(--hl)}.stat-card:nth-child(4){background:var(--tint-blue)}
 .stat-top::after{content:"";flex:none;width:14px;height:14px;border:2px solid var(--ink);border-radius:50%;background:var(--green)}
 .stat-card:nth-child(2) .stat-top::after{background:var(--red)}.stat-card:nth-child(3) .stat-top::after{background:var(--yellow)}.stat-card:nth-child(4) .stat-top::after{background:var(--blue)}
+/* Semantic tones: pass/fail counts must not inherit a decorative colour from their position */
+.stat-card.tone-good{background:var(--tint-green)}.stat-card.tone-warn{background:var(--hl)}.stat-card.tone-bad{background:var(--tint-red)}.stat-card.tone-info{background:var(--tint-blue)}
+.stat-card.tone-good .stat-top::after{background:var(--green)}.stat-card.tone-warn .stat-top::after{background:var(--yellow)}.stat-card.tone-bad .stat-top::after{background:var(--red)}.stat-card.tone-info .stat-top::after{background:var(--blue)}
 .stat-card .stat-top,.stat-card .stat-foot{color:var(--ink)}.stat-card .stat-foot{opacity:.75}
 
 /* Evidence states use all four colours: observed green, possible yellow, refuted red, unknown blue */
