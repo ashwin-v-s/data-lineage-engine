@@ -144,7 +144,7 @@ and a backfill — do not hot-patch it before a demo.
 metadata graph alone yields 9 assets with 41 columns and 9 edges, and no
 duplicates. SQL and dbt can be demonstrated in a second workspace.
 
-### BUG-02 — Catalog hardcodes `quality_checks` and `column_classifications` (High, demo-blocking) — **FIXED IN WORKING TREE, NOT DEPLOYED**
+### BUG-02 — Catalog hardcoded `quality_checks` and `column_classifications` (High, demo-blocking) — **FIXED, DEPLOYED AND VERIFIED**
 
 `backend/app/api/routes/search.py:323-324`:
 
@@ -175,8 +175,21 @@ limits test mock was extended for the new probe.
 Verified: `pytest -q` → **735 passed, 83 skipped**; the SQL used by the route
 returns the stored `PASS` result for `fct_daily_revenue` from the live database.
 
-**Not deployed:** production still returns the hardcoded arrays until this
-change is approved and deployed.
+**Deployed 2026-11-21** (PR #14 → `4478a71`, `vercel deploy --prod`). Verified
+against production:
+
+- `GET /api/v1/catalog` now returns one `quality_checks` row for the demo
+  workspace (`Revenue mart schema contract`, `fct_daily_revenue`, `schema`,
+  `score: null`, `status: PASS`) and `counts.quality_checks: 1`.
+- The Data quality page renders it end to end after a real form sign-in:
+  **Recorded checks 1, Passed 1, Warnings 0, Failed 0**, with the table row
+  `Revenue mart schema contract · fct_daily_revenue · schema · — · PASS ·
+  21 Nov 2026, 17:06`. Screenshot `.demo-sources/visual/live-06-quality.png`.
+- 0 console errors during the check.
+
+**Remaining cosmetic issue:** with no scored checks the panel header prints
+"Average score: 0.00" instead of "not scored" (`frontend/app.js`
+`qualityPage()` computes the mean over an empty scored set). Not fixed yet.
 
 ### BUG-03 — Column-level lineage cannot be produced (High for the brief)
 
