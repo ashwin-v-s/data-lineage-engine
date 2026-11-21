@@ -147,7 +147,7 @@ b,strong{font-weight:600}
 .btn.danger{background:var(--tint-red);color:var(--warn-ink)}
 .btn.small{min-height:34px;padding:5px 15px;font-size:.82rem}
 .asset-row-actions{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
-.panel-link,.inline-link{padding:0;border:0;background:none;color:var(--link);font:600 .85rem var(--font-body);text-align:left;text-underline-offset:3px}
+.panel-link,.inline-link{display:inline-flex;align-items:center;min-height:24px;padding:3px 0;border:0;background:none;color:var(--link);font:600 .85rem var(--font-body);text-align:left;text-underline-offset:3px}
 .inline-link{font-size:inherit}
 .panel-link:hover,.inline-link:hover{text-decoration:underline}
 .inline-link strong{color:var(--ink)}
@@ -469,10 +469,10 @@ body[data-tone="green"]{--tone:var(--green)}body[data-tone="yellow"]{--tone:var(
 .panel-head h2::before{content:"";display:inline-block;width:14px;height:14px;margin-right:10px;border:2px solid var(--ink);border-radius:50%;background:var(--tone);vertical-align:-1px}
 .modal-head h2::before{display:none}
 
-/* KPI cards: green / red / yellow / blue, each with a colour dot */
-.stat-card:nth-child(1){background:var(--tint-green)}.stat-card:nth-child(2){background:var(--tint-red)}.stat-card:nth-child(3){background:var(--hl)}.stat-card:nth-child(4){background:var(--tint-blue)}
+/* KPI cards are neutral by default: a red or amber tile must mean a failing or
+   at-risk count, so only the semantic tones below add colour. Position in the
+   grid is not information. */
 .stat-top::after{content:"";flex:none;width:14px;height:14px;border:2px solid var(--ink);border-radius:50%;background:var(--green)}
-.stat-card:nth-child(2) .stat-top::after{background:var(--red)}.stat-card:nth-child(3) .stat-top::after{background:var(--yellow)}.stat-card:nth-child(4) .stat-top::after{background:var(--blue)}
 /* Semantic tones: pass/fail counts must not inherit a decorative colour from their position */
 .stat-card.tone-good{background:var(--tint-green)}.stat-card.tone-warn{background:var(--hl)}.stat-card.tone-bad{background:var(--tint-red)}.stat-card.tone-info{background:var(--tint-blue)}
 .stat-card.tone-good .stat-top::after{background:var(--green)}.stat-card.tone-warn .stat-top::after{background:var(--yellow)}.stat-card.tone-bad .stat-top::after{background:var(--red)}.stat-card.tone-info .stat-top::after{background:var(--blue)}
