@@ -20,6 +20,9 @@ class _Cursor:
         self.query, self.params = " ".join(query.split()), params
 
     def fetchone(self):
+        if "to_regclass" in self.query:
+            # Migration 0011 tables are present, but this fixture stores no rows.
+            return {"assertions": "quality_assertion", "classifications": "pii_classification"}
         if "COUNT(*)" in self.query and "FROM dataset" in self.query:
             return {"count": 3}
         return {"count": 0}

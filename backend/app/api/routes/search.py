@@ -253,6 +253,94 @@ def catalog_snapshot(
                 LIMIT %s
             """, (evidence_limit + 1,))
             evidence_rows = [dict(row) for row in cur.fetchall()]
+            # M4 tables ship in migration 0011. A deployment that predates it must
+            # still serve the catalog, so treat their absence as "no records"
+            # rather than failing the whole snapshot.
+            cur.execute(
+                "SELECT to_regclass('public.quality_assertion') AS assertions, "
+                "       to_regclass('public.pii_classification') AS classifications"
+            )
+            governance_tables = cur.fetchone()
+            quality_checks: list[dict] = []
+            column_classifications: list[dict] = []
+            if (governance_tables or {}).get("assertions") is not None:
+                cur.execute("""
+                    SELECT qa.id::text AS id,
+                           qa.name AS rule_name,
+                           qa.assertion_type AS check_type,
+                           qa.severity,
+                           qa.dataset_id::text AS dataset_id,
+                           d.name AS qualified_asset_name,
+                           qr.status, qr.checked_count, qr.failed_count, qr.evaluated_at
+                    FROM quality_assertion qa
+                    JOIN dataset d ON d.id = qa.dataset_id
+                    LEFT JOIN LATERAL (
+                        SELECT r.status, r.checked_count, r.failed_count, r.evaluated_at
+                        FROM quality_result r
+                        WHERE r.assertion_id = qa.id
+                        ORDER BY r.evaluated_at DESC
+                        LIMIT 1
+                    ) qr ON TRUE
+                    ORDER BY qr.evaluated_at DESC NULLS LAST, qa.created_at DESC
+                    LIMIT 200
+                """)
+                for qa_row in cur.fetchall():
+                    evaluated = qa_row.get("evaluated_at")
+                    quality_checks.append({
+                        "id": qa_row["id"],
+                        "rule_name": qa_row["rule_name"],
+                        "qualified_asset_name": qa_row["qualified_asset_name"],
+                        "dataset_id": qa_row["dataset_id"],
+                        "check_type": qa_row["check_type"],
+                        "severity": qa_row["severity"],
+                        # Metadata-only assertions have no numeric score; the UI
+                        # must show "not scored" rather than inventing one.
+                        "score": None,
+                        "status": qa_row.get("status") or "NOT_EVALUATED",
+                        "checked_count": qa_row.get("checked_count"),
+                        "failed_count": qa_row.get("failed_count"),
+                        "evaluated_at": evaluated.isoformat() if hasattr(evaluated, "isoformat") else evaluated,
+                    })
+            if (governance_tables or {}).get("classifications") is not None:
+                cur.execute("""
+                    SELECT pc.id::text AS id,
+                           pc.dataset_id::text AS asset_id,
+                           d.name AS asset_name,
+                           pc.column_id::text AS column_id,
+                           cr.column_name,
+                           pc.classification,
+                           pc.evidence_state,
+                           pc.provenance,
+                           pc.created_at
+                    FROM pii_classification pc
+                    JOIN dataset d ON d.id = pc.dataset_id
+                    LEFT JOIN column_record cr ON cr.id = pc.column_id
+                    ORDER BY pc.created_at DESC
+                    LIMIT 500
+                """)
+                pii_flag = {
+                    "PII_SOURCE": True,
+                    "PII_INHERITED": True,
+                    "PII_POTENTIAL": True,
+                    "PII_MASKED": True,
+                    "PII_CLEARED": False,
+                }
+                for pc_row in cur.fetchall():
+                    created = pc_row.get("created_at")
+                    column_classifications.append({
+                        "id": pc_row["id"],
+                        "asset_id": pc_row["asset_id"],
+                        "asset_name": pc_row["asset_name"],
+                        "column_id": pc_row["column_id"],
+                        "column_name": pc_row["column_name"],
+                        "classification": pc_row["classification"],
+                        "evidence_state": pc_row["evidence_state"],
+                        "provenance": pc_row["provenance"],
+                        # UNKNOWN stays null so the UI shows "not classified"
+                        # instead of claiming the column is or is not PII.
+                        "is_pii": pii_flag.get(pc_row["classification"]),
+                        "created_at": created.isoformat() if hasattr(created, "isoformat") else created,
+                    })
             cur.execute("SELECT COUNT(*)::int AS count FROM raw_event")
             raw_event_count = int(cur.fetchone()["count"])
 
@@ -320,8 +408,8 @@ def catalog_snapshot(
             }
             for run in runs
         ],
-        "quality_checks": [],
-        "column_classifications": [],
+        "quality_checks": quality_checks,
+        "column_classifications": column_classifications,
         "pagination": {"limit": limit, "offset": offset, "total_assets": asset_total},
         "truncated": {
             "assets": assets_truncated,
@@ -332,7 +420,7 @@ def catalog_snapshot(
         "counts": {
             "assets": len(assets), "edges": len(edges),
             "evidence": evidence_count, "runs": run_count,
-            "quality_checks": 0, "raw_events": raw_event_count,
+            "quality_checks": len(quality_checks), "raw_events": raw_event_count,
         },
     }
 

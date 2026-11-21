@@ -1,0 +1,207 @@
+# KAIROS — Demo Data Catalog
+
+Prepared 2026-11-21. Every record below was written through the application's
+own authenticated HTTP pipeline (or a documented application route) into the
+shared Supabase Postgres project, workspace
+`d91f7d80-dc3e-401e-9df4-e7670e4d3ba1` (**Personal workspace**, owner
+`pranavsamal43@gmail.com`).
+
+> **Data origin — read this before presenting.** All assets, columns, lineage
+> edges, governance records and quality results in this workspace are
+> **synthetic demonstration data**. They model a plausible enterprise revenue
+> analytics stack; they are not customer data, not externally authenticated
+> metadata, and not the output of a real dbt run. Nothing here was scraped,
+> purchased, or imported from an organisation. The fixtures are committed in
+> `demo-authenticated-ingestion/` and are traceable to the exact file that
+> produced each row.
+
+---
+
+## 1. The business story
+
+A mid-size e-commerce company sells through its own storefront. Orders and
+payment authorisations land in a raw zone, are conformed in a staging layer,
+modelled into an analytics mart, and consumed by an executive dashboard and a
+customer-success portal. Two governance concerns drive the rest of the demo:
+
+1. **Revenue is regulated.** The daily revenue mart is SOX in scope, so its
+   definition (GMV, net recognised revenue) must be governed, versioned and
+   evidenced.
+2. **Customer identity is PII.** The raw customer table carries emails that are
+   hashed before any analytics consumer sees them.
+
+### Logical architecture (as ingested)
+
+```
+Tier 1  Raw sources
+  raw_enterprise.customers          (6 cols, PII source)
+  raw_enterprise.orders_feed        (6 cols)
+  raw_enterprise.payments_feed      (6 cols)
+
+Tier 2  Staging / conformance
+  staging.stg_orders_enriched       (7 cols)  <- orders_feed + payments_feed
+  staging.stg_customer_360          (5 cols)  <- customers (email pseudonymised)
+
+Tier 3  Analytics marts
+  analytics.fct_daily_revenue       (6 cols)  <- stg_orders_enriched + stg_customer_360
+  analytics.dim_customer_segments   (5 cols)  <- stg_orders_enriched + stg_customer_360
+
+Tier 4  Consumption
+  executive.daily_revenue_kpi       (dashboard) <- fct_daily_revenue
+  reporting.customer_retention_portal (dashboard) <- dim_customer_segments
+```
+
+## 2. Fixture → resulting records
+
+| Fixture (committed) | Adapter | Preview result | `import_id` |
+| --- | --- | --- | --- |
+| `enterprise_metadata_graph.json` | `metadata_graph` | 9 assets, 9 relationships, 41 columns | `cc782dcb-2209-42d3-8b78-798d50881844` |
+| `enterprise_lineage_pipeline.sql` | `sql_file` (`sqlglot`) | 8 assets, 6 relationships, 0 columns | `2ac950e6-c0dc-4d74-b830-a5b512a7aca4` |
+| `dbt_production_manifest.json` | `dbt_manifest` | 8 assets, 8 relationships | `b33f21f5-836d-4fb8-8bd4-42fb38730a5d` |
+| `customer_transactions_schema.csv` | `csv_headers` | 1 asset, 10 columns | `e958f1a0-9811-4de0-a956-fcb9f5d8d522` |
+| `enterprise_inventory.json` | `file_inventory` | 4 file assets | `477e8d47-b54f-4575-b841-14192572bef1` |
+
+Idempotency keys follow `kairo-e2e-2026-11-21-<kind>`. Replaying the metadata
+graph with the same key returned `replayed: true` and the same `import_id`, so
+the demo can be re-run safely.
+
+**Catalog readback after all five commits:** 30 assets, 23 lineage edges, 23
+evidence rows, 0 runs (`GET /api/v1/catalog?limit=200`, HTTP 200).
+
+> **Why 30 assets for 9 logical tables:** the three metadata adapters describe
+> the same entities with different `asset_type` values (`table`, `source`,
+> `model`, `view`, `exposure`), and the canonical upsert keys on that type. That
+> is defect **BUG-01** in the test report, and it is visible in the catalog as
+> e.g. three `fct_daily_revenue` rows. Demonstrate the metadata-graph assets
+> (`TABLE`/`VIEW`/`MODEL` from the graph) and explain the duplication if asked.
+
+## 3. Assets and columns (from the metadata graph)
+
+| Asset | Namespace | Type | Columns |
+| --- | --- | --- | --- |
+| `customers` | `raw_enterprise` | table | customer_id, email, full_name, signup_date, country_code, marketing_opt_in |
+| `orders_feed` | `raw_enterprise` | table | order_id, customer_id, order_total, currency, order_status, ordered_at |
+| `payments_feed` | `raw_enterprise` | table | payment_id, order_id, amount, payment_method, payment_status, captured_at |
+| `stg_orders_enriched` | `staging` | view | order_id, customer_id, gross_order_value, net_order_value, currency, payment_status, order_date |
+| `stg_customer_360` | `staging` | view | customer_id, masked_email, country_code, signup_date, lifetime_segment |
+| `fct_daily_revenue` | `analytics` | model | revenue_date, gross_merchandise_value, net_recognized_revenue, order_count, refund_amount, currency |
+| `dim_customer_segments` | `analytics` | model | customer_id, value_tier, lifetime_value, churn_risk_band, last_order_date |
+| `daily_revenue_kpi` | `executive` | dashboard | — |
+| `customer_retention_portal` | `reporting` | dashboard | — |
+
+Metadata carried on each asset: description, owner, steward, tags (including
+`sox-in-scope`, `pii`), `domain`, `compliance_context`, retention policy.
+
+## 4. Lineage edges (declared, `dbt_model_ref` / `dashboard_upstream_dataset`)
+
+```
+orders_feed    ─┐
+payments_feed  ─┴─► stg_orders_enriched ─┬─► fct_daily_revenue      ─► daily_revenue_kpi
+customers      ────► stg_customer_360   ──┴─► dim_customer_segments  ─► customer_retention_portal
+```
+
+Nine edges in the metadata graph; six equivalent edges are re-derived by the
+SQLGlot adapter from `CREATE TABLE … AS SELECT` / `INSERT … SELECT` in
+`enterprise_lineage_pipeline.sql`; eight more come from the dbt manifest's
+`depends_on.nodes`. Each persisted edge carries:
+
+- `granularity = DATASET`
+- `operator_fingerprint` (`declared_dependency` for static imports)
+- an `evidence` row of type `STATIC_DEPENDENCY`, `parser_status = SUPPORTED`,
+  with `diagnostics.edge_type`, `diagnostics.provenance` (the source file) and
+  `classification = DECLARED_METADATA`.
+
+Evidence ids follow `kairos-import:<import_id>` so every claim is traceable to a
+committed file.
+
+### Verified query results
+
+| Query | Result |
+| --- | --- |
+| `GET /api/v1/assets/{fct_daily_revenue MODEL}/lineage?depth=4` | 8 nodes, 8 edges |
+| `GET /api/v1/assets/{customers SOURCE}/downstream-impact?depth=4` | `total_affected: 4` across depth levels |
+| `GET /api/v1/lineage/edges/5a9abd50-…/evidence` | evidence rows returned |
+| `GET /api/v1/evidence-at-time?valid_as_of=now&recorded_as_of=now` | `included: 0, undated_valid_time: 23` (static evidence has no effective time) |
+| `GET /api/v1/column-lineage?valid_as_of=now` | `total: 0` (no COLUMN-granularity evidence exists) |
+
+## 5. Governance records created in this workspace
+
+| Kind | Record | Id |
+| --- | --- | --- |
+| Domain | Finance & Revenue — "Certified revenue, margin and customer-value reporting domain." | `f480e033-8b02-40ac-bd91-94ff545632fd` |
+| Glossary term | Gross Merchandise Value (GMV) — "Total value of settled orders before cancellations, refunds and taxes." | `fce04495-a252-4ec0-ae49-85c0702dbf3b` (status APPROVED) |
+| Term ↔ asset | GMV linked to `fct_daily_revenue` | `created: true` |
+| Data product | Executive Revenue Intelligence (ACTIVE) — assets: `daily_revenue_kpi` (DASHBOARD), `fct_daily_revenue` (TABLE) | `f33bea44-db2f-459c-8db2-8f42eac7e714` |
+| Quality assertion | "Revenue mart schema contract", type `schema`, severity HIGH, schedule manual | `480a9715-3dbc-4b4d-be47-703dde52a6bd` |
+| Quality result | PASS, checked 1, failed 0, evaluated 2026-11-21T11:36Z | `54a0cd91-49b3-4ec6-a532-6169b28e3e8b` |
+| Freshness SLA | `fct_daily_revenue`: warn 48 min, error 60 min, stale 120 min, signal `manual`, schedule `manual` | `e0f15710-ed4a-4947-8c2f-9e486d3854ea` |
+
+Readbacks: `/governance/terms` 4 rows, `/governance/domains` 3 rows,
+`/governance/products` 3 rows, `/quality/assertions` 1 row,
+`/governance/slas` 1 row — all HTTP 200.
+
+### Not created (and why)
+
+| Item | Reason |
+| --- | --- |
+| PII classification on `customers.email` | The imported columns live on the `SOURCE` duplicate of `customers`, while the UI/`TABLE` duplicate exposes none (`BUG-01`). The endpoint itself is verified. |
+| Data contract version | Available, but a contract needs an assertion id and clause JSON; prepared steps are in the demo guide. |
+| Incidents / notifications | No scheduler or runtime freshness signal exists in this deployment, so nothing legitimately triggers them. |
+| Sync jobs, source connections | Requires a reachable PostgreSQL source and `KAIROS_TOKEN_ENCRYPTION_KEY`. |
+| Column-level lineage | No adapter emits column-granularity evidence (`BUG-03`). |
+
+## 6. Historical / temporal data
+
+`edge_temporal_version` holds **131** rows globally, produced by the platform's
+temporal projection of edges; 23 undated evidence rows belong to this
+workspace's static imports. Because static imports carry no `event_time` or
+`effective_time`, the bitemporal query for "now" returns those rows as
+*undated* rather than included. To demonstrate time travel honestly you need a
+runtime source (OpenLineage or the PostgreSQL connector) that stamps times, or
+a backfill endpoint, which does not exist. Use the Time travel screen to show
+the *mechanism* and state clearly that the demo workspace's static evidence is
+undated.
+
+## 7. Reproducing this dataset
+
+```bash
+# 1. Real session (test account; credentials live in scripts/get_test_token.py)
+python scripts/get_test_token.py
+
+# 2. Preview + commit each fixture through the deployed API
+#    POST /api/v1/ingest/preview   {kind, filename, content}
+#    POST /api/v1/ingest/commit    {kind, filename, content, idempotency_key}
+#    Header: Authorization: Bearer <token>
+#            X-Kairos-Workspace-ID: d91f7d80-dc3e-401e-9df4-e7670e4d3ba1
+
+# 3. Governance objects
+#    POST /api/v1/governance/domains|terms|products|classifications|slas
+#    POST /api/v1/quality/assertions  then  /{id}/evaluate
+```
+
+The exact scripts used are in the (git-ignored) `.demo-sources/` folder:
+`e2e.py` (ingestion), `e2e2.py` (lineage/evidence/search),
+`e2e3.py` (governance/quality/SLA), `inspect.py` / `inspect2.py` / `qa.py`
+(database verification), `browser.mjs` / `.demo-check2.mjs` /
+`.demo-sweep.mjs` (browser verification).
+
+## 8. Cleanup
+
+To remove only what this preparation created, delete by identifier — never by
+name pattern:
+
+```sql
+-- workspace d91f7d80…, created 2026-11-21
+DELETE FROM quality_result      WHERE assertion_id = '480a9715-3dbc-4b4d-be47-703dde52a6bd';
+DELETE FROM quality_assertion   WHERE id           = '480a9715-3dbc-4b4d-be47-703dde52a6bd';
+DELETE FROM freshness_sla       WHERE id           = 'e0f15710-ed4a-4947-8c2f-9e486d3854ea';
+DELETE FROM product_asset       WHERE product_id   = 'f33bea44-db2f-459c-8db2-8f42eac7e714';
+DELETE FROM data_product        WHERE id           = 'f33bea44-db2f-459c-8db2-8f42eac7e714';
+DELETE FROM term_assignment     WHERE term_id      = 'fce04495-a252-4ec0-ae49-85c0702dbf3b';
+DELETE FROM glossary_term       WHERE id           = 'fce04495-a252-4ec0-ae49-85c0702dbf3b';
+DELETE FROM domain              WHERE id           = 'f480e033-8b02-40ac-bd91-94ff545632fd';
+DELETE FROM import_run          WHERE id IN ('cc782dcb-…','2ac950e6-…','b33f21f5-…','e958f1a0-…','477e8d47-…');
+-- then remove the workspace's datasets/edges/evidence by workspace_id if desired
+```
+
+Deleting is **not** part of the demo flow and must be authorised separately.
