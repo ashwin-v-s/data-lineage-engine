@@ -164,15 +164,24 @@ def create_classification(body: ClassificationInput, user: dict = Depends(requir
                 member = cur.fetchone()
                 if not member or member["role"] not in {"owner", "admin"}:
                     raise HTTPException(status_code=403, detail="PII_CLEARED classification requires an owner or admin review")
-            cur.execute("SELECT id FROM dataset WHERE id=%s::uuid", (str(body.dataset_id),))
-            if not cur.fetchone(): raise HTTPException(status_code=404, detail="Asset not found")
+            cur.execute("SELECT id::text,name,namespace FROM dataset WHERE id=%s::uuid", (str(body.dataset_id),))
+            target = cur.fetchone()
+            if not target: raise HTTPException(status_code=404, detail="Asset not found")
+            effective_dataset_id = target["id"]
             if body.column_id:
-                cur.execute("SELECT id FROM column_record WHERE id=%s::uuid AND dataset_id=%s::uuid", (str(body.column_id),str(body.dataset_id)))
-                if not cur.fetchone(): raise HTTPException(status_code=404, detail="Column not found for this asset")
+                cur.execute("SELECT cr.id::text,cr.dataset_id::text,d.name,d.namespace FROM column_record cr JOIN dataset d ON d.id=cr.dataset_id WHERE cr.id=%s::uuid", (str(body.column_id),))
+                column = cur.fetchone()
+                if not column: raise HTTPException(status_code=404, detail="Column not found for this asset")
+                if column["dataset_id"] != effective_dataset_id:
+                    # Importers can leave an equivalent asset variant that owns the
+                    # column; classify the asset the column actually belongs to.
+                    if column["name"] != target["name"] or column["namespace"] != target["namespace"]:
+                        raise HTTPException(status_code=404, detail="Column not found for this asset")
+                    effective_dataset_id = column["dataset_id"]
             if body.classification == "PII_CLEARED":
-                cur.execute("INSERT INTO pii_classification(dataset_id,column_id,classification,evidence_state,provenance,classified_by,reviewed_by,reviewed_at) VALUES (%s::uuid,%s::uuid,%s,%s,%s,%s::uuid,%s::uuid,now()) RETURNING id::text,dataset_id::text,column_id::text,classification,evidence_state,provenance,created_at,reviewed_by::text,reviewed_at", (str(body.dataset_id),str(body.column_id) if body.column_id else None,body.classification,body.evidence_state,Json(body.provenance),user["id"],user["id"]))
+                cur.execute("INSERT INTO pii_classification(dataset_id,column_id,classification,evidence_state,provenance,classified_by,reviewed_by,reviewed_at) VALUES (%s::uuid,%s::uuid,%s,%s,%s,%s::uuid,%s::uuid,now()) RETURNING id::text,dataset_id::text,column_id::text,classification,evidence_state,provenance,created_at,reviewed_by::text,reviewed_at", (effective_dataset_id,str(body.column_id) if body.column_id else None,body.classification,body.evidence_state,Json(body.provenance),user["id"],user["id"]))
             else:
-                cur.execute("INSERT INTO pii_classification(dataset_id,column_id,classification,evidence_state,provenance,classified_by) VALUES (%s::uuid,%s::uuid,%s,%s,%s,%s::uuid) RETURNING id::text,dataset_id::text,column_id::text,classification,evidence_state,provenance,created_at", (str(body.dataset_id),str(body.column_id) if body.column_id else None,body.classification,body.evidence_state,Json(body.provenance),user["id"]))
+                cur.execute("INSERT INTO pii_classification(dataset_id,column_id,classification,evidence_state,provenance,classified_by) VALUES (%s::uuid,%s::uuid,%s,%s,%s,%s::uuid) RETURNING id::text,dataset_id::text,column_id::text,classification,evidence_state,provenance,created_at", (effective_dataset_id,str(body.column_id) if body.column_id else None,body.classification,body.evidence_state,Json(body.provenance),user["id"]))
             result = dict(cur.fetchone())
     return result
 
@@ -201,6 +210,20 @@ def list_dataset_columns(dataset_id: uuid.UUID, user: dict = Depends(require_use
                 (str(dataset_id),),
             )
             rows = [dict(row) for row in cur.fetchall()]
+            if not rows:
+                # An equivalent variant of the same asset (created by another importer)
+                # can own the columns. Serve them, each tagged with its owning asset, so
+                # the asset profile and PII picker are not blank.
+                cur.execute(
+                    """SELECT cr.id::text, cr.column_name, cr.data_type, cr.dataset_id::text AS dataset_id
+                       FROM column_record cr
+                       JOIN dataset sibling ON sibling.id = cr.dataset_id
+                       JOIN dataset requested ON requested.id = %s::uuid
+                       WHERE sibling.name = requested.name AND sibling.namespace = requested.namespace
+                       ORDER BY cr.column_name""",
+                    (str(dataset_id),),
+                )
+                rows = [dict(row) for row in cur.fetchall()]
     return {"columns": rows, "count": len(rows)}
 
 

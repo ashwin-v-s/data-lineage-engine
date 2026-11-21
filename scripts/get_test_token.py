@@ -33,11 +33,18 @@ if env_file.exists():
 SUPABASE_URL = os.getenv("SUPABASE_URL", "").rstrip("/")
 ANON_KEY = os.getenv("SUPABASE_PUBLISHABLE_KEY", "")
 
-TEST_EMAIL = "pranavsamal43@gmail.com"   # your GitHub email — change if different
-TEST_PASSWORD = "Kairos_Test_2026!"
+# Credentials come from the environment (or the git-ignored .env) and are never
+# hardcoded here: a committed password is a leaked password.
+TEST_EMAIL = os.getenv("KAIROS_TEST_USER_EMAIL", "").strip()
+TEST_PASSWORD = os.getenv("KAIROS_TEST_USER_PASSWORD", "").strip()
 
 if not SUPABASE_URL or not ANON_KEY:
     print("ERROR: SUPABASE_URL or SUPABASE_PUBLISHABLE_KEY not set in .env")
+    sys.exit(1)
+
+if not TEST_EMAIL or not TEST_PASSWORD:
+    print("ERROR: set KAIROS_TEST_USER_EMAIL and KAIROS_TEST_USER_PASSWORD "
+          "(environment or .env) before running this script.")
     sys.exit(1)
 
 headers = {

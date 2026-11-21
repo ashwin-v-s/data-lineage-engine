@@ -109,7 +109,9 @@ def parse_dbt_manifest(
     _SUPPORTED_MANIFEST_VERSIONS = {"v7", "v8", "v9", "v10", "v11", "v12", "v13"}
     _early_version_warnings: list[Diagnostic] = []
     if isinstance(_schema_version_url, str) and _MANIFEST_URL_PREFIX in _schema_version_url:
-        _vtok = _schema_version_url.split(_MANIFEST_URL_PREFIX, 1)[1].split("/")[0].strip()
+        # URLs look like .../manifest/v10.json (also seen as .../manifest/v10/);
+        # strip the path separator and the .json suffix before comparing.
+        _vtok = _schema_version_url.split(_MANIFEST_URL_PREFIX, 1)[1].split("/")[0].split(".")[0].strip().lower()
         if _vtok and _vtok not in _SUPPORTED_MANIFEST_VERSIONS:
             try:
                 _vnum = int(_vtok.lstrip("v"))
