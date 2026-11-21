@@ -32,12 +32,65 @@
   color: var(--warn-ink, #8a1c1c);
 }
 
+/* Request in flight: neutral pill plus a looping ring, never a false claim. */
+.data-mode-badge--connecting {
+  background: var(--surface, #fff);
+  color: var(--muted, #4b5563);
+}
+
+.data-mode-spinner {
+  display: inline-block;
+  flex: none;
+  width: 8px;
+  height: 8px;
+  margin-right: 6px;
+  border: 1.5px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: data-mode-spin 0.9s linear infinite;
+}
+
+@keyframes data-mode-spin {
+  to { transform: rotate(360deg); }
+}
+
+.pulse-dot {
+  animation: data-mode-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes data-mode-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .data-mode-spinner {
+    animation: none;
+    border-right-color: currentColor;
+    opacity: 0.55;
+  }
+
+  .pulse-dot {
+    animation: none;
+  }
+}
+
 .sidebar-data-mode {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  min-width: 0;
   padding: 8px 12px;
   font-size: 11px;
   color: var(--faint, #6b7280);
+}
+
+.sidebar-data-mode > span:first-child {
+  min-width: 0;
+}
+
+.data-mode-badge {
+  max-width: 100%;
 }

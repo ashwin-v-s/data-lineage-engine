@@ -8,29 +8,57 @@ import FreshnessView from './components/FreshnessView.jsx';
 import GovernanceView from './components/GovernanceView.jsx';
 import IncidentsView from './components/IncidentsView.jsx';
 import MobileShell from './components/MobileShell.jsx';
-import { DATA_MODES, resolveDataMode, dataModeDescription } from './components/dataMode.js';
+import {
+  CONNECTING_DESCRIPTION,
+  DATA_MODES,
+  resolveDataMode,
+  dataModeDescription,
+} from './components/dataMode.js';
 import './components/dataMode.css';
 import './components/liveViews.css';
 
 const initialDashboardMarkup = '<div class="loading-state">Loading workspace…</div>';
 
-/** Read the shell's current data provenance without assuming it is live. */
-function readDataModeState() {
+/** True when this browser holds a session, so a catalog request is coming. */
+function hasStoredSession() {
+  try {
+    return Boolean(
+      window.localStorage.getItem('kairos_supabase_session')
+      || window.sessionStorage.getItem('kairos_supabase_session'),
+    );
+  } catch (_) {
+    return false;
+  }
+}
+
+/**
+ * Read the shell's current data provenance without assuming it is live.
+ *
+ * A saved session means the dashboard is about to request the catalog, so the
+ * shell starts in `loading`: the badges report progress instead of claiming
+ * `NOT CONNECTED` while the request is still in flight. Signed-out sessions
+ * have nothing in flight and go straight to the honest not-connected label.
+ */
+function readProvenanceState() {
   let stored = null;
   try {
     stored = window.localStorage.getItem('kairos_dataMode');
   } catch (_) {
     stored = null;
   }
-  return resolveDataMode({
-    dataMode: stored || undefined,
-    demoPreview: Boolean(window.kairosDemoPreview),
-    catalogStatus: 'loading',
-  });
+  return {
+    mode: resolveDataMode({
+      dataMode: stored || undefined,
+      demoPreview: Boolean(window.kairosDemoPreview),
+      catalogStatus: 'loading',
+    }),
+    catalogStatus: hasStoredSession() ? 'loading' : 'idle',
+  };
 }
 
 /** Short label for provenance source indicators. */
-function sourceLabel(mode) {
+function sourceLabel(mode, connecting = false) {
+  if (connecting) return 'Connecting…';
   if (mode === DATA_MODES.LIVE) return 'Connected';
   if (mode === DATA_MODES.DEMO_FIXTURE) return 'Demo fixture';
   if (mode === DATA_MODES.ERROR) return 'Catalog error';
@@ -38,25 +66,54 @@ function sourceLabel(mode) {
   return 'Not connected';
 }
 
-/** Track the data mode the shell reports, so the badge can never go stale. */
-function useDataMode() {
-  const [mode, setMode] = useState(readDataModeState);
+/** A dashboard script that never answers must not spin the badges forever. */
+const CONNECTING_TIMEOUT_MS = 30000;
+
+/**
+ * Track the data mode and whether a catalog request is still in flight.
+ *
+ * `mode` stays honest at all times: it is only promoted past `NOT CONNECTED`
+ * by a terminal `catalogStatus`. `connecting` is a separate, transient UI state
+ * driven by the request lifecycle, so the shell can animate progress without
+ * inventing a provenance claim.
+ */
+function useProvenance() {
+  const [state, setState] = useState(readProvenanceState);
   useEffect(() => {
     const sync = (event) => {
       const detail = event && event.detail;
-      setMode(detail
-        ? resolveDataMode({
+      if (!detail) {
+        setState(readProvenanceState());
+        return;
+      }
+      setState({
+        mode: resolveDataMode({
           dataMode: detail.dataMode,
           demoPreview: Boolean(window.kairosDemoPreview),
           catalogStatus: detail.catalogStatus,
           hasImportedRun: detail.hasImportedRun === true,
-        })
-        : readDataModeState());
+        }),
+        catalogStatus: detail.catalogStatus || 'ready',
+      });
     };
+    // app.js dispatches its first status only after the catalog request settles,
+    // so authentication is the signal that a request has started.
+    const onAuthReady = () => setState((prev) => ({ ...prev, catalogStatus: 'loading' }));
     window.addEventListener('kairos:data-mode', sync);
-    return () => window.removeEventListener('kairos:data-mode', sync);
+    window.addEventListener('kairos:auth-ready', onAuthReady);
+    return () => {
+      window.removeEventListener('kairos:data-mode', sync);
+      window.removeEventListener('kairos:auth-ready', onAuthReady);
+    };
   }, []);
-  return mode;
+  useEffect(() => {
+    if (state.catalogStatus !== 'loading') return undefined;
+    const timer = setTimeout(() => {
+      setState((prev) => (prev.catalogStatus === 'loading' ? { ...prev, catalogStatus: 'idle' } : prev));
+    }, CONNECTING_TIMEOUT_MS);
+    return () => clearTimeout(timer);
+  }, [state.catalogStatus]);
+  return { mode: state.mode, connecting: state.catalogStatus === 'loading' };
 }
 
 function AuthScreen() {
@@ -130,7 +187,9 @@ function useIsMobileLayout() {
 }
 
 function Sidebar() {
-  const dataMode = useDataMode();
+  const { mode: dataMode, connecting } = useProvenance();
+  const description = connecting ? CONNECTING_DESCRIPTION : dataModeDescription(dataMode);
+  const source = sourceLabel(dataMode, connecting);
   // Phones force every group's children open (mobile.css cannot use the
   // disclosure), so the disclosure buttons must not claim to be collapsed.
   const mobileLayout = useIsMobileLayout();
@@ -196,11 +255,17 @@ function Sidebar() {
         </div>
       </nav>
       <div className="sidebar-bottom">
-        <div className="sidebar-data-mode"><span>Data provenance</span><DataModeLabel mode={dataMode} /></div>
+        <div className="sidebar-data-mode"><span>Data provenance</span><DataModeLabel connecting={connecting} mode={dataMode} /></div>
         <div className="health-card">
-          <div className="health-top"><span className="status-dot" /><strong>Workspace mode</strong><span className="health-live" id="sidebarModeBadge">{dataMode}</span></div>
-          <p id="sidebarModeDescription">{dataModeDescription(dataMode)}</p>
-          <div className="health-foot"><span>Data source</span><b id="sidebarSourceLabel">{sourceLabel(dataMode)}</b></div>
+          <div className="health-top">
+            <span className="status-dot" />
+            <strong>Workspace mode</strong>
+            <span aria-live="polite" className={`health-live${connecting ? ' is-connecting' : ''}`} id="sidebarModeBadge" role="status">
+              {connecting ? <><span aria-hidden="true" className="data-mode-spinner" />CONNECTING</> : dataMode}
+            </span>
+          </div>
+          <p id="sidebarModeDescription">{description}</p>
+          <div className="health-foot"><span>Data source</span><b id="sidebarSourceLabel">{source}</b></div>
         </div>
         <button aria-label="Open user profile" className="user-row profile-shortcut" data-view="profile" type="button">
           <span className="avatar profile-avatar">U</span><span className="user-copy"><strong className="profile-display-name">Workspace user</strong><small>Signed-in account</small></span><span aria-hidden="true" className="more">•••</span>
@@ -214,7 +279,7 @@ function DashboardContent() {
   const [markup, setMarkup] = useState(initialDashboardMarkup);
   const [liveView, setLiveView] = useState(null);
   const [selectedAssetId, setSelectedAssetId] = useState(null);
-  const dataMode = useDataMode();
+  const { mode: dataMode } = useProvenance();
   useLayoutEffect(() => {
     window.kairosRenderDashboardView = (html) => flushSync(() => {
       setMarkup(html);
@@ -246,7 +311,9 @@ function DashboardContent() {
 }
 
 function DashboardShell() {
-  const dataMode = useDataMode();
+  const { mode: dataMode, connecting } = useProvenance();
+  const description = connecting ? CONNECTING_DESCRIPTION : dataModeDescription(dataMode);
+  const source = sourceLabel(dataMode, connecting);
   const demoMode = dataMode === DATA_MODES.DEMO_FIXTURE;
   // This build ships the persisted catalog only; no fixture dataset is bundled,
   // so offering a working demo switch would promise data the app cannot show.
@@ -261,11 +328,13 @@ function DashboardShell() {
           <div className="top-actions">
             <div aria-label="Data source mode" className="data-mode-control" role="group">
               <span>DATA</span>
-              <strong>{dataMode}</strong>
+              <strong>{connecting ? 'CONNECTING' : dataMode}</strong>
               <button aria-pressed={demoMode} className="data-mode-switch" data-mode-switch="demo" disabled={!demoFixturesAvailable} title={demoFixturesAvailable ? 'Show synthetic sample records' : 'Demo fixtures are not included in this build — this workspace shows persisted catalog data.'} type="button">Demo preview</button>
               <button aria-pressed={!demoMode} className="data-mode-switch" data-mode-switch="postgresql" disabled={Boolean(window.kairosDemoPreview)} type="button">Live catalog</button>
             </div>
-            <div className="environment" id="environmentBadge"><span className="status-dot" />{dataMode}</div>
+            <div aria-live="polite" className="environment" id="environmentBadge" role="status">
+              {connecting ? <><span aria-hidden="true" className="status-dot pulse-dot" />Connecting…</> : <><span className="status-dot" />{dataMode}</>}
+            </div>
             <button aria-label="Switch between light and dark theme" className="top-icon" id="themeToggle" title="Switch light / dark">◴</button>
             <button aria-label="Search workspace (Ctrl+K)" className="top-icon" id="globalSearchButton" title="Search (Ctrl+K)">⌕</button>
             <button aria-label="Help" className="top-icon" id="helpButton" title="Help">?</button>
@@ -273,7 +342,7 @@ function DashboardShell() {
           </div>
         </header>
         <DashboardContent />
-        <footer className="footer"><span><i className="status-dot" /> Kairos metadata engine <b>·</b> <span id="footerModeLabel">{sourceLabel(dataMode)}</span></span><span>Evidence-first lineage <b>·</b> v0.1 prototype <b>·</b> build v305</span></footer>
+        <footer className="footer"><span><i className="status-dot" /> Kairos metadata engine <b>·</b> <span id="footerModeLabel">{source}</span></span><span>Evidence-first lineage <b>·</b> v0.1 prototype <b>·</b> build v305</span></footer>
       </div>
       {/* Mobile-only chrome: app bar, drawer scrim and bottom tabs. Renders
           nothing above 768px, so the desktop shell is unchanged. */}
