@@ -22,7 +22,7 @@ Test identity: the repository's documented test account
 | Backend (pytest) | `python -m pytest -q` | **733 passed, 83 skipped, 0 failed** (16.9 s) |
 | Frontend (vitest) | `npx vitest run` | **134 passed / 134** |
 | Frontend build | `npm --prefix frontend run build` | **clean** (46 modules, 1.77 s) |
-| Migration/table presence | `python scripts/db/verify_applied.py` | **PASS** — 44 tables, 0 missing columns, routines present |
+| Migration/table presence | `python scripts/db/verify_applied.py` | **PASS** — 47 tables, 0 missing columns, routines present |
 | DB connectivity | `python scripts/test_connection.py` | **PASS** — PostgreSQL 17.6 |
 | Deployed health | `GET /healthz`, `GET /api/v1/health` | **200**, `{"db":"ok"}` |
 

@@ -179,3 +179,18 @@ gap text above implies:
 `python scripts/backfill_embeddings.py`, and add the keyword/semantic/hybrid
 control to the search screen plus a "why this matched" label. Until the backfill
 runs, the product must not be described as semantically searchable.
+
+### Correction (2026-11-22): G10 is already shipped
+
+The gap text above says the asset profile lacks Activity and Relationships tabs.
+That is no longer true, and was not true when this handout was re-read:
+
+- `frontend/app.js` → `assetProfile()` renders both, labelled **Relationships**
+  (`tab === 'lineage'`, with upstream/downstream counts) and **Activity**
+  (`tab === 'activity'`, workspace audit entries for the asset).
+- In PostgreSQL mode the tab list is capability-gated: Relationships appears when
+  the asset reports lineage capability, Activity always appears.
+- The audit data behind Activity is `GET /api/v1/audit/{asset_id}/trail`
+  (verified live, returns the asset's audit trail).
+
+So do **not** rebuild these tabs; verify them in the browser instead.

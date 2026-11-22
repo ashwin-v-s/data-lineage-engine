@@ -38,6 +38,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 import json
+import logging
 import os
 import secrets
 import uuid
@@ -46,6 +47,8 @@ from typing import Any, AsyncGenerator, List, Literal, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
 from fastapi.security import HTTPAuthorizationCredentials
+
+logger = logging.getLogger("kairos.api")
 from psycopg2.extras import Json, RealDictCursor
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -254,10 +257,16 @@ async def ingest_openlineage(request: Request, producer: dict = Depends(openline
         with get_conn() as conn:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
                 result = ingest_openlineage_events(cur, raw_events)
-    except Exception as exc:
+    except Exception:
+        # The driver message can carry host, user or table detail. Log it with the
+        # request id and give the caller a stable message instead.
+        logger.exception(
+            "OpenLineage ingest storage failure request_id=%s",
+            getattr(request.state, "request_id", None),
+        )
         return api_error(
             request,
-            f"Ingestion storage is not available: {exc}",
+            "Ingestion storage is temporarily unavailable. Retry, or share the request ID with support.",
             503,
             "STORAGE_UNAVAILABLE",
         )

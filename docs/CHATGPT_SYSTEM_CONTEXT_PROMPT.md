@@ -26,7 +26,7 @@ Kairos is an **Evidence-First Bitemporal Metadata and Lineage Platform**. Unlike
 3. **Zero Customer Data Ingestion (Strict Metadata Only):**
    Kairos **never** stores customer records, database rows, financial transactions, or PII. CSV adapters read only header lines (`line 1`); SQL adapters parse AST syntax only.
 4. **Kernel-Level Multi-Tenant Security:**
-   Tenant isolation is enforced by PostgreSQL Row-Level Security (RLS) across all 43 tables. Connections execute `SET LOCAL app.current_workspace_id = ...`. Bypassing RLS (`BYPASSRLS`) is prohibited.
+   Tenant isolation is enforced by PostgreSQL Row-Level Security (RLS) across all 47 tables. Connections execute `SET LOCAL app.current_workspace_id = ...`. Bypassing RLS (`BYPASSRLS`) is prohibited.
 5. **Two-Phase Ingestion Protocol:**
    Every import must undergo a dry-run preview (`POST /api/v1/ingest/preview`) before atomic commit (`POST /api/v1/ingest/commit`) with advisory transaction locks and SHA-256 idempotency.
 
@@ -476,7 +476,7 @@ If a pipeline change from March 1st is retroactively recorded on March 10th, an 
 | **Why bitemporality?** | Separates valid time (warehouse reality) from recorded time (ingestion time) for historical auditability and incident time-travel. |
 | **How does asset removal work?** | Soft deletion (`removed_at = NOW()`). RLS policy hides it from catalog views, but historical lineage and raw events are preserved. |
 | **What about ML and images?** | Metadata engines track S3 URIs, SHA-256 digests, and training runs, not raw pixels. Bitemporality prevents training data poisoning. |
-| **Can Tenant A see Tenant B's data?** | No. PostgreSQL Row-Level Security (RLS) on all 43 tables evaluates `app.current_workspace_id`. Cross-tenant queries return 0 rows. |
+| **Can Tenant A see Tenant B's data?** | No. PostgreSQL Row-Level Security (RLS) on all 47 tables evaluates `app.current_workspace_id`. Cross-tenant queries return 0 rows. |
 | **What if a query has `SELECT *`?** | Kairos refuses to guess; marks mapping as illustrative. Authoritative mapping requires explicit columns or schema binding. |
 | **Do incidents need manual closing?** | **Self-healing:** when a subsequent pipeline run succeeds, the engine computes `HEALTHY` and automatically marks the incident `RESOLVED`. |
 | **Can viewers delete assets?** | No. Admin endpoints enforce `require_role("owner", "admin")`. Unauthorized requests return `HTTP 403 Forbidden`. |

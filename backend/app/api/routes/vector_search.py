@@ -77,9 +77,10 @@ def _embeddings_ready(cur) -> tuple[bool, str]:
         return False, "semantic embeddings are not provisioned on this deployment"
     if not (os.getenv("OPENAI_API_KEY") or "").strip():
         return False, "OPENAI_API_KEY is not configured on this server"
-    cur.execute("SELECT COUNT(*) AS count FROM public.dataset WHERE embedding IS NOT NULL")
-    stored = int(cur.fetchone()["count"])
-    if stored == 0:
+    # EXISTS is a short-circuit: semantic readiness must not scan every dataset
+    # row on each hybrid request once the table grows.
+    cur.execute("SELECT 1 FROM public.dataset WHERE embedding IS NOT NULL LIMIT 1")
+    if cur.fetchone() is None:
         return False, "no dataset has been embedded yet (run scripts/backfill_embeddings.py)"
     return True, ""
 

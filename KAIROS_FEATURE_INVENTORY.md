@@ -2,7 +2,7 @@
 
 Scope: the repository at `E:\EDI-Metadata_Lineage`, the deployed app
 `https://data-lineage-engine-5i2x.vercel.app`, the shared Supabase Postgres
-project (44 tables present, `scripts/db/verify_applied.py` PASS), and a real
+project (47 tables present, `scripts/db/verify_applied.py` PASS), and a real
 signed-in session obtained through the Supabase password grant.
 
 Status vocabulary used below:

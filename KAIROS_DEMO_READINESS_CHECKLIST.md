@@ -205,3 +205,35 @@ deployed:
 - Still blocked on credentials or decisions, not code: `OPENAI_API_KEY` for the
   embedding backfill, GitHub App secrets, a scheduler location (D12), and a
   second Supabase account for the two-user isolation walkthrough.
+
+## 2026-11-22 — defect pass found by auditing the running product
+
+- **False operational claim fixed in source sync.** `/sources/{id}/sync` recorded
+  `assets_created = <all discovered assets>` on every run, so the new sync-history
+  view would have reported every re-synced table as newly created. The route now
+  checks each asset's identity before upserting and records `assets_created` vs
+  `assets_updated` (re-synced existing) separately, leaving `assets_unchanged`
+  NULL because field-level diffs are not tracked. The SQL was validated against
+  the live schema in a rolled-back transaction.
+- **Sync history is now visible.** The Sources screen reads
+  `GET /api/v1/sources/{id}/runs?limit=5` for each configured source and renders
+  one row per run (status, start, duration, discovered, new, existing, failed,
+  error). A source with no runs says so instead of showing zeros.
+- **Database error text no longer reaches clients.** OpenLineage ingest wrapped
+  `{exc}` into its 503 body; it now logs the driver message with the request id
+  and returns a stable message.
+- **Semantic readiness check is a short-circuit.** `EXISTS (... LIMIT 1)` instead
+  of `COUNT(*)` over `dataset`, so hybrid requests do not scan the table.
+- **OpenAPI snapshots reconciled.** `docs/openapi.json` (the exported artifact)
+  and `contracts/api/openapi.json` both hold 122 identical paths; drift check
+  reports 0.
+- **Living-doc numbers corrected:** 44→47 tables in `KAIROS_FEATURE_INVENTORY.md`
+  and `KAIROS_END_TO_END_TEST_REPORT.md`, 43→47 RLS tables in
+  `docs/CHATGPT_SYSTEM_CONTEXT_PROMPT.md`; the pasted output in
+  `docs/M1_SIGNUP_PROOF.md` is annotated as-of rather than rewritten.
+- **M3 handout corrected:** the asset profile already ships Activity and
+  Relationships tabs (`assetProfile()` in `app.js`); the handout now says so
+  instead of asking for them to be built.
+- Verification: **822 passed / 83 skipped**, coverage **62.80%** (gate 45%),
+  **155** vitest, production build clean, migrations PASS, RLS **47/47** PASS,
+  UI claim gate PASS.

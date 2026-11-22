@@ -41,6 +41,7 @@ export default function GovernanceView({ view, demoPreview = false }) {
   const [qualityChoices, setQualityChoices] = useState([]);
   const [columnChoices, setColumnChoices] = useState([]);
   const [selectedDatasetId, setSelectedDatasetId] = useState('');
+  const [syncRows, setSyncRows] = useState([]);
 
   const load = useCallback(async () => {
     setLoading(true); setError('');
@@ -83,6 +84,21 @@ export default function GovernanceView({ view, demoPreview = false }) {
   }, [config, demoPreview, view]);
 
   useEffect(() => { load(); }, [load]);
+
+  // Sync history is one request per configured source. It is loaded only for the
+  // sources screen, and a failed read leaves the panel saying so rather than
+  // inventing a run.
+  useEffect(() => {
+    let active = true;
+    if (view !== 'sources' || rows.length === 0) { setSyncRows([]); return () => { active = false; }; }
+    Promise.all(rows.slice(0, 8).map(async (source) => {
+      try {
+        const data = await request(`/sources/${encodeURIComponent(source.id)}/runs?limit=5`);
+        return (Array.isArray(data.runs) ? data.runs : []).map((run) => ({ ...run, source_name: source.name }));
+      } catch (_) { return []; }
+    })).then((groups) => { if (active) setSyncRows(groups.flat()); });
+    return () => { active = false; };
+  }, [view, rows]);
 
   useEffect(() => {
     let active = true;
@@ -230,6 +246,7 @@ export default function GovernanceView({ view, demoPreview = false }) {
         <h2>Bind a quality assertion to a contract clause</h2><label>Product contract<select name="contract_id" required><option value="">Choose a contract</option>{contractChoices.map((contract) => <option key={contract.id} value={contract.id}>{contract.product_name} · v{contract.version} · {contract.enforcement_mode}</option>)}</select></label><label>Quality assertion<select name="assertion_id" required><option value="">Choose an assertion</option>{qualityChoices.map((assertion) => <option key={assertion.id} value={assertion.id}>{assertion.name}</option>)}</select></label><label>Clause key<input name="clause_key" maxLength={120} required /></label><button className="btn" disabled={busy} type="submit">Link assertion</button>
       </form>
     </>}
+    {view === 'sources' && <section className="kv-card"><h2>Recent syncs</h2><p>One row per recorded sync run. New counts records the sync created; Existing counts records it re-synced. Field-level diffs are not tracked, so unchanged is not claimed.</p>{syncRows.length === 0 ? <p className="kv-freshness-placeholder">No sync runs recorded yet. Use Sync now on a source to create the first one.</p> : <div className="kv-table-wrap"><table className="kv-table"><thead><tr><th>Source</th><th>Status</th><th>Started</th><th>Duration</th><th>Discovered</th><th>New</th><th>Existing</th><th>Failed</th><th>Error</th></tr></thead><tbody>{syncRows.map((run) => <tr key={run.id}><td>{run.source_name}</td><td>{run.status}</td><td>{run.started_at || '—'}</td><td>{run.duration_ms == null ? '—' : `${run.duration_ms} ms`}</td><td>{run.assets_discovered ?? '—'}</td><td>{run.assets_created ?? '—'}</td><td>{run.assets_updated ?? '—'}</td><td>{run.assets_failed ?? '—'}</td><td>{run.error_message || '—'}</td></tr>)}</tbody></table></div>}</section>}
     <section className="kv-card"><h2>{view === 'notifications' ? 'Notification history' : `${config.title} records`}</h2>
       {loading ? <p role="status">Loading {recordLabel}…</p> : rows.length === 0 ? <p className="kv-freshness-placeholder">No {recordLabel} records were returned.</p> : <div className="kv-table-wrap"><table className="kv-table"><thead><tr>{view === 'notifications' ? <><th>Event</th><th>Title</th><th>Created</th><th>State</th><th>Action</th></> : view === 'quality' ? <><th>Assertion</th><th>Asset</th><th>Type</th><th>Latest result</th><th>Failures</th><th>Action</th></> : view === 'sources' ? <><th>Name</th><th>Type</th><th>Status</th><th>Last checked</th><th>Actions</th></> : view === 'settings' ? <><th>User ID</th><th>Role</th><th>Status</th><th>Joined</th></> : <><th>Name</th><th>Description / definition</th><th>Status</th><th>Updated</th>{view === 'products' && <th>Contract</th>}{view === 'glossary' && <th>Action</th>}</>}</tr></thead><tbody>{rows.map((row, index) => <tr key={row.id || index}>{view === 'notifications' ? <><td>{row.event_type}</td><td>{row.title}</td><td>{row.created_at || '—'}</td><td>{row.read_at ? 'Read' : 'Unread'}</td><td>{row.action_path && row.action_path.startsWith('/') && !row.action_path.startsWith('//') && <a href={row.action_path}>Open related record</a>} {!row.read_at && <button className="btn small" disabled={busy} onClick={() => { request('/notifications/read', { method: 'POST', body: JSON.stringify({ notification_ids: [row.id] }) }).then(load).catch((err) => setError(err.message)); }} type="button">Mark read</button>}</td></> : view === 'quality' ? <><td>{row.name}</td><td>{row.dataset_name || row.dataset_id}</td><td>{row.assertion_type}</td><td>{row.latest_status || 'Not evaluated'}</td><td>{row.failed_count ?? '—'}</td><td><button className="btn small" disabled={busy} onClick={() => evaluateAssertion(row.id)} type="button">Evaluate</button></td></> : view === 'sources' ? <><td>{row.name}</td><td>{row.source_kind}</td><td>{row.lifecycle_state}</td><td>{row.last_checked_at || 'Not checked'}</td><td><button className="btn small" disabled={busy} onClick={() => sourceAction(row.id, 'test')} type="button">Test</button> <button className="btn small" disabled={busy} onClick={() => sourceAction(row.id, 'preview')} type="button">Preview</button> <button className="btn small" disabled={busy || row.lifecycle_state === 'REVOKED'} onClick={() => sourceAction(row.id, 'sync')} type="button">Sync now</button> <button className="btn small" disabled={busy || row.lifecycle_state === 'REVOKED'} onClick={() => sourceAction(row.id, 'revoke')} type="button">Revoke</button></td></> : view === 'settings' ? <><td>{row.user_id}</td><td>{row.role}</td><td>{row.status}</td><td>{row.created_at || '—'}</td></> : <><td>{row.name}</td><td>{row.definition || row.description || 'Not recorded'}</td><td>{row.status || 'Not recorded'}</td><td>{row.updated_at || row.created_at || '—'}</td>{view === 'products' && <td>{row.contract_version ? `v${row.contract_version} · ${row.contract_enforcement_mode}` : 'No contract version'}</td>}{view === 'glossary' && <td>{row.status === 'DRAFT' && <button className="btn small" disabled={busy} onClick={() => approveTerm(row.id)} type="button">Approve</button>}</td>}</>}</tr>)}</tbody></table></div>}
     </section>

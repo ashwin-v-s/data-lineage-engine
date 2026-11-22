@@ -35,7 +35,7 @@ Connecting role : kairos_app
 Schema          : public
 Tables checked  : 43
 [PASS] connecting role 'kairos_app' cannot bypass RLS
-Summary: 43/43 tables passed, 0 failed
+Summary: 43/43 tables passed, 0 failed   # as of 2026-11-15; current suite reports 47/47
 RESULT: PASS
 ```
 

@@ -843,8 +843,29 @@ def sync_source(source_id: uuid.UUID, user: dict = Depends(require_user)):
             import_id = cur.fetchone()["id"]
 
             dataset_ids: dict[str, str] = {}
+            # Count new records separately from re-synced ones. Reporting every
+            # asset as "created" on every sync was a false operational claim;
+            # field-level diffs are still not tracked, so unchanged stays NULL.
+            created_count = 0
+            existing_count = 0
             for asset in payload["assets"]:
+                namespace = str(asset.get("namespace") or "general")
+                name = str(asset.get("name") or asset["qualified_name"].rsplit("/", 1)[-1])
+                cur.execute(
+                    """
+                    SELECT 1 FROM dataset
+                     WHERE database_name = %s AND schema_name = %s AND name = %s
+                       AND removed_at IS NULL
+                     LIMIT 1
+                    """,
+                    (source_ref or "kairos-import", namespace, name),
+                )
+                existed = cur.fetchone() is not None
                 dataset_ids[asset["id"]] = _insert_asset(cur, asset, "database", source_ref)
+                if existed:
+                    existing_count += 1
+                else:
+                    created_count += 1
 
             duration_ms = int((time.monotonic() - sync_start) * 1000)
             summary["persisted_assets"] = len(dataset_ids)
@@ -861,10 +882,11 @@ def sync_source(source_id: uuid.UUID, user: dict = Depends(require_user)):
                     """
                     INSERT INTO sync_job
                         (source_connection_id, sync_mode, status, finished_at,
-                         assets_discovered, assets_created, snapshot_hash)
-                    VALUES (%s::uuid, 'manual', 'completed', now(), %s, %s, %s)
+                         assets_discovered, assets_created, assets_updated,
+                         snapshot_hash)
+                    VALUES (%s::uuid, 'manual', 'completed', now(), %s, %s, %s, %s)
                     """,
-                    (str(source_id), len(dataset_ids), len(dataset_ids),
+                    (str(source_id), len(dataset_ids), created_count, existing_count,
                      payload["provenance"].get("content_sha256")),
                 )
 
@@ -876,10 +898,12 @@ def sync_source(source_id: uuid.UUID, user: dict = Depends(require_user)):
                     last_successful_sync_at = now(),
                     last_sync_duration_ms = %s,
                     last_assets_discovered = %s,
-                    last_assets_created = %s
+                    last_assets_created = %s,
+                    last_assets_updated = %s
                 WHERE id = %s::uuid
                 """,
-                (duration_ms, len(dataset_ids), len(dataset_ids), str(source_id)),
+                (duration_ms, len(dataset_ids), created_count, existing_count,
+                 str(source_id)),
             )
 
     return {"ok": True, "replayed": False, "import_id": import_id, "summary": summary}

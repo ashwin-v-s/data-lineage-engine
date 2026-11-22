@@ -304,7 +304,9 @@ def test_hybrid_search_degrades_to_keyword_when_no_key_is_configured(monkeypatch
     from backend.app.api.routes import vector_search
 
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
-    conn = _stub_conn([(1,), {"count": 0}, {"count": 0}])
+    # Without a key the readiness check stops after the column probe, so the
+    # next fetchone is the keyword count for the fallback result set.
+    conn = _stub_conn([(1,), {"count": 0}])
 
     with patch.object(vector_search, "get_conn", return_value=conn):
         response = vector_search.hybrid_search(
@@ -320,7 +322,7 @@ def test_embeddings_ready_reports_a_column_without_embedded_rows(monkeypatch):
     from backend.app.api.routes import vector_search
 
     monkeypatch.setenv("OPENAI_API_KEY", "not-a-real-key")
-    conn = _stub_conn([(1,), {"count": 0}])
+    conn = _stub_conn([(1,), None])
     with conn.cursor() as cur:
         ready, reason = vector_search._embeddings_ready(cur)
 
@@ -332,7 +334,7 @@ def test_embeddings_ready_is_true_only_with_key_and_stored_vectors(monkeypatch):
     from backend.app.api.routes import vector_search
 
     monkeypatch.setenv("OPENAI_API_KEY", "not-a-real-key")
-    conn = _stub_conn([(1,), {"count": 7}])
+    conn = _stub_conn([(1,), (1,)])
     with conn.cursor() as cur:
         ready, reason = vector_search._embeddings_ready(cur)
 
