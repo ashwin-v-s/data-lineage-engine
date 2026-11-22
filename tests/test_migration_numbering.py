@@ -41,13 +41,13 @@ def _check(directory: Path):
     return check_migrations.check_numbering(migrations)
 
 
-def test_expected_range_is_0001_through_0015():
+def test_expected_range_is_0001_through_0017():
     assert check_migrations.EXPECTED_FIRST_MIGRATION == 1
-    assert check_migrations.EXPECTED_LATEST_MIGRATION == 15
+    assert check_migrations.EXPECTED_LATEST_MIGRATION == 17
 
 
 def test_complete_chain_has_no_gaps(tmp_path):
-    for name in _numbers(*range(1, 16)):
+    for name in _numbers(*range(1, 18)):
         _write(tmp_path, name)
 
     gaps, notes = _check(tmp_path)
@@ -58,7 +58,7 @@ def test_complete_chain_has_no_gaps(tmp_path):
 
 def test_missing_0010_is_reported_as_a_gap(tmp_path):
     """The exact local state: 0001-0009 and 0011 present, 0010 absent."""
-    for number in [*range(1, 10), *range(11, 16)]:
+    for number in [*range(1, 10), *range(11, 18)]:
         _write(tmp_path, _numbers(number)[0])
 
     gaps, _notes = _check(tmp_path)
@@ -75,15 +75,15 @@ def test_every_missing_number_is_reported_independently(tmp_path):
     gaps, _notes = _check(tmp_path)
 
     reported = [gap for gap in gaps if "is MISSING" in gap]
-    assert len(reported) == 12  # 3,4,6,7,8,9,10,11,12,13,14,15
-    for number in (3, 4, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15):
+    assert len(reported) == 14  # 3,4 and 6..17
+    for number in (3, 4, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17):
         assert any(f"{number:04d}" in gap for gap in reported)
 
 
 def test_duplicate_number_is_reported_separately_from_a_gap(tmp_path):
     _write(tmp_path, "0001_first.sql")
     _write(tmp_path, "0001_second.sql")
-    for number in range(2, 16):
+    for number in range(2, 18):
         _write(tmp_path, _numbers(number)[0])
 
     gaps, _notes = _check(tmp_path)
@@ -94,9 +94,9 @@ def test_duplicate_number_is_reported_separately_from_a_gap(tmp_path):
 
 
 def test_non_conforming_filename_is_reported(tmp_path):
-    for number in range(1, 15):
+    for number in range(1, 17):
         _write(tmp_path, _numbers(number)[0])
-    _write(tmp_path, "0015-add-role.sql")  # hyphens, not NNNN_snake.sql
+    _write(tmp_path, "0017-add-role.sql")  # hyphens, not NNNN_snake.sql
 
     gaps, _notes = _check(tmp_path)
 
@@ -104,17 +104,17 @@ def test_non_conforming_filename_is_reported(tmp_path):
 
 
 def test_number_beyond_the_expected_range_is_a_note_not_a_gap(tmp_path):
-    for number in range(1, 17):
+    for number in range(1, 19):
         _write(tmp_path, _numbers(number)[0])
 
     gaps, notes = _check(tmp_path)
 
     assert gaps == []
-    assert any("0016" in note and "EXPECTED_LATEST_MIGRATION" in note for note in notes)
+    assert any("0018" in note and "EXPECTED_LATEST_MIGRATION" in note for note in notes)
 
 
 def test_real_migrations_directory_reports_complete_chain():
-    """Pin the current repository state: 0001-0015 all present, no gaps."""
+    """Pin the current repository state: 0001-0017 all present, no gaps."""
     migrations_dir = Path(__file__).resolve().parents[1] / "backend" / "migrations"
     if not migrations_dir.is_dir():  # pragma: no cover - defensive
         pytest.skip("migrations directory not present")

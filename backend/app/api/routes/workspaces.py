@@ -1,4 +1,4 @@
-﻿"""
+"""
 backend/app/api/routes/workspaces.py
 ────────────────────────────────────
 Workspace management: retrieve workspace and member information.
@@ -17,25 +17,53 @@ from __future__ import annotations
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException
-from psycopg2.extras import RealDictCursor
 from pydantic import BaseModel
 
 from backend.app.auth import require_user
 from backend.app.db import get_conn
-from backend.app.services.email_delivery import EmailDeliveryError, EmailSettings, send_welcome_email
+from backend.app.services.email_delivery import (
+    EmailDeliveryError,
+    EmailSettings,
+    send_welcome_email,
+)
 
 router = APIRouter(dependencies=[Depends(require_user)])
+
+# The workspace registry itself (kairos_workspace) is deliberately unreachable
+# from the API role: migration 0003 gives it FORCE ROW LEVEL SECURITY with a
+# default-deny policy and no grants. Memberships are read only through this
+# SECURITY DEFINER function, which returns the workspaces the supplied verified
+# user is an active member of.
+_MEMBERSHIP_SELECT = (
+    "SELECT workspace_id::text, workspace_name, role, is_current "
+    "FROM kairos_list_user_workspaces(%s::uuid) "
+)
+
+_NOT_FOUND_DETAIL = "Workspace not found or you do not have access to it"
+
+
+class WelcomeEmailRequest(BaseModel):
+    event_id: uuid.UUID
 
 
 class WorkspaceResponse(BaseModel):
     id: str
     name: str
-    owner_id: str
-    created_at: str
+    # Null unless the caller's membership role on this workspace is 'owner'.
+    owner_id: str | None
+    # The registry's created_at is not readable by the API role.
+    created_at: str | None
 
 
-class WelcomeEmailRequest(BaseModel):
-    event_id: uuid.UUID
+def _workspace_payload(row, user: dict, default_name: str) -> dict:
+    """Map one membership row (workspace_id, name, role, is_current) to the API shape."""
+    workspace_id, name, role, _is_current = row
+    return {
+        "id": workspace_id,
+        "name": name or default_name,
+        "owner_id": user["id"] if role == "owner" else None,
+        "created_at": None,
+    }
 
 
 @router.get("/me/workspace")
@@ -55,34 +83,19 @@ def get_my_workspace(user: dict = Depends(require_user)):
         )
     
     with get_conn() as conn:
-        with conn.cursor(cursor_factory=RealDictCursor) as cur:
-            # kairos_workspace is deliberately unreadable (migration 0003: RLS
-            # policy USING(false) plus REVOKE ALL), so a direct SELECT raises
-            # "permission denied" for the application role. The sanctioned read
-            # path is the SECURITY DEFINER function, which also proves
-            # membership: a workspace the caller does not belong to is absent.
+        with conn.cursor() as cur:
             cur.execute(
-                "SELECT workspace_id::text AS id, workspace_name AS name, role, is_current "
-                "FROM kairos_list_user_workspaces(%s::uuid) "
-                "WHERE workspace_id = %s::uuid",
-                (user["id"], workspace_id),
+                _MEMBERSHIP_SELECT + "WHERE is_current LIMIT 1",
+                (user["id"],)
             )
             row = cur.fetchone()
-
+    
     if not row:
-        raise HTTPException(
-            status_code=404,
-            detail="Workspace not found or you do not have access to it"
-        )
-
+        raise HTTPException(status_code=404, detail=_NOT_FOUND_DETAIL)
+    
     return {
         "ok": True,
-        "workspace": {
-            "id": row["id"],
-            "name": row["name"] or "My Workspace",
-            "role": row["role"],
-            "current": bool(row["is_current"]),
-        }
+        "workspace": _workspace_payload(row, user, "My Workspace"),
     }
 
 
@@ -182,34 +195,28 @@ def send_login_welcome_email(body: WelcomeEmailRequest, user: dict = Depends(req
 @router.get("/workspaces/{workspace_id}")
 def get_workspace(workspace_id: str, user: dict = Depends(require_user)):
     """Return workspace details by UUID.
-
-    Only members can read a workspace: the membership function returns an
-    empty set for anyone else, which this handler reports as 404.
+    
+    The lookup is restricted to the caller's own active memberships, so a
+    foreign workspace id and an id that does not exist are indistinguishable:
+    both answer with the same 404.
     """
+    try:
+        uuid.UUID(str(workspace_id))
+    except (ValueError, AttributeError, TypeError):
+        raise HTTPException(status_code=404, detail=_NOT_FOUND_DETAIL)
+    
     with get_conn() as conn:
-        with conn.cursor(cursor_factory=RealDictCursor) as cur:
-            # Same privacy rule as /me/workspace: read through the membership
-            # function instead of the revoked table.
+        with conn.cursor() as cur:
             cur.execute(
-                "SELECT workspace_id::text AS id, workspace_name AS name, role, is_current "
-                "FROM kairos_list_user_workspaces(%s::uuid) "
-                "WHERE workspace_id = %s::uuid",
-                (user["id"], workspace_id),
+                _MEMBERSHIP_SELECT + "WHERE workspace_id = %s::uuid LIMIT 1",
+                (user["id"], workspace_id)
             )
             row = cur.fetchone()
-
+    
     if not row:
-        raise HTTPException(
-            status_code=404,
-            detail="Workspace not found or you do not have access to it"
-        )
-
+        raise HTTPException(status_code=404, detail=_NOT_FOUND_DETAIL)
+    
     return {
         "ok": True,
-        "workspace": {
-            "id": row["id"],
-            "name": row["name"] or "Workspace",
-            "role": row["role"],
-            "current": bool(row["is_current"]),
-        }
+        "workspace": _workspace_payload(row, user, "Workspace"),
     }

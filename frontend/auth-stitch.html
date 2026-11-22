@@ -787,7 +787,10 @@
       if (idleContainer) container.innerHTML = idleContainer.innerHTML;
     }
   }
-  function showAuthResult(message, kind='error') {
+  // `form` is the operation that produced this result ('signin', 'signup',
+  // 'recover', 'oauth'). It is passed in by the message handler because this
+  // function has no other way to know it.
+  function showAuthResult(message, kind='error', form='') {
     const banner=document.getElementById('form-alert-banner');
     const text=document.getElementById('form-alert-text');
     const icon=document.getElementById('form-alert-icon');
@@ -811,7 +814,7 @@
     if (mode) window.switchAuthMode(mode);
     if (form === 'oauth') document.querySelectorAll('.sso-btn').forEach(button => { button.disabled=false; button.classList.remove('opacity-60','pointer-events-none'); });
     else if (form) setAuthPending(form, false);
-    if (message) showAuthResult(message,ok?'success':'error');
+    if (message) showAuthResult(message,ok?'success':'error',form);
     if (form==='recover' && ok) {
       const feedback=document.getElementById('forgot-feedback');
       const feedbackText=document.getElementById('forgot-feedback-text');

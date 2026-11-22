@@ -24,6 +24,10 @@ from psycopg2.extras import RealDictCursor
 from backend.app.db import get_conn
 from backend.app.schemas.lineage import LineageEdge, LineageNode, LineageResponse
 from backend.app.services.evidence_strength import STRENGTH_RULE_VERSION, evidence_strength
+from backend.app.services.lineage_coverage import (
+    aggregate_edge_evidence,
+    strongest_state,
+)
 
 router = APIRouter(dependencies=[Depends(require_user)])
 
@@ -181,9 +185,14 @@ def edge_evidence(edge_id: str, user: dict = Depends(require_user)):
         })
     conflicts = [run_id for run_id, states in states_by_run.items()
                  if {"OBSERVED", "REFUTED_FOR_RUN"}.issubset(states)]
+    aggregate_rows = [row for row in rows if row.get("evidence_row_id") is not None]
+    aggregate = aggregate_edge_evidence(
+        aggregate_rows, rows[0].get("granularity") or "DATASET"
+    )
     return {
         "edge_id": edge_id,
         "granularity": rows[0].get("granularity"),
+        "aggregate": aggregate,
         "evidence": evidence,
         "conflict": bool(conflicts),
         "conflicting_runs": sorted(conflicts),
@@ -263,6 +272,75 @@ def _resolve_asset(cur, asset_id: str) -> dict | None:
     return None
 
 
+def _edge_state_map(
+    cur,
+    edges: list[dict],
+    as_of: str,
+    recorded_as_of: str,
+) -> dict[str, dict]:
+    """Aggregate stored evidence for every edge in one bounded query."""
+    if not edges:
+        return {}
+    granularity_by_edge = {e["edge_id"]: e["granularity"] for e in edges}
+    cur.execute(
+        """
+        SELECT le.id::text AS edge_id, e.evidence_type, e.source_system,
+               e.coverage, e.parser_status, e.run_id, e.event_time, e.diagnostics
+        FROM   lineage_edge le
+        JOIN   edge_temporal_version etv ON etv.edge_id = le.id
+        JOIN   evidence e ON e.id = etv.evidence_id
+        WHERE  le.id = ANY(%s::uuid[])
+          AND  etv.valid_from       <= %s::timestamptz
+          AND  (etv.valid_to        IS NULL OR etv.valid_to        > %s::timestamptz)
+          AND  etv.transaction_from <= %s::timestamptz
+          AND  (etv.transaction_to  IS NULL OR etv.transaction_to  > %s::timestamptz)
+        """,
+        (
+            list(granularity_by_edge),
+            as_of, as_of,
+            recorded_as_of, recorded_as_of,
+        ),
+    )
+    grouped: dict[str, list[dict]] = {}
+    for row in cur.fetchall():
+        record = dict(row)
+        grouped.setdefault(record["edge_id"], []).append(record)
+    return {
+        edge_id: aggregate_edge_evidence(rows, granularity_by_edge[edge_id])
+        for edge_id, rows in grouped.items()
+    }
+
+
+def _aggregate_for(aggregates: dict[str, dict], edge: dict) -> dict:
+    return aggregates.get(edge["edge_id"]) or aggregate_edge_evidence(
+        [], edge.get("granularity") or "DATASET"
+    )
+
+
+def _edge_models(edges: list[dict], aggregates: dict[str, dict]) -> list[LineageEdge]:
+    models: list[LineageEdge] = []
+    for edge in edges:
+        aggregate = _aggregate_for(aggregates, edge)
+        models.append(
+            LineageEdge(
+                edge_id=edge["edge_id"],
+                source=edge["source"],
+                target=edge["target"],
+                granularity=edge["granularity"],
+                state=aggregate["state"],
+                state_reason=aggregate.get("state_reason"),
+                coverage=aggregate["coverage"],
+                coverage_basis=aggregate.get("coverage_basis") or [],
+                evidence_sources=aggregate.get("evidence_sources") or [],
+                evidence_count=aggregate.get("evidence_count") or 0,
+                run_count=aggregate.get("run_count") or 0,
+                latest_event_time=aggregate.get("latest_event_time"),
+                coverage_rule_version=aggregate.get("coverage_rule_version"),
+            )
+        )
+    return models
+
+
 def _walk_lineage(
     cur,
     root_id: str,
@@ -271,7 +349,7 @@ def _walk_lineage(
     as_of: str,
     recorded_as_of: str,
     direction: str = "both",
-) -> tuple[dict[str, dict], list[dict]]:
+) -> tuple[dict[str, dict], list[dict], dict[str, dict]]:
     """BFS over lineage_edge / edge_temporal_version with bitemporal filters.
 
     direction:
@@ -394,7 +472,8 @@ def _walk_lineage(
                 "source_system": r.get("source_system"),
             }
 
-    return nodes, edges
+    aggregates = _edge_state_map(cur, edges, as_of, recorded_as_of)
+    return nodes, edges, aggregates
 
 
 @router.get("/assets/{asset_id}/lineage", response_model=LineageResponse)
@@ -417,7 +496,7 @@ def get_lineage(
                     detail=f"Asset '{asset_id}' not found.",
                 )
 
-            nodes_map, edges = _walk_lineage(
+            nodes_map, edges, aggregates = _walk_lineage(
                 cur,
                 root_id=root["id"],
                 granularity=granularity,
@@ -442,15 +521,7 @@ def get_lineage(
         for v in nodes_map.values()
     ]
 
-    lineage_edges = [
-        LineageEdge(
-            edge_id=e["edge_id"],
-            source=e["source"],
-            target=e["target"],
-            granularity=e["granularity"],
-        )
-        for e in edges
-    ]
+    lineage_edges = _edge_models(edges, aggregates)
 
     return LineageResponse(asset_id=root["id"], nodes=nodes, edges=lineage_edges)
 
@@ -552,7 +623,7 @@ def get_column_lineage(
                        sc.column_name AS source_column,
                        td.database_name || '.' || td.schema_name || '.' || td.name AS target_asset,
                        tc.column_name AS target_column,
-                       le.edge_id,
+                       le.id::text AS edge_id,
                        le.valid_from,
                        le.valid_to,
                        le.transaction_from,
@@ -563,13 +634,8 @@ def get_column_lineage(
                 JOIN dataset sd ON sd.id = sc.dataset_id
                 JOIN column_record tc ON tc.id = e.target_column_id
                 JOIN dataset td ON td.id = tc.dataset_id
-                /* The edge and its bitemporal version must be read in the outer
-                   query: an EXISTS subquery cannot project them, which made this
-                   endpoint fail with "missing FROM-clause entry for table le".
-                   LATERAL keeps one row per evidence record, pinned to the
-                   version valid at the requested valid/recorded time. */
                 JOIN LATERAL (
-                    SELECT le.id::text AS edge_id,
+                    SELECT le.id,
                            etv.valid_from,
                            etv.valid_to,
                            etv.transaction_from,
@@ -584,7 +650,7 @@ def get_column_lineage(
                       AND (etv.valid_to IS NULL OR %(valid)s::timestamptz < etv.valid_to)
                       AND etv.transaction_from <= %(recorded)s::timestamptz
                       AND (etv.transaction_to IS NULL OR %(recorded)s::timestamptz < etv.transaction_to)
-                    ORDER BY etv.transaction_from DESC
+                    ORDER BY etv.transaction_from DESC, le.id
                     LIMIT 1
                 ) le ON TRUE
                 WHERE e.source_column_id IS NOT NULL
@@ -646,7 +712,7 @@ def expand_lineage(
                     detail=f"Asset '{asset_id}' not found.",
                 )
 
-            nodes_map, edges = _walk_lineage(
+            nodes_map, edges, aggregates = _walk_lineage(
                 cur,
                 root_id=root["id"],
                 granularity=granularity,
@@ -672,15 +738,7 @@ def expand_lineage(
         for v in nodes_map.values()
     ]
 
-    lineage_edges = [
-        LineageEdge(
-            edge_id=e["edge_id"],
-            source=e["source"],
-            target=e["target"],
-            granularity=e["granularity"],
-        )
-        for e in edges
-    ]
+    lineage_edges = _edge_models(edges, aggregates)
 
     return LineageResponse(asset_id=root["id"], nodes=nodes, edges=lineage_edges)
 
@@ -721,12 +779,20 @@ def get_downstream_impact(
     recorded_as_of: Optional[str] = Query(default=None),
     depth: int = Query(default=3, ge=1, le=10),
     granularity: str = Query(default="DATASET", pattern="^(DATASET|COLUMN)$"),
+    direction: str = Query(default="downstream", pattern="^(downstream|upstream|both)$"),
+    evidence_state: str = Query(
+        default="all",
+        pattern="^(all|OBSERVED|POSSIBLE|REFUTED_FOR_RUN|UNKNOWN)$",
+    ),
 ):
-    """Group everything reachable downstream of an asset by propagation depth.
+    """Group everything reachable from an asset by propagation depth.
 
-    Unlike the flat lineage graph, this answers "if I change this asset, what
-    else is at risk, and how far away is it?" — one bucket per hop, with the
-    affected assets labelled for display.
+    direction=downstream answers "if this asset changes, what is at risk?";
+    direction=upstream answers "what could have caused this asset to change?".
+    evidence_state filters each hop by the state stored for the *connecting*
+    edge, so an edge with no evidence is never presented as an observed
+    dependency. A filtered-out hop also stops traversal through it: descendants
+    of an edge that the filter hides are reachable only through that edge.
     """
     ts_as_of = as_of or _now_utc()
     ts_rec   = recorded_as_of or _now_utc()
@@ -744,35 +810,110 @@ def get_downstream_impact(
             frontier = {root["id"]}
             levels: list[dict] = []
             total = 0
+            state_counts = {"OBSERVED": 0, "POSSIBLE": 0, "REFUTED_FOR_RUN": 0, "UNKNOWN": 0}
+
+            if direction == "downstream":
+                direction_sql = "le.source_id = ANY(%s::uuid[])"
+                direction_params: list = [list(frontier)]
+            elif direction == "upstream":
+                direction_sql = "le.target_id = ANY(%s::uuid[])"
+                direction_params = [list(frontier)]
+            else:
+                direction_sql = "(le.source_id = ANY(%s::uuid[]) OR le.target_id = ANY(%s::uuid[]))"
+                direction_params = [list(frontier), list(frontier)]
 
             for hop in range(1, depth + 1):
                 if not frontier:
                     break
+                if direction == "downstream":
+                    direction_params = [list(frontier)]
+                elif direction == "upstream":
+                    direction_params = [list(frontier)]
+                else:
+                    direction_params = [list(frontier), list(frontier)]
+
                 cur.execute(
-                    """
-                    SELECT DISTINCT le.target_id::text AS target
+                    f"""
+                    SELECT DISTINCT le.id::text AS edge_id,
+                           le.source_id::text AS source,
+                           le.target_id::text AS target,
+                           le.granularity
                     FROM   lineage_edge le
                     JOIN   edge_temporal_version etv ON etv.edge_id = le.id
-                    WHERE  le.source_id = ANY(%s::uuid[])
+                    WHERE  {direction_sql}
                       AND  le.granularity = %s
                       AND  etv.valid_from        <= %s::timestamptz
                       AND  (etv.valid_to         IS NULL OR etv.valid_to        > %s::timestamptz)
                       AND  etv.transaction_from  <= %s::timestamptz
                       AND  (etv.transaction_to   IS NULL OR etv.transaction_to  > %s::timestamptz)
                     """,
-                    (list(frontier), granularity, ts_as_of, ts_as_of, ts_rec, ts_rec),
+                    (
+                        *direction_params,
+                        granularity,
+                        ts_as_of, ts_as_of,
+                        ts_rec, ts_rec,
+                    ),
                 )
-                next_frontier = {
-                    row["target"] for row in cur.fetchall() if row["target"] not in visited
-                }
-                if not next_frontier:
+                hop_edges = [dict(row) for row in cur.fetchall()]
+                aggregates = _edge_state_map(cur, hop_edges, ts_as_of, ts_rec)
+
+                candidates: dict[str, dict] = {}
+                for edge in hop_edges:
+                    if direction == "downstream":
+                        neighbor = edge["target"] if edge["source"] in frontier else None
+                    elif direction == "upstream":
+                        neighbor = edge["source"] if edge["target"] in frontier else None
+                    elif edge["source"] in frontier:
+                        neighbor = edge["target"]
+                    elif edge["target"] in frontier:
+                        neighbor = edge["source"]
+                    else:
+                        neighbor = None
+                    if not neighbor or neighbor in visited or neighbor == root["id"]:
+                        continue
+
+                    aggregate = _aggregate_for(aggregates, edge)
+                    current = candidates.get(neighbor)
+                    if current is not None and strongest_state(
+                        [current["state"], aggregate["state"]]
+                    ) == current["state"]:
+                        continue
+                    candidates[neighbor] = {
+                        "edge_id": edge["edge_id"],
+                        "state": aggregate["state"],
+                        "state_reason": aggregate.get("state_reason"),
+                        "coverage": aggregate["coverage"],
+                        "coverage_basis": aggregate.get("coverage_basis") or [],
+                        "evidence_sources": aggregate.get("evidence_sources") or [],
+                        "evidence_count": aggregate.get("evidence_count") or 0,
+                        "run_count": aggregate.get("run_count") or 0,
+                    }
+
+                if evidence_state != "all":
+                    candidates = {
+                        nid: info for nid, info in candidates.items()
+                        if info["state"] == evidence_state
+                    }
+                if not candidates:
                     break
 
-                labels = _dataset_labels(cur, list(next_frontier))
-                assets = [labels[nid] for nid in sorted(next_frontier) if nid in labels]
+                labels = _dataset_labels(cur, list(candidates))
+                assets: list[dict] = []
+                for nid in sorted(candidates):
+                    if nid not in labels:
+                        continue
+                    asset = dict(labels[nid])
+                    asset.update(candidates[nid])
+                    assets.append(asset)
+                    if asset["state"] in state_counts:
+                        state_counts[asset["state"]] += 1
+                if not assets:
+                    break
+
                 total += len(assets)
                 levels.append({"depth": hop, "asset_count": len(assets), "assets": assets})
 
+                next_frontier = set(candidates)
                 visited |= next_frontier
                 frontier = next_frontier
 
@@ -780,7 +921,10 @@ def get_downstream_impact(
         "asset_id": root["id"],
         "asset_name": root["name"],
         "granularity": granularity,
+        "direction": direction,
+        "evidence_state": evidence_state,
         "depth": len(levels),
         "total_affected": total,
+        "state_counts": state_counts,
         "levels": levels,
     }

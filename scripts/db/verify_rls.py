@@ -102,6 +102,12 @@ WORKSPACE_SCOPED_TABLES = (
     "notification_preference",
     # 0014_welcome_email_delivery.sql
     "kairos_welcome_email_delivery",
+    # 0016_api_keys_webhooks.sql
+    "workspace_api_key",
+    "workspace_webhook",
+    "workspace_webhook_delivery",
+    # 0017_stewardship_requests.sql
+    "stewardship_request",
 )
 
 # Exit codes.

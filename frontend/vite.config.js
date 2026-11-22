@@ -23,6 +23,7 @@ const runtimeFiles = [
   'stewardship.js',
   'evidence-semantics.js',
   'lineage-investigation.js',
+  'lineage-edge-inspector.js',
   'personalization.js',
   'personalization.css',
   'logo.png',

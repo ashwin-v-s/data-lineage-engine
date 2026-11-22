@@ -30,6 +30,8 @@ from backend.app.auth import require_user
 from psycopg2.extras import RealDictCursor
 
 from backend.app.db import get_conn
+from backend.app.services.lineage_coverage import state_for_evidence_type
+from backend.app.services.run_status import ui_run_status
 from backend.app.schemas.search import SearchResponse, SearchResult
 
 router = APIRouter(dependencies=[Depends(require_user)])
@@ -214,8 +216,26 @@ def catalog_snapshot(
             run_count = int(cur.fetchone()["count"])
             cur.execute("SELECT COUNT(*)::int AS count FROM evidence")
             evidence_count = int(cur.fetchone()["count"])
+            # Assets and events are counted from what the workspace actually
+            # stored for the run: distinct datasets named by its evidence rows,
+            # and delivered raw events whose run id matches. A run with no
+            # evidence reports zero rather than an invented figure.
             cur.execute("""
-                SELECT er.run_id, er.status, er.started_at, er.completed_at, j.name AS job_name
+                SELECT er.run_id, er.status, er.started_at, er.completed_at, j.name AS job_name,
+                       COALESCE((
+                           SELECT COUNT(DISTINCT touched.dataset_id)::int
+                           FROM evidence ev
+                           CROSS JOIN LATERAL (
+                               VALUES (ev.source_dataset_id), (ev.target_dataset_id)
+                           ) AS touched(dataset_id)
+                           WHERE ev.run_id = er.run_id
+                             AND touched.dataset_id IS NOT NULL
+                       ), 0) AS asset_count,
+                       COALESCE((
+                           SELECT COUNT(*)::int
+                           FROM raw_event re
+                           WHERE re.payload -> 'run' ->> 'runId' = er.run_id
+                       ), 0) AS event_count
                 FROM execution_run er JOIN job j ON j.id = er.job_id
                 ORDER BY er.started_at DESC NULLS LAST LIMIT 100
             """)
@@ -236,14 +256,12 @@ def catalog_snapshot(
                        sc.column_name AS source_column,
                        td.database_name || '.' || td.schema_name || '.' || td.name AS target_dataset,
                        tc.column_name AS target_column,
-                       COALESCE((
-                           SELECT es.state
-                           FROM execution_state es
-                           WHERE es.run_id = e.run_id
-                             AND es.source_column_id = e.source_column_id
-                             AND es.target_column_id = e.target_column_id
-                           ORDER BY es.computed_at DESC LIMIT 1
-                       ), 'UNKNOWN') AS state
+                       (SELECT es.state
+                        FROM execution_state es
+                        WHERE es.run_id = e.run_id
+                          AND es.source_column_id = e.source_column_id
+                          AND es.target_column_id = e.target_column_id
+                        ORDER BY es.computed_at DESC LIMIT 1) AS execution_state
                 FROM evidence e
                 LEFT JOIN column_record sc ON sc.id = e.source_column_id
                 LEFT JOIN dataset sd ON sd.id = COALESCE(sc.dataset_id, e.source_dataset_id)
@@ -366,7 +384,10 @@ def catalog_snapshot(
         target_name = ".".join(part for part in (row.get("target_dataset"), row.get("target_column")) if part)
         evidence.append({
             "id": row["id"], "source_name": source_name or row.get("source_system") or "Unknown source",
-            "target_name": target_name or "Unknown target", "state": row.get("state") or "UNKNOWN",
+            "target_name": target_name or "Unknown target",
+            # A reasoning result (execution_state) wins when one exists; otherwise
+            # the row is labelled by the claim its own evidence type makes.
+            "state": row.get("execution_state") or state_for_evidence_type(row.get("evidence_type")),
             "evidence_type": row.get("evidence_type"), "run_id": row.get("run_id"),
             "coverage": row.get("coverage"), "rule_name": row.get("operator") or row.get("granularity"),
             "explanation": (
@@ -395,15 +416,15 @@ def catalog_snapshot(
             {
                 "id": run.get("run_id"),
                 "pipeline_name": run.get("job_name") or run.get("run_id"),
-                "status": run.get("status"),
+                "status": ui_run_status(run.get("status")),
                 "started_at": run["started_at"].isoformat() if run.get("started_at") else None,
                 "completed_at": run["completed_at"].isoformat() if run.get("completed_at") else None,
                 "duration_ms": (
                     int((run["completed_at"] - run["started_at"]).total_seconds() * 1000)
                     if run.get("started_at") and run.get("completed_at") else None
                 ),
-                "asset_count": 0,
-                "event_count": 0,
+                "asset_count": int(run.get("asset_count") or 0),
+                "event_count": int(run.get("event_count") or 0),
                 "environment_name": None,
             }
             for run in runs
