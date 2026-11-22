@@ -127,5 +127,31 @@ infrastructure; **UNVERIFIED** = not executed.
 - Still blocked on credentials or infrastructure, not code: SMTP, GitHub App,
   a reachable PostgreSQL source, embeddings for vector search, a scheduler for
   freshness/incidents/notifications, and a second real user for the isolation demo.
-- The deployed site still serves commit `e398cd0`; publishing this merge needs an
-  explicit go-ahead.
+- The deployed site served commit `e398cd0` until 2026-11-22; the go-ahead was
+  given and `main` is now published (see the deployment section below).
+
+## 2026-11-22 — production deployment (done)
+
+- `vercel --prod` from `main` @ `75c360c` (CLI 65.9.0, account `jat-in32006`).
+  Deployment `3WQdi955cMcDHfUpVEVzBBJL1SFe`, aliased to
+  `https://data-lineage-engine-5i2x.vercel.app`.
+- Live verification on the aliased domain:
+  - `/healthz` → `200 {"status":"ok","service":"kairos-api"}`
+  - `/` → `200 text/html; charset=utf-8`
+  - `/api/v1/auth/config` → `200` with Supabase URL + publishable key
+  - `/api/v1/catalog` → `401 {"error":{"code":"UNAUTHENTICATED",...}}` (fail-closed)
+  - `/ingestion.html` → `302 /?signin_required=1` (no raw JSON to a browser)
+- Re-verified against the live database the same day: `verify_applied.py` PASS,
+  `verify_rls.py` **47/47** PASS, `verify_workspace_isolation.py` PASS,
+  `check_migrations.py` PASS (0017, 0 gaps).
+- Suite state at deploy time: backend **816 passed, 83 skipped**; frontend
+  **155 passed** (14 files); 3 Playwright specs; OpenAPI **122 paths**, 0 drift.
+- M1 handout (`docs/handouts/M1_JATIN_platform_identity_deployment.md`) now
+  carries the deployed commit, deployment ID and the live evidence block.
+  `docs/DEMO_1_SIGNIN_WORKSPACE_ISOLATION.md` preflight counts were corrected
+  from 15 migrations / 44 tables / 43 RLS tables to the real 17 / 47 / 47, and
+  its auth-surface claim now matches the measured 134-of-139 protected operations.
+- Remaining demo risk (unchanged, no code fix): the two-user browser isolation
+  walkthrough still needs two provisioned Supabase accounts; the DB/RLS and API
+  scoping proofs already pass. GitHub App, embeddings key and the scheduler
+  remain blocked on credentials/decision, not on M1 code.

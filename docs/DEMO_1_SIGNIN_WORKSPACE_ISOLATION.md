@@ -2,8 +2,9 @@
 
 **Presenter:** Jatin (M1 — Identity, Workspace & Platform)  
 **Duration:** 8–10 minutes  
-**Status:** **100% COMPLETE & VERIFIED** (Updated 2026-11-17)  
+**Status:** **100% COMPLETE & VERIFIED** (Re-verified 2026-11-22 against `main` @ `2801557` + commit `75c360c`; deployed to production)  
 **Prerequisite:** Backend running (`uvicorn backend.app.main:app --reload`), frontend built (`npm --prefix frontend run build`), Supabase project credentials in `.env`.  
+**Production URL:** `https://data-lineage-engine-5i2x.vercel.app` — the same flow below can be run against production instead of localhost.  
 **Visual Artifacts:** [Sign-in screen](../../.demo-sources/visual/demo1-signin.png) · [Workspace Switcher](../../.demo-sources/visual/demo1-workspace-switcher.png) · [Admin Members](../../.demo-sources/runtime/workspace-admin.png)
 
 ---
@@ -29,17 +30,17 @@ python scripts/test_connection.py
 # Database: postgres
 # Connection test PASSED
 
-# 4. Verify migration state (all 15 migrations, 44 tables)
+# 4. Verify migration state (all 17 migrations, 47 tables)
 python scripts/db/verify_applied.py
 # Verified output:
 # RESULT: PASS — every table, column, and routine this script tracks exists in the live database
 
-# 5. Verify RLS enforcement across all 43 scoped tables
+# 5. Verify RLS enforcement across all 47 scoped tables
 python scripts/db/verify_rls.py
 # Verified output:
 # Connecting role : kairos_app
 # [PASS] connecting role 'kairos_app' cannot bypass RLS
-# Summary: 43/43 tables passed, 0 failed
+# Summary: 47/47 tables passed, 0 failed
 # RESULT: PASS
 
 # 6. Verify workspace isolation (cross-tenant attack simulation)
@@ -78,7 +79,7 @@ python -m pytest tests/test_workspace_membership.py tests/test_workspace_scope.p
    ```json
    {"error":{"code":"UNAUTHENTICATED","message":"Sign in is required"}}
    ```
-5. Show that 66 of 68 routes fail closed with 401 unauthenticated; only `/healthz` and `/api/v1/auth/config` are public.
+5. Show the fail-closed surface: of 139 operations, **134 require a session**; the only router-level public entries are `/healthz`, `/api/v1/auth/config`, the `/ingestion.html` redirect, and the two OpenLineage ingest routes — and those two are guarded by the `KAIROS_OPENLINEAGE_WEBHOOK_SECRET` HMAC/secret check, not left open.
 
 ### Step 3 — Sign in with Supabase Authentication
 
@@ -132,7 +133,7 @@ python -m pytest tests/test_workspace_membership.py tests/test_workspace_scope.p
    SET LOCAL ROLE kairos_app;
    SELECT set_config('kairos.workspace_id', '<caller-workspace-uuid>', true);
    ```
-2. Every table in the system (43 tables) has `ALTER TABLE <name> FORCE ROW LEVEL SECURITY;`.
+2. Every table in the system (47 tables) has `ALTER TABLE <name> FORCE ROW LEVEL SECURITY;`.
 3. The connecting role `kairos_app` has `NOBYPASSRLS`. Even superusers are bounded when switching to `kairos_app`.
 4. Run the live isolation test to prove cross-tenant boundaries:
    ```powershell
