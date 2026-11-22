@@ -8,12 +8,20 @@
 @media(max-width:1180px){:root{--pad:22px}}
 @media(max-width:640px){:root{--pad:14px;--gap:18px}}
 
-/* Header source switch: compact, non-wrapping controls across tablet widths. */
-.data-mode-control{flex:0 0 auto;min-width:0}
-.data-mode-control>strong{flex:none;white-space:nowrap}
-.data-mode-switch{display:inline-flex;flex:0 0 auto;align-items:center;justify-content:center;min-height:34px;padding:6px 10px;border:1px solid var(--ink);border-radius:999px;background:var(--surface);color:var(--ink);font:600 .74rem/1.1 var(--font-body);white-space:nowrap;cursor:pointer;transition:background-color .12s,color .12s}
-.data-mode-switch:hover,.data-mode-switch[aria-pressed="true"]{background:var(--yellow);color:var(--on-yellow)}
+/* Header source switch: one segmented control with identical segment geometry.
+   The segments used to be full-height pills with their own ink border inside a
+   border-only container, so the active pill pressed through the outer edge and
+   the inactive one read as a second, clipped outline. The container now owns
+   the padding and the border; the two segments share one height, radius, font
+   and horizontal padding, and only the selected one is filled. */
+.data-mode-control{flex:0 0 auto;min-width:0;display:flex;align-items:center;gap:2px;height:38px;padding:3px 6px 3px 12px;border:2px solid var(--ink);border-radius:999px;background:var(--surface);box-sizing:border-box}
+.data-mode-control>span{flex:none;padding-right:6px;font:500 .62rem/1 var(--font-mono);letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.data-mode-control>strong{flex:none;padding-right:8px;white-space:nowrap;font:700 .66rem/1 var(--font-mono);letter-spacing:.1em;text-transform:uppercase;color:var(--ink)}
+.data-mode-switch{display:inline-flex;flex:0 0 auto;align-items:center;justify-content:center;min-width:104px;height:28px;padding:0 12px;border:1px solid transparent;border-radius:999px;background:transparent;color:var(--ink);font:500 .74rem/1 var(--font-body);white-space:nowrap;cursor:pointer;transition:background-color .12s,color .12s,border-color .12s}
+.data-mode-switch:hover:not(:disabled){background:var(--hl);border-color:var(--line)}
+.data-mode-switch[aria-pressed="true"]{background:var(--yellow);border-color:transparent;color:var(--on-yellow);font-weight:700}
 .data-mode-switch:disabled{opacity:.55;cursor:not-allowed}
+.data-mode-switch:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
 .sidebar-bottom .btn.small.sidebar-signout{width:100%;min-height:42px;margin:8px 0 0;padding:8px 12px;justify-content:flex-start;border-width:1px;box-shadow:none;background:transparent;color:var(--muted);font-size:.84rem}
 .sidebar-bottom .btn.small.sidebar-signout:hover{background:var(--hl);color:var(--ink);box-shadow:none;transform:none}
 
@@ -22,16 +30,16 @@
   .breadcrumbs{min-width:0;white-space:nowrap}
   .breadcrumbs span,.breadcrumbs b{display:none}
   .top-actions{min-width:0;flex:0 1 auto;gap:6px}
-  .data-mode-control{gap:4px;padding-inline:4px;border-width:1px}
+  .data-mode-control{gap:2px;padding:2px 3px;border-width:1.5px}
   .data-mode-control>span,.data-mode-control>strong{display:none}
-  .data-mode-switch{padding-inline:9px;font-size:.72rem}
+  .data-mode-switch{min-width:0;height:26px;padding:0 10px;font-size:.72rem}
 }
 @media(max-width:760px){
   .top-actions #helpButton,.top-actions .top-avatar{display:none}
 }
 @media(max-width:640px){
-  .data-mode-control{gap:3px}
-  .data-mode-switch{min-height:42px;padding-inline:8px;font-size:.7rem}
+  .data-mode-control{gap:2px;padding:2px 3px}
+  .data-mode-switch{min-width:0;height:30px;padding:0 10px;font-size:.7rem}
 }
 
 /* assets.css ends in a stray literal "\n", which silently broke these rules */
