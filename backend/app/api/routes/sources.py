@@ -38,6 +38,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from psycopg2.extras import Json, RealDictCursor
 from pydantic import BaseModel, ConfigDict, Field
 
+from backend.app.api.routes.membership import require_role
 from backend.app.auth import require_user
 from backend.app.db import get_conn
 from backend.app.services.token_crypto import decrypt_token, encrypt_token
@@ -48,6 +49,11 @@ from ingestion.postgres_source import (
 )
 
 router = APIRouter(prefix="/sources", tags=["sources"], dependencies=[Depends(require_user)])
+
+# Source configuration stores credentials and sync writes catalog rows, so every
+# mutating source route is a metadata write: a viewer is read-only and must get
+# 403 (docs/DEMO_1_SIGNIN_WORKSPACE_ISOLATION.md, RBAC lifecycle).
+source_write_role = require_role("owner", "admin", "editor")
 
 _SUMMARY_COLUMNS = """
     id::text                                                                       AS id,
@@ -333,7 +339,7 @@ def _check_credential_privilege(config: PostgresSourceConfig) -> tuple[bool, str
 # Routes
 # ---------------------------------------------------------------------------
 
-@router.post("", response_model=SourceSummary)
+@router.post("", response_model=SourceSummary, dependencies=[Depends(source_write_role)])
 def create_source(payload: SourceCreate, user: dict = Depends(require_user)):
     """Register an encrypted, workspace-scoped PostgreSQL connection.
 
@@ -515,7 +521,7 @@ def list_source_runs(
     return {"runs": [dict(r) for r in rows], "count": len(rows), "total": total}
 
 
-@router.patch("/{source_id}", response_model=SourceSummary)
+@router.patch("/{source_id}", response_model=SourceSummary, dependencies=[Depends(source_write_role)])
 def patch_source(
     source_id: uuid.UUID,
     payload: SourcePatch,
@@ -572,7 +578,7 @@ def patch_source(
     return dict(row)
 
 
-@router.post("/{source_id}/test", response_model=TestResult)
+@router.post("/{source_id}/test", response_model=TestResult, dependencies=[Depends(source_write_role)])
 def test_source(source_id: uuid.UUID, user: dict = Depends(require_user)):
     """Credential and reachability check only — does NOT read the schema.
 
@@ -618,7 +624,11 @@ def test_source(source_id: uuid.UUID, user: dict = Depends(require_user)):
     return TestResult(ok=ok, lifecycle_state=new_state, message=message)
 
 
-@router.post("/{source_id}/discover", response_model=DiscoverResult)
+@router.post(
+    "/{source_id}/discover",
+    response_model=DiscoverResult,
+    dependencies=[Depends(source_write_role)],
+)
 def discover_source(source_id: uuid.UUID, user: dict = Depends(require_user)):
     """Read the full source schema and record counts for review.
 
@@ -701,7 +711,7 @@ def discover_source(source_id: uuid.UUID, user: dict = Depends(require_user)):
     )
 
 
-@router.post("/{source_id}/preview")
+@router.post("/{source_id}/preview", dependencies=[Depends(source_write_role)])
 def preview_source(source_id: uuid.UUID, user: dict = Depends(require_user)):
     """Read the source and summarise what a sync would persist, without writing."""
     with get_conn() as conn:
@@ -741,7 +751,7 @@ def preview_source(source_id: uuid.UUID, user: dict = Depends(require_user)):
     }
 
 
-@router.post("/{source_id}/sync")
+@router.post("/{source_id}/sync", dependencies=[Depends(source_write_role)])
 def sync_source(source_id: uuid.UUID, user: dict = Depends(require_user)):
     """Read the source and atomically persist assets into the catalog."""
     with get_conn() as conn:
@@ -875,7 +885,7 @@ def sync_source(source_id: uuid.UUID, user: dict = Depends(require_user)):
     return {"ok": True, "replayed": False, "import_id": import_id, "summary": summary}
 
 
-@router.delete("/{source_id}")
+@router.delete("/{source_id}", dependencies=[Depends(source_write_role)])
 def delete_source(source_id: uuid.UUID, user: dict = Depends(require_user)):
     """Soft-revoke a source; evidence is kept as history (§9.9)."""
     with get_conn() as conn:

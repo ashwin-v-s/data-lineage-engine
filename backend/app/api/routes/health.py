@@ -13,6 +13,8 @@ need to know whether the *full stack* is ready, including the database.
 """
 from __future__ import annotations
 
+import logging
+
 from fastapi import APIRouter, Depends, Response
 from pydantic import BaseModel
 
@@ -37,10 +39,13 @@ def health(response: Response):
                 cur.execute("SELECT 1")
                 cur.fetchone()
         return HealthResponse(status="ok", db="ok")
-    except Exception as exc:
+    except Exception:
+        # Driver errors embed the host, port, database and role of the pooled
+        # connection; that is infrastructure detail, not client-facing text.
+        logging.getLogger("kairos.health").exception("Readiness database check failed")
         response.status_code = 503
         return HealthResponse(
             status="degraded",
             db="unavailable",
-            detail=str(exc),
+            detail="Database is unavailable",
         )

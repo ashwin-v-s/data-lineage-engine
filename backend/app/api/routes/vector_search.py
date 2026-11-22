@@ -27,6 +27,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, Query, HTTPException
 from psycopg2.extras import RealDictCursor
 
+from backend.app import db as db_module
 from backend.app.auth import require_user
 from backend.app.db import get_conn
 from backend.app.schemas.search import SearchResponse, SearchResult
@@ -35,6 +36,61 @@ router = APIRouter(dependencies=[Depends(require_user)])
 
 EMBEDDING_MODEL = "text-embedding-3-small"
 EMBEDDING_DIM = 1536
+
+# Keyword predicate shared by the search and count statements so pagination
+# cannot drift from the result set.
+_KEYWORD_MATCH_SQL = (
+    "( lower(d.name) ILIKE lower(%(pattern)s)"
+    " OR lower(d.schema_name) ILIKE lower(%(pattern)s)"
+    " OR lower(d.description) ILIKE lower(%(pattern)s) )"
+)
+
+
+def _workspace_id_for(user: dict | None) -> str | None:
+    """Resolve the caller's workspace from the authenticated database scope.
+
+    ``require_user`` yields the Supabase ``/auth/v1/user`` payload (id, email,
+    ...), which does **not** contain a workspace id; the workspace is applied to
+    the session as a context variable that ``get_conn`` turns into RLS scope.
+    Reading it from there is what makes this router reachable for real sessions.
+    The explicit key is kept only for direct callers (tests, scripts).
+    """
+    return db_module._workspace_id.get() or (user or {}).get("workspace_id")
+
+
+def _embedding_supported(cur) -> bool:
+    """Whether the deployment actually stores semantic embeddings.
+
+    Without the pgvector column every semantic query would raise a database
+    error (HTTP 500); reporting the capability as unavailable is honest and
+    keeps keyword search usable on deployments that never applied it.
+    """
+    cur.execute(
+        "SELECT 1 FROM information_schema.columns "
+        "WHERE table_schema = 'public' AND table_name = 'dataset' "
+        "AND column_name = 'embedding' "
+        "LIMIT 1"
+    )
+    return cur.fetchone() is not None
+
+
+def _count_matches(cur, query: str, workspace_id: str, mode: str) -> int:
+    """Count every row the requested mode can return, for correct paging."""
+    if mode == "semantic":
+        where = "d.embedding IS NOT NULL"
+        params = {"workspace_id": workspace_id}
+    elif mode == "hybrid":
+        where = f"({_KEYWORD_MATCH_SQL} OR d.embedding IS NOT NULL)"
+        params = {"workspace_id": workspace_id, "pattern": f"%{query}%"}
+    else:
+        where = _KEYWORD_MATCH_SQL
+        params = {"workspace_id": workspace_id, "pattern": f"%{query}%"}
+    cur.execute(
+        "SELECT COUNT(*) AS count FROM dataset d "
+        "WHERE d.workspace_id = %(workspace_id)s AND " + where,
+        params,
+    )
+    return int(cur.fetchone()["count"])
 
 
 def _get_embedding(text: str) -> list[float]:
@@ -62,11 +118,13 @@ def _get_embedding(text: str) -> list[float]:
             input=text
         )
         return response.data[0].embedding
-    except Exception as e:
+    except Exception as exc:
+        # Provider error text can include account identifiers or request ids;
+        # log the detail and return a stable message to the caller.
         raise HTTPException(
-            status_code=500,
-            detail=f"Failed to generate embedding: {str(e)}"
-        )
+            status_code=503,
+            detail="Vector search could not generate an embedding for this query"
+        ) from exc
 
 
 def _keyword_search(cur, pattern: str, workspace_id: str, limit: int, offset: int) -> list[dict]:
@@ -203,43 +261,35 @@ def hybrid_search(
     - keyword: Traditional ILIKE search only
     - semantic: Vector similarity only
     """
-    workspace_id = user.get('workspace_id')
+    workspace_id = _workspace_id_for(user)
     if not workspace_id:
         raise HTTPException(status_code=403, detail="User workspace not found")
-    
+
     offset = (page - 1) * page_size
-    
+
     with get_conn() as conn:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
             # Set RLS context (belt-and-suspenders with explicit WHERE clauses)
             cur.execute("SET LOCAL app.current_workspace_id = %s", (workspace_id,))
-            
+
             if mode == "keyword":
                 results = _keyword_search(cur, q, workspace_id, page_size, offset)
-                
-            elif mode == "semantic":
+                total = _count_matches(cur, q, workspace_id, mode)
+            else:
+                if not _embedding_supported(cur):
+                    raise HTTPException(
+                        status_code=503,
+                        detail=(
+                            "Vector search is unavailable: semantic embeddings are not "
+                            "provisioned on this deployment. Keyword mode still works."
+                        ),
+                    )
                 query_embedding = _get_embedding(q)
-                results = _semantic_search(cur, query_embedding, workspace_id, page_size, offset)
-                
-            else:  # hybrid
-                query_embedding = _get_embedding(q)
-                results = _hybrid_search(cur, q, query_embedding, workspace_id, page_size, offset)
-            
-            # Count total (for pagination)
-            count_sql = """
-                SELECT COUNT(*) FROM dataset d
-                WHERE d.workspace_id = %(workspace_id)s
-                  AND (
-                      lower(d.name) ILIKE lower(%(pattern)s) OR
-                      lower(d.schema_name) ILIKE lower(%(pattern)s) OR
-                      lower(d.description) ILIKE lower(%(pattern)s)
-                  )
-            """
-            cur.execute(count_sql, {
-                'workspace_id': workspace_id,
-                'pattern': f"%{q}%"
-            })
-            total = cur.fetchone()['count']
+                if mode == "semantic":
+                    results = _semantic_search(cur, query_embedding, workspace_id, page_size, offset)
+                else:  # hybrid
+                    results = _hybrid_search(cur, q, query_embedding, workspace_id, page_size, offset)
+                total = _count_matches(cur, q, workspace_id, mode)
             
             # Format results
             search_results = [

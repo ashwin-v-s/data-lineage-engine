@@ -4,6 +4,7 @@ Handles inline editing of descriptions, tags, and custom properties
 """
 
 import logging
+import re
 from uuid import UUID
 from datetime import datetime
 from typing import Optional
@@ -11,6 +12,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import text
 
+from backend.app.api.routes.membership import require_role
 from backend.app.db import get_db_connection
 from backend.app.auth import require_user
 from backend.app.schemas.metadata import (
@@ -25,12 +27,33 @@ from backend.app.schemas.metadata import (
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/metadata", tags=["metadata"], dependencies=[Depends(require_user)])
 
+# Editing catalog metadata is a write: viewers are read-only and must receive
+# 403 (docs/DEMO_1_SIGNIN_WORKSPACE_ISOLATION.md, RBAC lifecycle).
+metadata_write_role = require_role("owner", "admin", "editor")
+
+_UUID_RE = re.compile(
+    r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$',
+    re.IGNORECASE,
+)
+
+
+def _uuid_or_404(asset_id: str) -> str:
+    """Reject a malformed asset id as not-found instead of failing in SQL.
+
+    Passing a non-UUID string to ``id = %s`` makes PostgreSQL raise 22P02,
+    which used to surface as an HTTP 500 for a resource that simply does not
+    exist here.
+    """
+    if not asset_id or not _UUID_RE.match(asset_id):
+        raise HTTPException(status_code=404, detail="Dataset not found")
+    return asset_id
+
 
 # ═══════════════════════════════════════════════════════════════════
 # Single Field Updates
 # ═══════════════════════════════════════════════════════════════════
 
-@router.put("/{asset_id}/description")
+@router.put("/{asset_id}/description", dependencies=[Depends(metadata_write_role)])
 def update_description(
     asset_id: str,
     description: str = "",
@@ -48,6 +71,7 @@ def update_description(
         Confirmation of update
     """
     current_user = user.get("email") or user["id"]
+    asset_id = _uuid_or_404(asset_id)
     if description is not None and len(description) > 500:
         raise HTTPException(status_code=400, detail="Description must be 500 characters or less")
     conn = get_db_connection()
@@ -118,7 +142,7 @@ def update_description(
         conn.close()
 
 
-@router.put("/{asset_id}/tags")
+@router.put("/{asset_id}/tags", dependencies=[Depends(metadata_write_role)])
 def update_tags(
     asset_id: str,
     add_tags: Optional[list[str]] = None,
@@ -140,6 +164,7 @@ def update_tags(
         Updated tags
     """
     current_user = user.get("email") or user["id"]
+    asset_id = _uuid_or_404(asset_id)
     for tag in (add_tags or []) + (remove_tags or []) + (set_tags or []):
         if not tag.strip() or len(tag.strip()) > 50:
             raise HTTPException(status_code=422, detail="Tags must contain 1–50 non-whitespace characters.")
@@ -214,7 +239,7 @@ def update_tags(
 # Bulk Updates
 # ═══════════════════════════════════════════════════════════════════
 
-@router.post("/bulk-update")
+@router.post("/bulk-update", dependencies=[Depends(metadata_write_role)])
 def bulk_update_metadata(
     request: BulkMetadataUpdate,
     user: dict = Depends(require_user),
@@ -304,6 +329,7 @@ def get_editable_metadata(asset_id: str):
     Returns:
         Entity metadata with editable fields
     """
+    asset_id = _uuid_or_404(asset_id)
     conn = get_db_connection()
     try:
         cur = conn.cursor(row_factory=dict)
@@ -362,6 +388,9 @@ def get_editable_metadata(asset_id: str):
             editable_fields=editable_fields
         )
     
+    except HTTPException:
+        # A missing asset is a 404, not a server failure.
+        raise
     except Exception as e:
         logger.error(f"Error fetching editable metadata: {e}")
         raise HTTPException(status_code=500, detail="Failed to fetch metadata")

@@ -88,11 +88,68 @@ if "psycopg2" not in sys.modules:
 import psycopg2.errors  # noqa: E402
 
 from fastapi.testclient import TestClient  # noqa: E402
+from backend.app import db as db_module  # noqa: E402
+from backend.app.api.routes import membership  # noqa: E402
 from backend.app.auth import require_user  # noqa: E402
 from backend.app.main import app           # noqa: E402
 
 client = TestClient(app)
 _USER = {"id": str(uuid.uuid4()), "email": "test@kairos.test"}
+_WORKSPACE = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+
+
+class _RoleCursor:
+    """Serves the two lookups ``require_role`` performs."""
+
+    def __init__(self) -> None:
+        self._row = None
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *_exc):
+        return False
+
+    def execute(self, query, params=()):
+        if query.strip().startswith("SELECT to_regclass"):
+            self._row = ("public.workspace_member",)
+        else:
+            self._row = ("editor",)
+
+    def fetchone(self):
+        return self._row
+
+
+class _RoleConnection:
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *_exc):
+        return False
+
+    def cursor(self, *_args, **_kwargs):
+        return _RoleCursor()
+
+
+class _WorkspaceContext:
+    def get(self):
+        return _WORKSPACE
+
+
+@pytest.fixture(autouse=True)
+def _signed_in_editor(monkeypatch):
+    """Give every request a workspace and an editor role.
+
+    Source configuration is role-gated, so the offline harness must model a real
+    member; previously it supplied only the user id.
+    """
+
+    @contextmanager
+    def role_conn():
+        yield _RoleConnection()
+
+    monkeypatch.setattr(membership, "get_conn", role_conn)
+    monkeypatch.setattr(db_module, "_workspace_id", _WorkspaceContext())
 
 # ── DB cursor mock ────────────────────────────────────────────────────────────
 

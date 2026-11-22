@@ -202,19 +202,54 @@ def test_rls_context_is_set():
 
 
 def test_missing_workspace_id_raises_403():
-    """
-    Test that requests without workspace_id are rejected.
-    """
+    """A request with no authenticated workspace scope is refused."""
     from backend.app.api.routes.vector_search import hybrid_search
+    from backend.app import db as db_module
     from fastapi import HTTPException
-    
-    user_no_workspace = {'id': 'user-1'}  # No workspace_id
-    
-    with pytest.raises(HTTPException) as exc_info:
-        hybrid_search(q='test', mode='hybrid', page=1, page_size=20, user=user_no_workspace)
-    
+
+    token = db_module._workspace_id.set(None)
+    try:
+        with pytest.raises(HTTPException) as exc_info:
+            hybrid_search(q='test', mode='keyword', page=1, page_size=20, user={'id': 'user-1'})
+    finally:
+        db_module._workspace_id.reset(token)
+
     assert exc_info.value.status_code == 403
     assert 'workspace' in exc_info.value.detail.lower()
+
+
+def test_session_workspace_context_is_used_when_the_user_has_no_workspace_key():
+    """Regression: ``require_user`` yields a Supabase user, not a workspace.
+
+    The workspace is the session-scoped context variable that ``get_conn``
+    applies as RLS scope.  Reading ``user['workspace_id']`` made this endpoint
+    answer 403 for every real signed-in session.
+    """
+    from backend.app.api.routes import vector_search
+    from backend.app import db as db_module
+
+    token = db_module._workspace_id.set('workspace-from-context')
+    try:
+        with patch('backend.app.api.routes.vector_search.get_conn') as mock_conn:
+            mock_cur = MagicMock()
+            mock_conn.return_value.__enter__.return_value.cursor.return_value.__enter__.return_value = mock_cur
+            mock_cur.fetchall.return_value = []
+            mock_cur.fetchone.return_value = {'count': 0}
+
+            response = vector_search.hybrid_search(
+                q='orders', mode='keyword', page=1, page_size=20, user={'id': 'user-1'}
+            )
+    finally:
+        db_module._workspace_id.reset(token)
+
+    assert response.total == 0
+    scoped = [
+        call[0][1]['workspace_id']
+        for call in mock_cur.execute.call_args_list
+        if len(call[0]) > 1 and isinstance(call[0][1], dict) and 'workspace_id' in call[0][1]
+    ]
+    assert scoped, 'search did not scope a single query to the workspace'
+    assert set(scoped) == {'workspace-from-context'}
 
 
 # Test data for parameterized tests

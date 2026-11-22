@@ -28,7 +28,9 @@ How it works
 Graceful degradation
 ────────────────────
   If no evidence exists yet (M1 hasn't loaded data), the engine returns UNKNOWN (R5).
-  The route returns 200 in all cases — 404 only if the run_id itself doesn't exist.
+  404 is returned for a run, source or target that does not exist in this
+  workspace; a malformed timestamp is 422.  Neither case ever reaches SQL with a
+  non-UUID identifier, which previously surfaced as a 500.
 """
 from __future__ import annotations
 
@@ -107,6 +109,24 @@ _INTERPRETATIONS: dict[PredictedState, str] = {
 
 def _now_utc() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def _parse_timestamp(value: str, field: str) -> str:
+    """Validate and normalise an ISO-8601 query timestamp to UTC.
+
+    The value is interpolated into ``%s::timestamptz``, so an unparseable value
+    would fail inside PostgreSQL (HTTP 500) instead of naming the bad parameter.
+    """
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(
+            status_code=422,
+            detail=f"{field} must be an ISO-8601 timestamp (for example 2026-01-01T00:00:00Z).",
+        ) from exc
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc).isoformat()
 
 
 def _resolve_column(cur, identifier: str, run_id: str) -> dict | None:
@@ -358,8 +378,8 @@ def get_dependency_state(
     recorded_as_of: Optional[str] = Query(default=None),
     granularity: str = Query(default="COLUMN", pattern="^(DATASET|COLUMN)$"),
 ):
-    ts_as_of = as_of or _now_utc()
-    ts_rec   = recorded_as_of or _now_utc()
+    ts_as_of = _parse_timestamp(as_of, "as_of") if as_of else _now_utc()
+    ts_rec = _parse_timestamp(recorded_as_of, "recorded_as_of") if recorded_as_of else _now_utc()
 
     with get_conn() as conn:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
@@ -380,10 +400,24 @@ def get_dependency_state(
             src = _resolve_column(cur, source, run_id)
             tgt = _resolve_column(cur, target, run_id)
 
-            src_id = src["id"] if src else source
-            tgt_id = tgt["id"] if tgt else target
-            src_display = src["display"] if src else source
-            tgt_display = tgt["display"] if tgt else target
+            # An unresolved identifier must never be used as ``%s::uuid`` in the
+            # evidence queries: that raises 22P02 and turned a missing asset
+            # into an opaque HTTP 500.
+            if src is None:
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"Source '{source}' was not found in this workspace.",
+                )
+            if tgt is None:
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"Target '{target}' was not found in this workspace.",
+                )
+
+            src_id = src["id"]
+            tgt_id = tgt["id"]
+            src_display = src["display"]
+            tgt_display = tgt["display"]
 
             # 3. Fetch evidence
             static_ev  = _fetch_static_evidence(cur, src_id, tgt_id, granularity, ts_as_of, ts_rec)

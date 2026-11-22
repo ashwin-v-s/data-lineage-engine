@@ -262,6 +262,48 @@ def test_viewer_cannot_create_a_quality_assertion(client, monkeypatch):
     assert response.status_code == 403
 
 
+def test_viewer_cannot_edit_asset_metadata(client, monkeypatch):
+    """A viewer is read-only: inline metadata editing returns 403."""
+    _authenticate(monkeypatch, VIEWER, role="viewer")
+
+    response = client.put(
+        f"/api/v1/metadata/{DATASET_ID}/description",
+        params={"description": "changed by a viewer"},
+    )
+
+    assert response.status_code == 403
+
+
+def test_viewer_cannot_bulk_update_metadata(client, monkeypatch):
+    _authenticate(monkeypatch, VIEWER, role="viewer")
+
+    response = client.post(
+        "/api/v1/metadata/bulk-update",
+        json={"asset_ids": [DATASET_ID], "description": "changed by a viewer"},
+    )
+
+    assert response.status_code == 403
+
+
+def test_viewer_cannot_configure_a_source_connection(client, monkeypatch):
+    """Storing source credentials and syncing them are metadata writes."""
+    _authenticate(monkeypatch, VIEWER, role="viewer")
+
+    response = client.post(
+        "/api/v1/sources",
+        json={
+            "name": "warehouse",
+            "host": "db.internal",
+            "port": 5432,
+            "dbname": "analytics",
+            "user": "kairos_reader",
+            "password": "s3cret",
+        },
+    )
+
+    assert response.status_code == 403
+
+
 def test_editor_can_create_a_glossary_term(client, monkeypatch):
     _authenticate(monkeypatch, EDITOR, role="editor")
 
