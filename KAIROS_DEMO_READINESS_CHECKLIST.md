@@ -99,3 +99,33 @@ infrastructure; **UNVERIFIED** = not executed.
 | Quality and PII demos | ✅ working (BUG-02/01 symptom fixed); temporal demo is partial (BUG-04) |
 | External integrations | ⛔ blocked on credentials |
 | Documentation (6 deliverables) | ✅ |
+
+## 2026-11-22 — merged M4 branch and audit fixes (code state)
+
+- Pulled `origin/codex/m4-gauree-completion` into `main`. It was the only branch
+  ahead of `main`; both remotes' `main` branches were already fully fetched.
+- New in this build: service-backed OpenLineage ingest with `/ingest/openlineage/preview`,
+  coverage-aware `/assets/{id}/downstream-impact`, the column-lineage scope fix,
+  membership-safe workspace reads, the edge evidence inspector (aggregate vs.
+  stored record), refresh-catalog on the lineage page, and per-run asset/event counts
+  computed from stored evidence and raw events.
+- Conflict rule applied: keep the newer implementation per feature, not one side
+  wholesale. Ingest takes the branch's service for events plus main's static-import
+  commit path; workspace routes keep main's `/me/workspaces` and welcome-email
+  endpoints; `app.js` keeps main's UI and adds only the branch's new panels.
+- OpenLineage producers accept either a signed-in session / Kairos API key or the
+  server-side `KAIROS_OPENLINEAGE_WEBHOOK_SECRET` scoped to
+  `KAIROS_OPENLINEAGE_WORKSPACE_ID`; the secret is ignored unless both are set.
+- Fixed in this pass: hybrid search returning 403 for every session; viewer access to
+  metadata and source mutations; lineage dependency 500s (now 404/422); database
+  exception text in `/api/v1/health`; hardcoded zero run counts; four tables missing
+  from the RLS verifier; migration range pinned at 0017.
+- Verified this pass: backend `816 passed, 83 skipped`; frontend `155 passed`;
+  production build clean; `check_migrations.py` PASS (0017, 0 gaps);
+  `verify_applied.py` PASS (44 tables); `verify_rls.py` PASS (47/47);
+  app boots locally (`/healthz` 200, `/` 200, 122 documented API paths).
+- Still blocked on credentials or infrastructure, not code: SMTP, GitHub App,
+  a reachable PostgreSQL source, embeddings for vector search, a scheduler for
+  freshness/incidents/notifications, and a second real user for the isolation demo.
+- The deployed site still serves commit `e398cd0`; publishing this merge needs an
+  explicit go-ahead.
