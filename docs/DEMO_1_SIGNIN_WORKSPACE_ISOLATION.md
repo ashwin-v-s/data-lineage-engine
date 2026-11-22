@@ -229,3 +229,25 @@ PASS: temporary workspaces and datasets were rolled back.
 | **What happens if a user navigates to `/ingestion.html` unauthenticated?** | The server checks credentials on the navigation request and returns a **302 redirect to `/?signin_required=1`**, ensuring users see a branded sign-in screen rather than a raw JSON error. (`backend/app/main.py`) |
 | **How is personal workspace provisioning made race-condition safe?** | `kairos_ensure_personal_workspace` runs inside a serializable database function using `INSERT ... ON CONFLICT DO NOTHING` to guarantee idempotent creation. (`backend/migrations/0013_membership_lifecycle.sql`) |
 | **How does soft asset removal work without losing lineage?** | Migration 0015 adds `removed_at` and `removed_by`. The `kairos_dataset_active_read` policy hides them from catalog SELECTs (`WHERE removed_at IS NULL`), while `lineage_edge`, `evidence`, and `raw_event` rows remain intact for bitemporal queries. (`backend/migrations/0015_dataset_soft_removal.sql`) |
+
+---
+
+## Production verification (2026-11-22)
+
+Run against `https://data-lineage-engine-5i2x.vercel.app` (deployment `3WQdi955cMcDHfUpVEVzBBJL1SFe`), not localhost:
+
+| Step | Request | Result |
+|---|---|---|
+| Backend liveness | `GET /healthz` | `200 {"status":"ok","service":"kairos-api"}` |
+| Public auth config | `GET /api/v1/auth/config` | `200` with Supabase URL + publishable key |
+| Fail-closed API | `GET /api/v1/catalog` (no token) | `401 {"error":{"code":"UNAUTHENTICATED","message":"Sign in is required","request_id":"..."}}` |
+| Fail-closed navigation | `GET /ingestion.html` (no token) | `302 → /?signin_required=1` |
+| Demo sign-in | `POST {SUPABASE}/auth/v1/token?grant_type=password` | `200`, access token issued for the configured demo account |
+| Auto-provisioned workspace | `GET /api/v1/me/workspace` | `200`, personal workspace returned |
+| Workspace list | `GET /api/v1/me/workspaces` | `200`, membership list with role `owner` |
+| Catalog visible after sign-in | `GET /api/v1/catalog?page_size=5` | `200`, 30 assets |
+| Asset detail / lineage | `GET /api/v1/assets/{id}`, `.../lineage`, `.../capabilities` | `200` each |
+| Audit trail | `GET /api/v1/audit/{id}/trail` | `200` |
+| Governance read paths | `GET /api/v1/governance/terms`, `/domains`, `/products` | `200` with real rows (GMV term, Finance domain, Executive Revenue Intelligence product) |
+
+The database-level isolation proof (`scripts/db/verify_workspace_isolation.py`) and the API workspace-scope tests were re-run the same day and passed. The only step that still needs a human is signing in as a **second** provisioned account in a browser to show the empty/different workspace.

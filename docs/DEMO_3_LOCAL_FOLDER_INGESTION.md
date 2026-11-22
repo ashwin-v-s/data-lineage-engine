@@ -2,7 +2,7 @@
 
 **Presenter:** Anushka (M2) or Jatin (M1)  
 **Duration:** 6–8 minutes  
-**Status:** **100% COMPLETE & VERIFIED** (Updated 2026-11-17)  
+**Status:** **100% COMPLETE & VERIFIED** (Re-verified 2026-11-22 against production `https://data-lineage-engine-5i2x.vercel.app`)  
 **Prerequisite:** Backend running (`uvicorn backend.app.main:app --reload`), frontend built (`npm --prefix frontend run build`), signed in with a confirmed Supabase account.  
 **Visual Artifacts:** [Local Folder Preview](../../.demo-sources/visual/demo3-local-preview.png) · [File Ingestion View](../../.demo-sources/visual/3-file-ingestion.png)
 
@@ -13,8 +13,8 @@
 Execute these commands before beginning the live demo:
 
 ```powershell
-# 1. Confirm the authenticated enterprise demo fixture files exist in demo-authenticated-ingestion/
-Get-ChildItem demo-authenticated-ingestion/ | Select-Object Name, Length
+# 1. Confirm the authenticated enterprise demo fixture files exist in docs/demo-fixtures/
+Get-ChildItem docs/demo-fixtures/ | Select-Object Name, Length
 
 # Verified output:
 #   customer_transactions_schema.csv (555 B, 10 columns)
@@ -36,7 +36,7 @@ $env:PYTHONPATH='.'; python scripts/demo/verify_authenticated_fixtures.py
 
 # 3. Confirm ingestion & parser test suite
 python -m pytest tests/test_ingestion_api.py tests/test_metadata_graph_adapter.py tests/test_sql_static_file_adapter.py tests/test_static_corpus.py tests/test_ingest_sql_dbt_route.py -q
-# Verified output: 68 passed, 7 warnings
+# Verified output: 71 passed, 7 warnings (re-run 2026-11-22)
 
 # 4. Optional: Pre-seed complete enterprise governance bindings (Glossary, Domains, Products, SLAs)
 $env:PYTHONPATH='.'; python scripts/demo/seed_authenticated_demo.py
@@ -176,3 +176,14 @@ GET  /api/v1/catalog         -> 200 OK (returned imported assets under workspace
 | **What prevents duplicate asset insertion on network retries?** | The client generates a random UUID `idempotency_key` per upload session. `backend/app/api/routes/ingest.py:commit_import` checks for an existing `import_run` with that key. If found, it immediately returns `replayed: true` with the original summary without writing rows. |
 | **Does parsing a SQL file prove data flowed between tables?** | **No.** SQL parsing is purely *static evidence*. It proves only that the SQL statement declared a dependency in its code. Kairos labels this evidence `POSSIBLE`. It requires runtime execution evidence (e.g., OpenLineage in Demo 7) to elevate an edge to `OBSERVED`. |
 | **Where is the original uploaded file preserved?** | The raw content is hashed (SHA-256) and stored in `public.raw_event` with `event_type = 'STATIC_FILE_IMPORT'`. An immutable Postgres trigger (`raw_event_immutable`) forbids any UPDATE or DELETE on raw event records. (`backend/migrations/0001_core.sql`) |
+
+---
+
+## Production verification (2026-11-22) — read-only / dry-run
+
+- `PYTHONPATH=. python scripts/demo/verify_authenticated_fixtures.py` → 5/5 fixtures PASS (metadata graph 9 assets/9 edges, SQL 8/6, dbt manifest 8/8, CSV 1 table/10 columns, inventory 4 files).
+- `python -m pytest tests/test_ingestion_api.py tests/test_metadata_graph_adapter.py tests/test_sql_static_file_adapter.py tests/test_static_corpus.py tests/test_ingest_sql_dbt_route.py -q` → **71 passed**.
+- Against production `https://data-lineage-engine-5i2x.vercel.app` with the configured demo account:
+  - `POST /api/v1/ingest/preview` (`kind=metadata_graph`, `docs/demo-fixtures/enterprise_metadata_graph.json`) → `200`, `contract_version: kairos.ingest.v1`, **9 assets, 9 relationships, 41 columns, 0 warnings, writes: 0**.
+  - `GET /api/v1/ingest/runs` → `200` with a previous `upload` / `local_folder` run, so the run history the demo points at is real.
+- No production data was written during this verification: the preview path is explicitly non-persisting. The commit step is left to the live demo.

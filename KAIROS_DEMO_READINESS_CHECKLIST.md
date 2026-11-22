@@ -155,3 +155,22 @@ infrastructure; **UNVERIFIED** = not executed.
   walkthrough still needs two provisioned Supabase accounts; the DB/RLS and API
   scoping proofs already pass. GitHub App, embeddings key and the scheduler
   remain blocked on credentials/decision, not on M1 code.
+
+## 2026-11-22 — demo flows verified against the deployed site
+
+Signed in to production with the configured demo account (never printed) and exercised
+the demo paths over HTTPS, not localhost:
+
+- **Demo 1 prerequisites:** `/api/v1/me/workspace` `200`, `/api/v1/me/workspaces` `200`
+  (role `owner`), `/api/v1/catalog` `200` with 30 assets, asset detail + lineage +
+  capabilities `200`, audit trail `200`, governance `terms`/`domains`/`products` `200`
+  with real rows.
+- **Demo 3 prerequisites:** fixture verifier 5/5 PASS; ingestion subset **71 passed**;
+  `POST /api/v1/ingest/preview` on the enterprise metadata graph returns
+  `9 assets / 9 relationships / 41 columns / 0 warnings / writes: 0`; `/api/v1/ingest/runs`
+  shows the earlier upload run. Nothing was written to production data.
+- **Fail-closed still holds live:** `/api/v1/catalog` without a token `401`,
+  `/ingestion.html` `302 → /?signin_required=1`.
+
+Still a human step, not a code gap: the second-account browser isolation walkthrough
+from Demo 1 step 6–7.

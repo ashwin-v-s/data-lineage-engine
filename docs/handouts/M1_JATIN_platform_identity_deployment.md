@@ -178,7 +178,7 @@ curl -s -o /dev/null -w '%{http_code} %{redirect_url}' https://data-lineage-engi
 
 | Item | Value |
 |---|---|
-| Source commit | `75c360c` on `main` (post-merge tree, 14 conflicts resolved from PR #24) |
+| Source commit | `75c360c` on `main` (post-merge tree, 14 conflicts resolved from PR #24); `main` is now `7fc254f`, docs-only and excluded from the build by `.vercelignore` |
 | CLI | `vercel --prod` (Vercel CLI 65.9.0, account `jat-in32006`) |
 | Project | `jatins-projects-4d272d2b/data-lineage-engine-5i2x` (`prj_AdilqlGfM3rvRsC6P5cxBDCQL4NI`) |
 | Deployment ID | `3WQdi955cMcDHfUpVEVzBBJL1SFe` |
