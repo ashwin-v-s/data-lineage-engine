@@ -108,3 +108,26 @@ Evidence in [VERIFICATION_2026-11-02.md](../VERIFICATION_2026-11-02.md) §1, §4
 | B5 | **Demo script** (v2 §9.2): every source with best-attainable state + never-proves sentence; fix/delete `demo_m5.py` (P7); retire REPRODUCIBILITY §4 (P6) | `python scripts/demo_m5.py` exits 0 and shows only real capability |
 | B6 | **MLflow + RAG adapters co-own** (C1 #10/#11 with M2): you own the honesty contract of both (states, never-proves sentences, demo wiring) | both adapters ship with their honesty labels tested |
 | B7 | **D12 memo**: where does the scheduler/evaluator actually run (serverless cron vs external worker) — written decision the whole team executes | one page, decision recorded, CI/config matches it |
+
+---
+
+## 2026-11-22 status — two of the P9 items are closed
+
+- **Coverage floor raised to 45%.** `.github/workflows/ci.yml` now runs
+  `pytest --cov=backend.app --cov-fail-under=45`; measured coverage is **62.88%**
+  over 822 passing tests, so the floor is real rather than aspirational.
+- **A claim-vs-request gate now exists and runs in CI:**
+  `scripts/check_ui_claims.py` walks `frontend/src`, extracts every
+  `/api/v1/...` request the live views make (15 paths across the React views and
+  API client), normalises template interpolations, and fails when any of them is
+  absent from `docs/openapi.json`. Wired into `ci.yml` next to the OpenAPI drift
+  step. It is a static gate, not the full browser tour.
+- **Still not built:** the browser-level honesty walk you specified in §"A
+  browser-level honesty test" — enter demo preview, click every nav entry, fail
+  if a screen says "catalog" / "persisted" / "live" while zero authenticated
+  requests succeeded, and fail on more than one provenance banner. That needs a
+  signed-in Playwright fixture; the current e2e suite is backend-free by design
+  (7 passed, 1 skipped).
+- Findings are still plumbing-only: `docs/BENCHMARK_RESULTS.md` remains
+  `PLUMBING Evidence Only` with the 18 mock-fixture cells, and kill criteria
+  K1–K8 are still undefined.

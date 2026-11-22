@@ -27,6 +27,8 @@ jobs:
         \ \\\n  tests/test_live_api.py \\\n  tests/test_audit_api_live.py\n"
     - name: OpenAPI contract drift
       run: python scripts/check_openapi_drift.py
+    - name: UI claim surface (every live view calls a documented endpoint)
+      run: python scripts/check_ui_claims.py
     - name: Migration / RLS consistency (static)
       run: python scripts/db/check_migrations.py
     - name: False-green guard (verify DB probes fail on bad credentials)
@@ -47,7 +49,7 @@ jobs:
     - name: Tests
       run: python -m pytest -q
     - name: Coverage floor
-      run: python -m pytest --cov=backend.app --cov-fail-under=40 -q
+      run: python -m pytest --cov=backend.app --cov-fail-under=45 -q
     - name: AI CI Healer
       if: failure()
       uses: mariorazo97/ai-ci-healer@v1.0.0

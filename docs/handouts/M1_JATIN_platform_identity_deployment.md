@@ -26,7 +26,7 @@
 | G2 | No workspace membership/role model in git | `0007` untracked | ✅ **RESOLVED** | Migrations `0007_membership_roles.sql` and `0013_membership_lifecycle.sql` applied to live database; `workspace_member` and `workspace_invite` tables have forced RLS; `kairos_accept_workspace_invite` and `kairos_list_user_workspaces` routines active; 23 tests passing in `tests/test_workspace_membership.py` & `tests/test_membership_api.py`. |
 | G3 | Signup flow & workspace provisioning | 0 registered users | ✅ **RESOLVED** | Auto-provisioning via `provision_personal_workspace` in `backend/app/auth.py`; fail-closed 401 gate across the API (134 of 139 operations require a session); personal workspace created on first auth; workspace isolation verified in `verify_workspace_isolation.py`. |
 | G4 | Deployment readiness | Nightly live-smoke red | ✅ **RESOLVED** | `vercel.json` valid JSON, `backend/api/index.py` re-exports FastAPI app, `npm --prefix frontend run build` builds production assets in `dist/`, `scripts/check_deployment.py` verifies stylesheet resolution, and the 2026-11-22 production deploy serves `200` on `/`, `/healthz` and `/api/v1/auth/config`. |
-| G5 | Uncommitted tree & unpushed commits | 4,000-line dirty tree | ✅ **RESOLVED** | All branch work is merged into `main` (last merge: `2801557`, M4 branch — 14 conflicts resolved, main-only routes restored); working tree clean; full suite passes **816 tests**. |
+| G5 | Uncommitted tree & unpushed commits | 4,000-line dirty tree | ✅ **RESOLVED** | All branch work is merged into `main` (last merge: `2801557`, M4 branch — 14 conflicts resolved, main-only routes restored); working tree clean; full suite passes **822 tests** (final count after the 2026-11-22 semantic-search and signed-webhook changes). |
 | G6 | Review routing & CODEOWNERS | `@M1-handle` placeholders | ✅ **RESOLVED** | Real handles (`Jat-in32006`, `AnaaMorr`, `ashwin-v-s`, `gaureehatkar`, `pranav-samal`) mapped to Architecture v2 §7 ownership paths in `.github/CODEOWNERS` and `docs/TEAM_GUIDE.md`. |
 | G7 | Unverified migration claims | `Applied` headers unverifiable | ✅ **RESOLVED** | `scripts/db/verify_applied.py` contacts live database and validates every tracked table, column, and stored routine. Exits 0: `RESULT: PASS — every table, column, and routine this script tracks exists in the live database`. |
 | G8 | Team Guide ownership out of date | Old M1-M5 split | ✅ **RESOLVED** | `docs/TEAM_GUIDE.md` updated to reflect Architecture v2 §7 vertical slice ownership. |
@@ -45,7 +45,7 @@
 | J6 | Unauthenticated routes | Security check | ✅ **VERIFIED** | 134 of 139 API operations fail closed with 401 JSON; the only router-level public entries are `/healthz`, `/api/v1/auth/config`, the `/ingestion.html` redirect, and the two OpenLineage ingest routes (guarded by the webhook secret, not open). |
 | J7 | Navigation to `/ingestion.html` returned raw JSON | Static file mount lacked redirect | ✅ **FIXED** | Unauthenticated navigation requests 302 to `/?signin_required=1` (confirmed on production 2026-11-22); `/api/*` endpoints return JSON 401. |
 | J8 | Local DB absence | No local Docker target | ✅ **RESOLVED** | D12 settled: Shared Supabase PostgreSQL 17.6 is active, provisioned, and verified live. |
-| J9 | Test coverage floor | Dead code in repositories/ | ✅ **EXPANDED** | Suite now holds **816 passed tests** (83 skipped) with zero failures; CI enforces `--cov-fail-under=40` on `backend.app`. |
+| J9 | Test coverage floor | Dead code in repositories/ | ✅ **EXPANDED** | Suite now holds **822 passed tests** (83 skipped) with zero failures; CI enforces `--cov-fail-under=45` on `backend.app` and measured coverage is 62.88%. |
 | J10 | Playwright install & e2e smoke | Missing Chromium binary | ✅ **FIXED** | Playwright Chromium installed; `frontend/e2e` holds three passing specs (`shell.smoke`, `auth-config-race`, `asset-removal`). |
 | J11 | Frontend CDN dependencies | Tailwind and Google Fonts CDN | ✅ **FIXED** | Critical inline layout CSS fallback and system font fallbacks added to `frontend/auth-stitch.html` for offline demo safety. |
 | J12 | Frontend dist build missing on clone | `dist/` gitignored | ✅ **FIXED** | `npm --prefix frontend run build` completes in <6s producing `dist/index.html` and bundled CSS/JS assets; the same build runs on Vercel. |
@@ -98,7 +98,7 @@
 | B3 | Soft removal & quarantine | Soft removal hides active assets; preserves lineage/evidence/audit | ✅ **DONE** | Migration 0015 + `kairos_remove_dataset` + `DELETE /api/v1/assets/{id}` soft-removal tested in `tests/test_asset_removal.py`. |
 | B4 | Deployment configuration | Real production build and serverless bridge | ✅ **DONE** | `npm --prefix frontend run build` produces production bundle; `backend/api/index.py` handles API rewrites; production deploy live. |
 | B5 | Live proofs executed | RLS isolation test + applied migrations verified | ✅ **DONE** | `verify_applied.py` (PASS), `verify_rls.py` (**47/47** PASS), `verify_workspace_isolation.py` (PASS), `check_migrations.py` (0 gaps) — all re-run 2026-11-22. |
-| B6 | CI & test hardening | Suite comprehensive with 0 regressions | ✅ **DONE** | **816** pytest tests passing (83 skipped); **155** vitest tests passing (14 files); 3 Playwright e2e specs. |
+| B6 | CI & test hardening | Suite comprehensive with 0 regressions | ✅ **DONE** | **822** pytest tests passing (83 skipped); **155** vitest tests passing (14 files); Playwright e2e suite 7 passed / 1 skipped; coverage gate 45% (actual 62.88%); UI claim-vs-contract gate in CI. |
 
 ---
 
@@ -137,7 +137,7 @@ python scripts/db/check_migrations.py
 # 5. Full backend test suite
 python -m pytest -q
 # OUTPUT:
-# 816 passed, 83 skipped, 91 warnings in 16.71s
+# 822 passed, 83 skipped (final pass after the semantic-search and signed-webhook changes)
 
 # 6. Frontend unit suite
 cd frontend && npx vitest run

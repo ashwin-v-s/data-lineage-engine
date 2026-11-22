@@ -13,8 +13,14 @@ workspace implicitly. Two credentials are accepted:
   * the server-side ``KAIROS_OPENLINEAGE_WEBHOOK_SECRET`` bearer secret used by
     external schedulers, scoped to ``KAIROS_OPENLINEAGE_WORKSPACE_ID``.
 
-The secret path exists only when both variables are configured; otherwise the
-endpoint requires a normal user session.
+External producers that cannot send a bearer token can instead sign the raw
+body with ``KAIROS_WEBHOOK_SIGNING_SECRET`` and send
+``X-Kairos-Signature: sha256=<hex-hmac-sha256>``. A signed request is scoped to
+``KAIROS_OPENLINEAGE_WORKSPACE_ID`` exactly like the shared-secret path, and a
+present-but-invalid signature is rejected instead of falling back to a session.
+
+The secret paths exist only when the matching variables are configured;
+otherwise the endpoint requires a normal user session.
 
 Rules (from Architecture Pack §12 and handout G1/A1) live in
 ``backend/app/services/openlineage_ingest.py`` — this module only handles the
@@ -29,6 +35,8 @@ HTTP contract. In short:
 """
 from __future__ import annotations
 
+import hashlib
+import hmac
 import json
 import os
 import secrets
@@ -97,14 +105,90 @@ def _webhook_principal() -> dict | None:
     return {"id": None, "workspace_id": workspace, "auth": "openlineage_webhook"}
 
 
+SIGNATURE_HEADER = "x-kairos-signature"
+SIGNING_SECRET_ENV = "KAIROS_WEBHOOK_SIGNING_SECRET"
+
+
+def _signature_secret() -> str:
+    return (os.getenv(SIGNING_SECRET_ENV) or "").strip()
+
+
+def _normalise_signature(value: Optional[str]) -> str:
+    raw = (value or "").strip().lower()
+    if raw.startswith("sha256="):
+        raw = raw.split("=", 1)[1].strip()
+    return raw
+
+
+def _signature_principal() -> Optional[dict]:
+    """Workspace a signature-verified producer may write to.
+
+    A signed request is authorised by its own secret, so it does not need the
+    shared bearer secret to be configured. It still needs exactly one workspace
+    to write into; without that the server cannot scope the write safely.
+    """
+    workspace = (os.getenv("KAIROS_OPENLINEAGE_WORKSPACE_ID") or "").strip()
+    if not workspace:
+        return None
+    try:
+        workspace = str(uuid.UUID(workspace))
+    except (ValueError, AttributeError):
+        return None
+    return {"id": None, "workspace_id": workspace, "auth": "openlineage_signature"}
+
+
+async def _signature_state(request: Request) -> Optional[tuple[bool, str]]:
+    """Verify an ``X-Kairos-Signature`` HMAC when the caller sends one.
+
+    Returns ``None`` when the header is absent, so session and shared-secret
+    callers are unaffected. Returns ``(ok, reason)`` otherwise; the reason is a
+    short diagnostic that never includes the secret or the expected digest.
+    """
+    header = request.headers.get(SIGNATURE_HEADER)
+    if header is None or not header.strip():
+        return None
+    secret = _signature_secret()
+    if not secret:
+        return False, "Webhook signature verification is not configured on this server"
+    body = await request.body()
+    expected = hmac.new(secret.encode("utf-8"), body, hashlib.sha256).hexdigest()
+    provided = _normalise_signature(header)
+    if not provided or not secrets.compare_digest(provided, expected):
+        return False, "Webhook signature does not match the request body"
+    return True, ""
+
+
 async def openlineage_producer(request: Request) -> AsyncGenerator[dict, None]:
-    """Authorize an OpenLineage producer via webhook secret or user session.
+    """Authorize an OpenLineage producer via signature, webhook secret or session.
 
     The secret is compared in constant time and only accepted when the server
     has both a secret and the single workspace it may write to. A signed-in
     session is validated by the standard ``require_user`` dependency, so API
-    keys and Supabase tokens keep working unchanged.
+    keys and Supabase tokens keep working unchanged. A request that carries an
+    ``X-Kairos-Signature`` header must carry a valid one: an invalid signature
+    never falls through to an ambient session.
     """
+    signature = await _signature_state(request)
+    if signature is not None:
+        ok, reason = signature
+        if not ok:
+            raise HTTPException(status_code=401, detail=reason)
+        signed_principal = _signature_principal()
+        if signed_principal is None:
+            raise HTTPException(
+                status_code=503,
+                detail=(
+                    "A verified webhook signature needs "
+                    "KAIROS_OPENLINEAGE_WORKSPACE_ID to scope the write"
+                ),
+            )
+        token = set_workspace_id(signed_principal["workspace_id"])
+        try:
+            yield {**signed_principal, "auth": "openlineage_signature"}
+        finally:
+            reset_workspace_id(token)
+        return
+
     authorization = request.headers.get("authorization", "")
     supplied = authorization[7:].strip() if authorization.lower().startswith("bearer ") else ""
     principal = _webhook_principal()

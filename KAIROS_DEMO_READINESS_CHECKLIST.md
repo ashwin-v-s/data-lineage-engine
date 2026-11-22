@@ -174,3 +174,34 @@ the demo paths over HTTPS, not localhost:
 
 Still a human step, not a code gap: the second-account browser isolation walkthrough
 from Demo 1 step 6–7.
+
+## 2026-11-22 — credential-free completion pass
+
+Everything that did not need another person's account was finished, tested and
+deployed:
+
+- **Semantic search unblocked one layer.** Migration `0012` applied to the live
+  database (vector 0.8.2, `dataset.embedding`, ivfflat cosine index);
+  `openai>=1,<2` added to `requirements.txt`; `scripts/backfill_embeddings.py`
+  added (`--dry-run` reports **122 datasets without an embedding**). The search
+  endpoint now refuses to imply vector ranking: it exposes `mode` + `note`,
+  returns `503` for explicit semantic requests without a key, and serves keyword
+  results for `mode=hybrid` until embeddings exist.
+- **Signed OpenLineage webhooks are functional in production.**
+  `KAIROS_WEBHOOK_SIGNING_SECRET` and `KAIROS_OPENLINEAGE_WORKSPACE_ID` were
+  generated/set on the Vercel production environment; `X-Kairos-Signature`
+  HMAC-SHA256 over the raw body is verified in constant time, invalid signatures
+  are `401`, and a replay by `runId` still commits once.
+- **Honesty gate in CI.** `scripts/check_ui_claims.py` fails the build when a
+  live view requests an endpoint the OpenAPI contract does not expose (15 request
+  paths checked, currently PASS). Coverage floor raised from 40% to **45%**
+  (actual 62.88%).
+- **Adapter inventory corrected.** `ingestion/ADAPTER_STATUS.md` no longer claims
+  the metadata-graph, dbt, inventory and CSV adapters lack API wiring.
+- Verification this pass: **822 passed / 83 skipped**, coverage gate PASS,
+  **155** vitest, 14 e2e specs → 7 passed / 1 skipped, OpenAPI 122 paths with 0
+  drift after regenerating the snapshot, migrations PASS (0017, 0 gaps),
+  `verify_applied` PASS, `verify_rls` **47/47** PASS, production build clean.
+- Still blocked on credentials or decisions, not code: `OPENAI_API_KEY` for the
+  embedding backfill, GitHub App secrets, a scheduler location (D12), and a
+  second Supabase account for the two-user isolation walkthrough.

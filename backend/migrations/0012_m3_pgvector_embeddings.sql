@@ -1,7 +1,10 @@
 -- Migration 0012: M3 pgvector embeddings for hybrid search
 -- Author: M3 (Ashwin) - ashwin-v-s
 -- Date: 2026-11-05
--- Status: PROPOSAL ONLY / NOT APPLIED
+-- Status: APPLIED 2026-11-22 (vector 0.8.2 installed; embedding column + ivfflat index live)
+-- Embeddings themselves are populated by scripts/backfill_embeddings.py, which
+-- needs OPENAI_API_KEY. Until then `mode=semantic` returns no rows and
+-- `mode=hybrid` ranks on keyword matches only — never fabricated similarity.
 -- Naming: Per D13 decision - {number}_{owner_initials}_{feature}.sql
 --
 -- Adds pgvector extension and embedding column to dataset table

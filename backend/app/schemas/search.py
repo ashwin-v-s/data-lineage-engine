@@ -32,3 +32,6 @@ class SearchResponse(BaseModel):
     page: Optional[int] = None
     page_size: Optional[int] = None
     mode: Optional[str] = None  # hybrid, keyword, or semantic
+    # Set when the requested mode could not be honoured in full, e.g. hybrid
+    # search falling back to keyword because no embedding is stored yet.
+    note: Optional[str] = None

@@ -58,12 +58,14 @@ def _workspace_id_for(user: dict | None) -> str | None:
     return db_module._workspace_id.get() or (user or {}).get("workspace_id")
 
 
-def _embedding_supported(cur) -> bool:
-    """Whether the deployment actually stores semantic embeddings.
+def _embeddings_ready(cur) -> tuple[bool, str]:
+    """Whether this deployment can actually rank by semantic similarity.
 
-    Without the pgvector column every semantic query would raise a database
-    error (HTTP 500); reporting the capability as unavailable is honest and
-    keeps keyword search usable on deployments that never applied it.
+    The pgvector column alone is not enough: migration 0012 ships the column and
+    the index, but rows are embedded by ``scripts/backfill_embeddings.py`` and
+    queries need ``OPENAI_API_KEY``. Checking all three keeps the endpoint
+    honest: it never silently ranks on an embedding it could not compute, and
+    never presents keyword matches as semantic ones.
     """
     cur.execute(
         "SELECT 1 FROM information_schema.columns "
@@ -71,7 +73,20 @@ def _embedding_supported(cur) -> bool:
         "AND column_name = 'embedding' "
         "LIMIT 1"
     )
-    return cur.fetchone() is not None
+    if cur.fetchone() is None:
+        return False, "semantic embeddings are not provisioned on this deployment"
+    if not (os.getenv("OPENAI_API_KEY") or "").strip():
+        return False, "OPENAI_API_KEY is not configured on this server"
+    cur.execute("SELECT COUNT(*) AS count FROM public.dataset WHERE embedding IS NOT NULL")
+    stored = int(cur.fetchone()["count"])
+    if stored == 0:
+        return False, "no dataset has been embedded yet (run scripts/backfill_embeddings.py)"
+    return True, ""
+
+
+def _embedding_supported(cur) -> bool:
+    """Backwards-compatible boolean view of :func:`_embeddings_ready`."""
+    return _embeddings_ready(cur)[0]
 
 
 def _count_matches(cur, query: str, workspace_id: str, mode: str) -> int:
@@ -272,24 +287,38 @@ def hybrid_search(
             # Set RLS context (belt-and-suspenders with explicit WHERE clauses)
             cur.execute("SET LOCAL app.current_workspace_id = %s", (workspace_id,))
 
+            note: Optional[str] = None
+            effective_mode = mode
             if mode == "keyword":
                 results = _keyword_search(cur, q, workspace_id, page_size, offset)
                 total = _count_matches(cur, q, workspace_id, mode)
             else:
-                if not _embedding_supported(cur):
+                semantic_ready, unavailable_reason = _embeddings_ready(cur)
+                if not semantic_ready and mode == "hybrid":
+                    # Hybrid search promises keyword + semantic ranking. Rather
+                    # than fail the whole screen, serve the keyword half and say
+                    # so in the payload; the UI must not claim a vector match.
+                    results = _keyword_search(cur, q, workspace_id, page_size, offset)
+                    total = _count_matches(cur, q, workspace_id, "keyword")
+                    effective_mode = "keyword"
+                    note = (
+                        "Semantic ranking is unavailable: "
+                        + unavailable_reason
+                        + ". Results are keyword matches only."
+                    )
+                elif not semantic_ready:
                     raise HTTPException(
                         status_code=503,
-                        detail=(
-                            "Vector search is unavailable: semantic embeddings are not "
-                            "provisioned on this deployment. Keyword mode still works."
-                        ),
+                        detail=(f"Vector search is unavailable: {unavailable_reason}. "
+                                "Keyword mode still works."),
                     )
-                query_embedding = _get_embedding(q)
-                if mode == "semantic":
-                    results = _semantic_search(cur, query_embedding, workspace_id, page_size, offset)
-                else:  # hybrid
-                    results = _hybrid_search(cur, q, query_embedding, workspace_id, page_size, offset)
-                total = _count_matches(cur, q, workspace_id, mode)
+                else:
+                    query_embedding = _get_embedding(q)
+                    if mode == "semantic":
+                        results = _semantic_search(cur, query_embedding, workspace_id, page_size, offset)
+                    else:  # hybrid
+                        results = _hybrid_search(cur, q, query_embedding, workspace_id, page_size, offset)
+                    total = _count_matches(cur, q, workspace_id, mode)
             
             # Format results
             search_results = [
@@ -310,5 +339,6 @@ def hybrid_search(
                 total=total,
                 page=page,
                 page_size=page_size,
-                mode=mode
+                mode=effective_mode,
+                note=note,
             )

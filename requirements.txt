@@ -6,3 +6,6 @@ pydantic[email]>=2,<3
 sqlalchemy>=2,<3
 sqlglot>=26
 cryptography>=42,<47
+# Semantic search embedding client. Imported lazily by
+# backend/app/api/routes/vector_search.py, so the API boots without a key.
+openai>=1,<2

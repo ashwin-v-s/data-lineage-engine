@@ -148,3 +148,34 @@ This section supersedes the stale “Still open” bullets in section 7 where no
 ### Verification record
 
 `pytest -q`: **424 passed, 84 skipped**. Focused Vitest: **35 passed**. Full Vitest: **39 passed, 17 failed**. `npm run build`: passed. `node --check` for the changed JavaScript entry/modules: passed. `python scripts/check_openapi_drift.py`: passed, 76 paths. Pytest emitted existing httpx and pytest-asyncio deprecation warnings.
+
+---
+
+## 2c. Status as of 2026-11-22 — pgvector is now provisioned
+
+G4 and §6 item 9 are partially closed, and the remaining work is smaller than the
+gap text above implies:
+
+- **Migration `0012` is applied** to the live database: `vector` 0.8.2 installed,
+  `public.dataset.embedding vector(1536)` present, `dataset_embedding_idx`
+  (ivfflat, cosine) created. The file header now reads `APPLIED 2026-11-22`.
+- **`openai>=1,<2` is in `requirements.txt`.** It is still imported lazily, so the
+  API boots without a key.
+- **`scripts/backfill_embeddings.py` exists**: `--dry-run` and `--limit`, builds
+  the document from stored metadata only, refuses to run without
+  `OPENAI_API_KEY`, exits 3 if the column is missing. It currently reports
+  **122 datasets without an embedding**.
+- **`GET /api/v1/search/hybrid` no longer lies.** `_embeddings_ready()` requires
+  the column *and* a configured key *and* at least one stored vector. Without
+  them: `mode=semantic` returns `503` naming the missing piece, and
+  `mode=hybrid` serves keyword results with `mode="keyword"` plus a `note`
+  explaining that semantic ranking was skipped. `SearchResponse.note` is new and
+  the OpenAPI snapshot was regenerated in the same change.
+- Tests: `test_hybrid_search_degrades_to_keyword_when_no_key_is_configured`,
+  `test_embeddings_ready_reports_a_column_without_embedded_rows`,
+  `test_embeddings_ready_is_true_only_with_key_and_stored_vectors`.
+
+**Still genuinely open (yours):** provide `OPENAI_API_KEY`, run
+`python scripts/backfill_embeddings.py`, and add the keyword/semantic/hybrid
+control to the search screen plus a "why this matched" label. Until the backfill
+runs, the product must not be described as semantically searchable.

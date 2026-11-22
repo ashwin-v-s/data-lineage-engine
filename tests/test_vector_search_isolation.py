@@ -280,3 +280,61 @@ def test_all_search_modes_enforce_workspace_isolation(mode, mock_cursor):
                 break
     
     assert workspace_found, f"{mode} mode did not enforce workspace isolation"
+
+
+# ---------------------------------------------------------------------------
+# Honest degradation: an unembedded deployment must not claim vector ranking
+# ---------------------------------------------------------------------------
+
+def _stub_conn(fetchone_side_effect):
+    cur = MagicMock()
+    cur.fetchone.side_effect = fetchone_side_effect
+    cur.fetchall.return_value = []
+    cursor_ctx = MagicMock()
+    cursor_ctx.__enter__ = Mock(return_value=cur)
+    cursor_ctx.__exit__ = Mock(return_value=False)
+    conn = MagicMock()
+    conn.cursor.return_value = cursor_ctx
+    conn.__enter__ = Mock(return_value=conn)
+    conn.__exit__ = Mock(return_value=False)
+    return conn
+
+
+def test_hybrid_search_degrades_to_keyword_when_no_key_is_configured(monkeypatch):
+    from backend.app.api.routes import vector_search
+
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    conn = _stub_conn([(1,), {"count": 0}, {"count": 0}])
+
+    with patch.object(vector_search, "get_conn", return_value=conn):
+        response = vector_search.hybrid_search(
+            q="orders", mode="hybrid", page=1, page_size=20, user={"workspace_id": "ws-1"}
+        )
+
+    assert response.mode == "keyword"
+    assert response.note and "OPENAI_API_KEY" in response.note
+    assert response.results == []
+
+
+def test_embeddings_ready_reports_a_column_without_embedded_rows(monkeypatch):
+    from backend.app.api.routes import vector_search
+
+    monkeypatch.setenv("OPENAI_API_KEY", "not-a-real-key")
+    conn = _stub_conn([(1,), {"count": 0}])
+    with conn.cursor() as cur:
+        ready, reason = vector_search._embeddings_ready(cur)
+
+    assert ready is False
+    assert "backfill_embeddings.py" in reason
+
+
+def test_embeddings_ready_is_true_only_with_key_and_stored_vectors(monkeypatch):
+    from backend.app.api.routes import vector_search
+
+    monkeypatch.setenv("OPENAI_API_KEY", "not-a-real-key")
+    conn = _stub_conn([(1,), {"count": 7}])
+    with conn.cursor() as cur:
+        ready, reason = vector_search._embeddings_ready(cur)
+
+    assert ready is True
+    assert reason == ""

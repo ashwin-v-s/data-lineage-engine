@@ -20,6 +20,8 @@ cover validation, batching, idempotency and the write path together:
 """
 from __future__ import annotations
 
+import hashlib
+import hmac
 import json
 import sys
 from types import ModuleType
@@ -463,3 +465,76 @@ def test_webhook_principal_requires_both_secret_and_workspace(monkeypatch):
     principal = ingest_module._webhook_principal()
     assert principal is not None
     assert principal["workspace_id"] == "11111111-1111-4111-8111-111111111111"
+
+
+# ---------------------------------------------------------------------------
+# Signed webhooks: HMAC-SHA256 over the raw body
+# ---------------------------------------------------------------------------
+
+def _sign(body: bytes, secret: str) -> dict:
+    digest = hmac.new(secret.encode("utf-8"), body, hashlib.sha256).hexdigest()
+    return {
+        "X-Kairos-Signature": "sha256=" + digest,
+        "Content-Type": "application/json",
+    }
+
+
+def test_hmac_signature_authenticates_an_external_producer(monkeypatch, cursor):
+    """A producer that signs the body needs no bearer token at all."""
+    app.dependency_overrides.pop(openlineage_producer, None)
+    monkeypatch.delenv("KAIROS_OPENLINEAGE_WEBHOOK_SECRET", raising=False)
+    monkeypatch.setenv("KAIROS_WEBHOOK_SIGNING_SECRET", "sign-me")
+    monkeypatch.setenv(
+        "KAIROS_OPENLINEAGE_WORKSPACE_ID", "11111111-1111-4111-8111-111111111111"
+    )
+    body = json.dumps(_complete_event()).encode("utf-8")
+
+    with patch(
+        "backend.app.api.routes.ingest.get_conn", side_effect=make_get_conn(cursor)
+    ):
+        resp = client.post(
+            "/api/v1/ingest/openlineage", content=body, headers=_sign(body, "sign-me")
+        )
+
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["accepted"] == 1
+    assert len(cursor.evidence) == 1
+
+
+def test_hmac_signature_rejects_a_tampered_body(monkeypatch, cursor):
+    """Signing one body and sending another is refused, not silently accepted."""
+    app.dependency_overrides.pop(openlineage_producer, None)
+    monkeypatch.setenv("KAIROS_WEBHOOK_SIGNING_SECRET", "sign-me")
+    monkeypatch.setenv(
+        "KAIROS_OPENLINEAGE_WORKSPACE_ID", "11111111-1111-4111-8111-111111111111"
+    )
+    signed = json.dumps(_complete_event()).encode("utf-8")
+    tampered = json.dumps(_complete_event(run_id="run-other")).encode("utf-8")
+
+    with patch(
+        "backend.app.api.routes.ingest.get_conn", side_effect=make_get_conn(cursor)
+    ):
+        resp = client.post(
+            "/api/v1/ingest/openlineage", content=tampered, headers=_sign(signed, "sign-me")
+        )
+
+    assert resp.status_code == 401, resp.text
+    assert resp.json()["error"]["code"] == "UNAUTHENTICATED"
+    assert len(cursor.evidence) == 0
+
+
+def test_hmac_header_without_a_configured_secret_is_rejected(monkeypatch, cursor):
+    """A signature header we cannot verify must not fall back to a session."""
+    app.dependency_overrides.pop(openlineage_producer, None)
+    monkeypatch.delenv("KAIROS_WEBHOOK_SIGNING_SECRET", raising=False)
+    body = json.dumps(_complete_event()).encode("utf-8")
+
+    with patch(
+        "backend.app.api.routes.ingest.get_conn", side_effect=make_get_conn(cursor)
+    ):
+        resp = client.post(
+            "/api/v1/ingest/openlineage", content=body, headers=_sign(body, "anything")
+        )
+
+    assert resp.status_code == 401, resp.text
+    assert len(cursor.evidence) == 0

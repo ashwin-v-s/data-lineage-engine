@@ -118,3 +118,26 @@ Connect a real source (or upload a `kairos.ingest.v1` fixture) → preview shows
 | B7 | Source wizard UI states (v2 §9.1): 5-step wizard, credential-test ≠ discovery labels, masked display | every §5.4 state visible in UI during a real sync |
 
 Every source ships with its best-attainable state and its "never proves" sentence written first (v2 §9.2 rule).
+
+---
+
+## 2c. Status as of 2026-11-22 — signed webhooks are live, the rest is not
+
+- **G9 / B1 (signature validation) is now implemented for OpenLineage.**
+  `POST /api/v1/ingest/{openlineage,openlineage/preview}` accepts
+  `X-Kairos-Signature: sha256=<hex HMAC-SHA256 of the raw body>` verified against
+  `KAIROS_WEBHOOK_SIGNING_SECRET`, constant-time, scoped to
+  `KAIROS_OPENLINEAGE_WORKSPACE_ID`. A present-but-invalid signature is `401`; a
+  signature header with no configured secret is `401` (it never falls back to an
+  ambient session). Both variables are now set on the production deployment.
+  Tests: valid signature accepted, tampered body rejected, unconfigured secret
+  rejected (`tests/test_ingest_openlineage_route.py`).
+- **Replay dedupe** by OpenLineage `runId` already existed and is covered by the
+  idempotency tests; a replayed signed event commits once.
+- **`ingestion/ADAPTER_STATUS.md` is corrected**: the metadata-graph, dbt
+  manifest, file-inventory and CSV adapters are wired to
+  `POST /api/v1/ingest/{preview,commit}`, not "pure Python with no API wiring".
+- **Still yours, unchanged:** dbt CI push receiver (only OpenLineage is signed
+  today), GitHub App credentials and connect UI, MLflow / RAG-trace / profiler
+  adapters (none exist), incremental sync cursors (no `sync_cursor` column), and
+  the scheduler for `/sync` (D12).
