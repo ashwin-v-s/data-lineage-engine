@@ -40,6 +40,10 @@ for this run); their behaviour was exercised manually instead (section 3).
 | Cross-workspace isolation | not re-run here | prior evidence: `scripts/db/verify_workspace_isolation.py` PASS, 42 forced-RLS tables | NOT RUN THIS SESSION |
 | 401 without token | 401 | API requires `require_user`; probes without a token are rejected | PASS (code + route guards) |
 
+> **Read this table as the pre-fix run.** It records what was observed before the
+> 2026-11-23 fixes; rows that failed then are annotated with the resolved value,
+> and §7 carries the fix evidence.
+
 ## 3. Ingestion pipeline (deployed API, real database)
 
 | Step | Endpoint | Expected | Actual | Verdict |
@@ -51,7 +55,7 @@ for this run); their behaviour was exercised manually instead (section 3).
 | CSV headers preview/commit | same | 1 asset / 10 columns | `e958f1a0…`, `COMMITTED_WITH_WARNINGS` (no relationships) | PASS |
 | File inventory preview/commit | same | file assets, no edges | 4 assets, `477e8d47…` | PASS |
 | Idempotent replay | repeat metadata-graph commit | `replayed: true`, same id | exactly that | PASS |
-| Catalog readback | `GET /api/v1/catalog` | committed assets + edges + evidence | 30 assets, 23 edges, 23 evidence | PASS |
+| Catalog readback | `GET /api/v1/catalog` | committed assets + edges + evidence | then 30 assets, 23 edges, 23 evidence; after 0018: 17 assets, 23 dataset + 19 column edges, 42 evidence | PASS |
 | Persistence proof | direct SQL | rows in `dataset`/`lineage_edge`/`evidence` | 51 `column_record`, 5 `import_run`, matching edge counts | PASS |
 
 ## 4. Lineage, evidence and search
@@ -63,7 +67,7 @@ for this run); their behaviour was exercised manually instead (section 3).
 | Edge evidence | stored evidence for the edge | rows returned for `5a9abd50…` | PASS |
 | Downstream impact | bucketed depth levels | `customers` → `total_affected: 4` | PASS |
 | Evidence as-of query | dated evidence | `included: 0`, 23 undated | **PARTIAL** (BUG-04) |
-| Column lineage | column mappings | `total: 0` | **FAIL** (BUG-03) |
+| Column lineage | column mappings | then `total: 0`; now 19 mappings from the backfill (BUG-03 fixed) | PASS |
 | Keyword search | results | `q=revenue` → 13 | PASS |
 | 3D observatory | renders graph | 3,632 chars, 0 errors | PASS |
 
@@ -74,17 +78,17 @@ for this run); their behaviour was exercised manually instead (section 3).
 | Create domain | 201 + row | 201 `f480e033…` | PASS |
 | Create term + assign + approve | 201 + APPROVED | APPROVED `fce04495…`, assignment `created: true` | PASS |
 | Create product with assets | 201 + links | `f33bea44…`, 2 assets | PASS |
-| Dataset columns for PII | imported columns | **0 columns** for the `TABLE` duplicate | **FAIL** (BUG-01) |
-| PII classification | 201 + readback | not created (no column id); endpoint contract validated | BLOCKED by BUG-01 |
+| Dataset columns for PII | imported columns | then 0 columns on the duplicate; now `customers` is one asset with 6 columns (BUG-01 fixed) | PASS |
+| PII classification | 201 + readback | created against `customers.email` after the merge, readback resolves to the surviving asset | PASS |
 | Quality assertion | 200/201 + row | `480a9715…` | PASS |
 | Evaluate assertion | result row | PASS, checked 1, failed 0, `54a0cd91…` | PASS |
-| Quality visible in UI | results on Data quality page + KPI | page says "No quality checks"; catalog returns `quality_checks: []` | **FAIL** (BUG-02) |
+| Quality visible in UI | results on Data quality page + KPI | then "No quality checks"; now catalog returns the latest PASS result (BUG-02 fixed) | PASS |
 | Freshness SLA | 200 + row | 48/60/120 min `e0f15710…` | PASS |
 | Freshness evaluation | status per SLA | `UNKNOWN` (no runtime signal) | PARTIAL (expected) |
 | Incidents | lifecycle | 0 rows; page reads live API | PASS (empty state) |
 | Notifications | rows on trigger | 0 rows; no trigger engine ran | PARTIAL |
 
-## 6. Browser sweep (22 views, real session)
+## 6. Browser sweep (22 views, real session, before BUG-08)
 
 All views were loaded from the deployed app with a real Supabase session.
 **0 console errors, 0 failed API requests** across the sweep. Rendered text and
@@ -112,9 +116,9 @@ screenshots are in `.demo-sources/visual/`.
 | search | 14.3 s | keyword search form |
 | observatory | 16.8 s | 3D graph |
 
-Load time is dominated by reloading `app.js` + `three.min.js` on every
-`?view=` navigation; in-app navigation (clicking the sidebar) is much faster.
-Presenters should navigate by clicking, not by editing the URL.
+These times predate BUG-08: every `?view=` navigation used to reload `app.js`
+plus the 670 KB `three.min.js`. The 3D runtime now loads only on the first
+observatory entry, so non-3D views no longer pay for it.
 
 ## 7. Defects
 
@@ -331,6 +335,7 @@ only chart, stewardship, evidence, lineage, app and removal scripts.
 | Welcome / invitation email | Needs SMTP credentials and `KAIROS_PUBLIC_APP_URL` on Vercel |
 | Scheduler-driven freshness, incidents, notifications | No scheduler is deployed; signals are `manual` |
 | Hybrid vector search | No embeddings generated for this workspace |
+| Rotation of the password exposed before BUG-07 | Requires the Supabase dashboard; the repository code no longer contains it |
 
 ## 9. Reproduction commands
 
