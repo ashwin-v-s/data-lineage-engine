@@ -182,9 +182,9 @@ Created from the signed-in **Workspace administration** page on 2026-11-23:
 | Record | Value |
 | --- | --- |
 | API key | `ci-readonly-catalog`, prefix `kairos_sk_2bI-S26ksl`, scope `read`, last used 2026-11-23T22:09Z |
-| API key secret | `.demo-sources/ci-readonly-catalog.key` (git-ignored, mode 600; never documented) |
+| API key secret | `.demo-sources/ci-readonly-catalog.key` (git-ignored local file; never documented) |
 | Webhook | `https://httpbin.org/post`, description "Demo echo receiver - replace with your HTTPS endpoint", all 7 events, active |
-| Webhook signing secret | `.demo-sources/webhook-signing-secret.txt` (git-ignored, mode 600) |
+| Webhook signing secret | `.demo-sources/webhook-signing-secret.txt` (git-ignored local file) |
 | Delivery | `test.ping`, HTTP 200, 26 ms, `X-Kairos-Signature` echoed by the receiver |
 
 The API key was verified against production: catalog read **200** with 17
