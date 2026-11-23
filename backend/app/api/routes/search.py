@@ -222,6 +222,7 @@ def catalog_snapshot(
             # evidence reports zero rather than an invented figure.
             cur.execute("""
                 SELECT er.run_id, er.status, er.started_at, er.completed_at, j.name AS job_name,
+                       j.namespace AS environment_name,
                        COALESCE((
                            SELECT COUNT(DISTINCT touched.dataset_id)::int
                            FROM evidence ev
@@ -425,7 +426,7 @@ def catalog_snapshot(
                 ),
                 "asset_count": int(run.get("asset_count") or 0),
                 "event_count": int(run.get("event_count") or 0),
-                "environment_name": None,
+                "environment_name": run.get("environment_name"),
             }
             for run in runs
         ],

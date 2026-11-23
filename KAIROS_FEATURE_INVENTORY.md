@@ -101,7 +101,7 @@ Status vocabulary used below:
 
 | Feature | Route / page | Status | Evidence |
 | --- | --- | --- | --- |
-| Pipeline runs | `catalog.runs` ← `execution_run` → `?view=runs` | **Partial** | 2 `execution_run` rows globally, 0 in demo workspace; runs page draws from catalog |
+| Pipeline runs | `catalog.runs` ← `execution_run` → `?view=runs` | **Verified (demo data)** | 4 persisted demo runs (2 SUCCESS, 1 WARNING, 1 FAILED), each with one stored source event; `namespace` now surfaced as environment. Asset counts stay 0 because no per-run evidence exists. |
 | Sync jobs | `sync_job` | **Blocked** | 0 rows; populated only by the PostgreSQL connector |
 | Notifications | `/api/v1/notifications`, `/read`, `/read-all` | **Verified (API), no triggers** | 0 rows; no scheduler emits `FRESHNESS_BREACH` |
 | Notification preferences | `/notifications/preferences` | **Verified (API)** | UI toggles render in Settings |

@@ -68,7 +68,8 @@ class _Cursor:
         if "FROM execution_run er" in query:
             return [
                 {"run_id": "run_999", "status": "completed", "started_at": None,
-                 "completed_at": None, "job_name": "new_revenue_job"},
+                 "completed_at": None, "job_name": "new_revenue_job",
+                 "environment_name": "production"},
                 {"run_id": "run_998", "status": "failed", "started_at": None,
                  "completed_at": None, "job_name": "new_revenue_job"},
                 {"run_id": "run_997", "status": "running", "started_at": None,
@@ -131,6 +132,7 @@ def test_catalog_maps_stored_run_status_to_the_runs_view_vocabulary(monkeypatch)
     assert [row["status"] for row in result["runs"]] == [
         "SUCCESS", "FAILED", "RUNNING", "QUEUED",
     ]
+    assert result["runs"][0]["environment_name"] == "production"
 
 
 def test_openlineage_evidence_is_not_reported_as_unknown(monkeypatch):

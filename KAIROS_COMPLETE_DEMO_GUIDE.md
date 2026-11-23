@@ -237,6 +237,36 @@ Change it to **2026-11-18** → eight rows again. Change recorded time to before
 
 ---
 
+## 8a. Pipeline runs (Operations)
+
+**A.** Persisted job/run records from the catalog API, with outcome, duration,
+environment and stored-event count.
+
+**B/C.** Sidebar → **Operations → Pipeline runs**.
+
+**D (verified live).** The demo workspace returns four runs:
+
+| Run | Pipeline | Status | Duration | Environment | Events |
+| --- | --- | --- | ---: | --- | ---: |
+| `demo-run-revenue-20261123-0200` | Revenue daily pipeline | SUCCESS | 8m 42s | production | 1 |
+| `demo-run-customer360-20261123-0230` | Customer 360 refresh | SUCCESS | 11m 10s | production | 1 |
+| `demo-run-revenue-quality-20261123-0300` | Revenue quality gate | WARNING | 2m 15s | staging | 1 |
+| `demo-run-legacy-export-20261123-0315` | Legacy warehouse export | FAILED | 1m 05s | production | 1 |
+
+The cards read **2 successful, 1 warning, 1 failed, 4 runs shown**. Search by
+`demo-run` or filter to `FAILED`; **Inspect** opens the stored run identity,
+start, duration, environment and counts.
+
+**E.** "These are persisted run records, not live orchestration. Assets stay
+zero because this workspace has no normalized per-run evidence for these jobs;
+the page reports that instead of inventing observed assets. The stored source
+event is counted separately."
+
+**F.** `GET /api/v1/catalog` → `runs[]` (`run_id`, `pipeline_name`, `status`,
+`started_at`, `duration_ms`, `asset_count`, `event_count`, `environment_name`).
+
+---
+
 ## 9. Data quality
 
 **A.** Quality assertions over metadata (schema completeness, uniqueness,

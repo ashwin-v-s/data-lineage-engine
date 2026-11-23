@@ -67,7 +67,7 @@ the demo can be re-run safely.
 
 **Catalog readback after all five commits (before migration 0018):** 30 assets,
 23 lineage edges, 23 evidence rows, 0 runs (`GET /api/v1/catalog?limit=200`,
-HTTP 200).
+HTTP 200). Four demo pipeline runs were added later (see §5a).
 
 > **Resolved 2026-11-23 (BUG-01):** migration 0018 reconciles the adapters'
 > variants by logical identity, and the demo workspace was merged from 30 rows
@@ -153,6 +153,28 @@ Readbacks: `/governance/terms` 4 rows, `/governance/domains` 3 rows,
 | Sync jobs, source connections | Requires a reachable PostgreSQL source and `KAIROS_TOKEN_ENCRYPTION_KEY`. |
 | Column-level lineage | **Available** — 19 SQL projection mappings backfilled; no longer a gap. |
 
+### 5a. Demo pipeline runs
+
+`scripts/db/seed_demo_runs.py` adds four `job`/`execution_run` records and one
+immutable source event per run, all idempotent by workspace + run id:
+
+| Run | Pipeline | Stored status | Started → completed | Environment | Assets | Events |
+| --- | --- | --- | --- | --- | ---: | ---: |
+| `demo-run-revenue-20261123-0200` | Revenue daily pipeline | completed → SUCCESS | 2026-11-23T02:00Z → 02:08:42Z | production | 0 | 1 |
+| `demo-run-customer360-20261123-0230` | Customer 360 refresh | completed → SUCCESS | 2026-11-23T02:30Z → 02:41:10Z | production | 0 | 1 |
+| `demo-run-revenue-quality-20261123-0300` | Revenue quality gate | warning → WARNING | 2026-11-23T03:00Z → 03:02:15Z | staging | 0 | 1 |
+| `demo-run-legacy-export-20261123-0315` | Legacy warehouse export | failed → FAILED | 2026-11-23T03:15Z → 03:16:05Z | production | 0 | 1 |
+
+Asset counts are deliberately zero: there is no normalized per-run evidence
+linking these jobs to datasets, and the run page must not claim an observed
+asset. The stored `raw_event` rows are counted as source events. Job
+`namespace` is the environment shown in the UI. Reproduction:
+
+```bash
+python scripts/db/seed_demo_runs.py \
+  --workspace d91f7d80-dc3e-401e-9df4-e7670e4d3ba1
+```
+
 ## 6. Historical / temporal data
 
 The dbt manifest declares `metadata.generated_at = 2026-11-17T21:00:00Z`.
@@ -177,6 +199,10 @@ the same timestamp directly from the adapter.
 ## 7. Reproducing this dataset
 
 ```bash
+# 0. Demo pipeline-run records (idempotent)
+python scripts/db/seed_demo_runs.py \
+  --workspace d91f7d80-dc3e-401e-9df4-e7670e4d3ba1
+
 # 1. Real session (test account; credentials live in scripts/get_test_token.py)
 python scripts/get_test_token.py
 
