@@ -12,7 +12,7 @@
   const T = window.THREE;
   if(!T) return;
   const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
-  const CARD_W=5.6, CARD_H=1.8, PITCH_Y=2.55, LAYER_GAP=2.4, INNER_GAP=1.3, MAX_ROWS=8;
+  const CARD_W=5.6, CARD_H=1.8, CARD_D=1.25, PITCH_Y=2.55, LAYER_GAP=2.4, INNER_GAP=1.3, MAX_ROWS=8;
   const KIND_COLOR={source:0x1f9d8b, transform:0x6d5bd0, output:0x2f7de1};
   const KIND_HEX={source:'#128173', transform:'#5b46c4', output:'#1f68c4'};
   const EDGE_BASE=0x2f6b5f;
@@ -455,9 +455,12 @@
       ctx.fillStyle=accent; ctx.font='700 22px "Segoe UI",Arial,sans-serif';
       ctx.fillText(String(asset.kind||'asset').toUpperCase(),38,150);
       const tex=new T.CanvasTexture(canvas); tex.colorSpace=T.SRGBColorSpace;
-      const sprite=new T.Sprite(new T.SpriteMaterial({map:tex,transparent:true,depthWrite:false}));
-      sprite.scale.set(CARD_W*.86,CARD_W*.86*(168/512),1);
-      return sprite;
+      /* Labels are glued to the block faces rather than billboarded: a
+         camera-facing sprite would slice into a deep box at oblique angles. */
+      return new T.Mesh(
+        new T.PlaneGeometry(CARD_W*.9,CARD_W*.9*(168/512)),
+        new T.MeshBasicMaterial({map:tex,transparent:true,depthWrite:false,side:T.DoubleSide})
+      );
     }
 
     function makeBandLabel(text){
@@ -492,22 +495,25 @@
       const color=KIND_COLOR[a.kind]||KIND_COLOR.transform;
       const isSelected=a.id===selected;
       const bodyMat=new T.MeshPhysicalMaterial({color:0xefe6d2,roughness:.68,metalness:.02,clearcoat:.08,clearcoatRoughness:.6,envMapIntensity:.25,transparent:true,opacity:1});
-      const body=new T.Mesh(new T.BoxGeometry(CARD_W,CARD_H,.26),bodyMat);
+      /* A solid block, not a flat plate: the lineage asset is a box you can
+         walk around, with the label on each face. */
+      const body=new T.Mesh(new T.BoxGeometry(CARD_W,CARD_H,CARD_D),bodyMat);
       body.userData.asset=a; body.castShadow=true; body.receiveShadow=true; body.renderOrder=1; group.add(body); pickables.push(body);
-      const strip=new T.Mesh(new T.BoxGeometry(.2,CARD_H,.3),new T.MeshStandardMaterial({color,roughness:.45,metalness:.1,transparent:true,opacity:1}));
-      strip.position.set(-CARD_W/2+.1,0,.02); strip.castShadow=true; group.add(strip);
+      const strip=new T.Mesh(new T.BoxGeometry(.22,CARD_H,CARD_D+.04),new T.MeshStandardMaterial({color,roughness:.42,metalness:.12,transparent:true,opacity:1}));
+      strip.position.set(-CARD_W/2+.11,0,0); strip.castShadow=true; group.add(strip);
       const halo=new T.Mesh(
         new T.TorusGeometry(1,.045,10,72),
         new T.MeshBasicMaterial({color:isSelected?0xffffff:0x5b7f9c,transparent:true,opacity:isSelected?.98:.3})
       );
-      halo.scale.set(CARD_W/2+.16,CARD_H/2+.16,1); halo.position.z=-.22;
+      halo.scale.set(CARD_W/2+.16,CARD_H/2+.16,1); halo.position.z=0;
       halo.visible=isSelected; group.add(halo);
-      const label=makeLabel(a); label.position.z=.2; label.renderOrder=4; group.add(label);
-      /* The plaque is a physical object, so it needs a second face: without it
-         the names vanish as soon as the viewer orbits behind the graph. */
-      const backLabel=new T.Sprite(new T.SpriteMaterial({map:label.material.map,transparent:true,depthWrite:false}));
-      backLabel.scale.set(label.scale.x,label.scale.y,1);
-      backLabel.position.z=-.34; backLabel.renderOrder=4;
+      const label=makeLabel(a); label.position.z=CARD_D/2+.012; label.renderOrder=4; group.add(label);
+      /* The block has two faces, so the name is printed on both. The back plane
+         is rotated to face away and mirrored back so it reads normally. */
+      const backLabel=makeLabel(a);
+      backLabel.position.z=-CARD_D/2-.012;
+      backLabel.rotation.y=Math.PI;
+      backLabel.renderOrder=4;
       group.add(backLabel);
 
       const orb=new T.Mesh(
@@ -819,10 +825,6 @@
           f.orbit.rotation.z+=delta*.35;
         });
       }
-      /* Show the face that looks at the viewer, so a full orbit never lands on
-         a blank plaque. */
-      const frontFace=camera.position.z>=0;
-      nodeMeshes.forEach(node=>{ node.label.visible=frontFace; node.backLabel.visible=!frontFace; });
       renderer.render(scene,camera);
     };
     raf=requestAnimationFrame(animate);
