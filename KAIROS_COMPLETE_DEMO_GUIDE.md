@@ -56,8 +56,9 @@ evidence coverage, recognised runs, metadata attention.
 "Assets discovered" table.
 
 **D (verified).** With the demo workspace after identity reconciliation: 17
-active assets, 23 dataset edges plus 19 column edges, and 42 evidence rows; the
-table lists `customers`, `orders_feed`, `fct_daily_revenue`, dashboards, etc.
+active assets, 23 dataset edges plus 19 column edges, 42 evidence rows and 4
+persisted pipeline runs; the table lists `customers`, `orders_feed`,
+`fct_daily_revenue`, dashboards, etc.
 
 **E.** "Every number here is computed from the same `/api/v1/catalog` payload the
 rest of the app uses. Nothing is hard-coded."
@@ -248,10 +249,10 @@ environment and stored-event count.
 
 | Run | Pipeline | Status | Duration | Environment | Events |
 | --- | --- | --- | ---: | --- | ---: |
-| `demo-run-revenue-20261123-0200` | Revenue daily pipeline | SUCCESS | 8m 42s | production | 1 |
-| `demo-run-customer360-20261123-0230` | Customer 360 refresh | SUCCESS | 11m 10s | production | 1 |
-| `demo-run-revenue-quality-20261123-0300` | Revenue quality gate | WARNING | 2m 15s | staging | 1 |
-| `demo-run-legacy-export-20261123-0315` | Legacy warehouse export | FAILED | 1m 05s | production | 1 |
+| `demo-run-legacy-export-20261123-0315` | Legacy warehouse export | FAILED | 65.0 s | production | 1 |
+| `demo-run-revenue-quality-20261123-0300` | Revenue quality gate | WARNING | 135.0 s | staging | 1 |
+| `demo-run-customer360-20261123-0230` | Customer 360 refresh | SUCCESS | 670.0 s | production | 1 |
+| `demo-run-revenue-20261123-0200` | Revenue daily pipeline | SUCCESS | 522.0 s | production | 1 |
 
 The cards read **2 successful, 1 warning, 1 failed, 4 runs shown**. Search by
 `demo-run` or filter to `FAILED`; **Inspect** opens the stored run identity,

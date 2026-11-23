@@ -76,7 +76,7 @@ HTTP 200). Four demo pipeline runs were added later (see §5a).
 > three rows because they are different kinds. Column records, edges, temporal
 > versions, PII, quality, freshness, terms and product links were moved to the
 > surviving row, not dropped. Current production readback: **17 active assets,
-> 42 edges (23 dataset + 19 column), 42 evidence rows, 1 quality check**.
+> 42 edges (23 dataset + 19 column), 42 evidence rows, 4 pipeline runs, 9 raw events, 1 quality check**.
 
 ## 3. Assets and columns (from the metadata graph)
 
@@ -160,10 +160,10 @@ immutable source event per run, all idempotent by workspace + run id:
 
 | Run | Pipeline | Stored status | Started → completed | Environment | Assets | Events |
 | --- | --- | --- | --- | --- | ---: | ---: |
-| `demo-run-revenue-20261123-0200` | Revenue daily pipeline | completed → SUCCESS | 2026-11-23T02:00Z → 02:08:42Z | production | 0 | 1 |
-| `demo-run-customer360-20261123-0230` | Customer 360 refresh | completed → SUCCESS | 2026-11-23T02:30Z → 02:41:10Z | production | 0 | 1 |
-| `demo-run-revenue-quality-20261123-0300` | Revenue quality gate | warning → WARNING | 2026-11-23T03:00Z → 03:02:15Z | staging | 0 | 1 |
 | `demo-run-legacy-export-20261123-0315` | Legacy warehouse export | failed → FAILED | 2026-11-23T03:15Z → 03:16:05Z | production | 0 | 1 |
+| `demo-run-revenue-quality-20261123-0300` | Revenue quality gate | warning → WARNING | 2026-11-23T03:00Z → 03:02:15Z | staging | 0 | 1 |
+| `demo-run-customer360-20261123-0230` | Customer 360 refresh | completed → SUCCESS | 2026-11-23T02:30Z → 02:41:10Z | production | 0 | 1 |
+| `demo-run-revenue-20261123-0200` | Revenue daily pipeline | completed → SUCCESS | 2026-11-23T02:00Z → 02:08:42Z | production | 0 | 1 |
 
 Asset counts are deliberately zero: there is no normalized per-run evidence
 linking these jobs to datasets, and the run page must not claim an observed
