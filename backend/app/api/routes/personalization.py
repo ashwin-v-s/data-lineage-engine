@@ -43,7 +43,7 @@ _ASSET_COLUMNS = """
     d.schema_name                           AS schema_name,
     d.database_name                         AS database_name,
     d.source_system                         AS source_system,
-    d.database_name || '.' || d.schema_name || '.' || d.name AS qualified_name
+    concat_ws('.', NULLIF(d.database_name, ''), NULLIF(d.schema_name, ''), d.name) AS qualified_name
 """
 
 

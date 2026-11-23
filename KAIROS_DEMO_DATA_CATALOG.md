@@ -65,8 +65,9 @@ Idempotency keys follow `kairo-e2e-2026-11-21-<kind>`. Replaying the metadata
 graph with the same key returned `replayed: true` and the same `import_id`, so
 the demo can be re-run safely.
 
-**Catalog readback after all five commits:** 30 assets, 23 lineage edges, 23
-evidence rows, 0 runs (`GET /api/v1/catalog?limit=200`, HTTP 200).
+**Catalog readback after all five commits (before migration 0018):** 30 assets,
+23 lineage edges, 23 evidence rows, 0 runs (`GET /api/v1/catalog?limit=200`,
+HTTP 200).
 
 > **Resolved 2026-11-23 (BUG-01):** migration 0018 reconciles the adapters'
 > variants by logical identity, and the demo workspace was merged from 30 rows
@@ -74,7 +75,8 @@ evidence rows, 0 runs (`GET /api/v1/catalog?limit=200`, HTTP 200).
 > a single row; a table, its dashboard and its exposure legitimately remain
 > three rows because they are different kinds. Column records, edges, temporal
 > versions, PII, quality, freshness, terms and product links were moved to the
-> surviving row, not dropped.
+> surviving row, not dropped. Current production readback: **17 active assets,
+> 42 edges (23 dataset + 19 column), 42 evidence rows, 1 quality check**.
 
 ## 3. Assets and columns (from the metadata graph)
 

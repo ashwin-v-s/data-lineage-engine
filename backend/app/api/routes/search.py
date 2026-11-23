@@ -26,13 +26,13 @@ from __future__ import annotations
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Query, Response
-from backend.app.auth import require_user
 from psycopg2.extras import RealDictCursor
 
+from backend.app.auth import require_user
 from backend.app.db import get_conn
+from backend.app.schemas.search import SearchResponse, SearchResult
 from backend.app.services.lineage_coverage import state_for_evidence_type
 from backend.app.services.run_status import ui_run_status
-from backend.app.schemas.search import SearchResponse, SearchResult
 
 router = APIRouter(dependencies=[Depends(require_user)])
 
@@ -92,7 +92,7 @@ def search(
                 SELECT
                     d.id::text                                              AS id,
                     d.asset_type                                            AS type,
-                    d.database_name || '.' || d.schema_name || '.' || d.name AS name,
+                    concat_ws('.', NULLIF(d.database_name, ''), NULLIF(d.schema_name, ''), d.name) AS name,
                     d.name                                                  AS label,
                     d.schema_name                                           AS schema,
                     NULL::text                                              AS owner,
@@ -113,8 +113,8 @@ def search(
                 SELECT
                     cr.id::text                                                        AS id,
                     'COLUMN'                                                           AS type,
-                    d.database_name || '.' || d.schema_name || '.' || d.name
-                        || '.' || cr.column_name                                       AS name,
+                    concat_ws('.', NULLIF(d.database_name, ''), NULLIF(d.schema_name, ''),
+                              d.name, cr.column_name)                                  AS name,
                     cr.column_name                                                     AS label,
                     d.schema_name                                                      AS schema,
                     NULL::text                                                         AS owner,
@@ -252,9 +252,9 @@ def catalog_snapshot(
                        e.diagnostics,
                        e.event_time,
                        e.effective_time,
-                       sd.database_name || '.' || sd.schema_name || '.' || sd.name AS source_dataset,
+                       concat_ws('.', NULLIF(sd.database_name, ''), NULLIF(sd.schema_name, ''), sd.name) AS source_dataset,
                        sc.column_name AS source_column,
-                       td.database_name || '.' || td.schema_name || '.' || td.name AS target_dataset,
+                       concat_ws('.', NULLIF(td.database_name, ''), NULLIF(td.schema_name, ''), td.name) AS target_dataset,
                        tc.column_name AS target_column,
                        (SELECT es.state
                         FROM execution_state es

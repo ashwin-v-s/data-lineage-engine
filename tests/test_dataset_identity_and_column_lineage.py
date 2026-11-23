@@ -7,6 +7,8 @@ always returned an empty list.
 """
 from __future__ import annotations
 
+from pathlib import Path
+
 from backend.app.identity.canonical_ids import (
     asset_identity_kind,
     canonical_asset_type,
@@ -14,6 +16,24 @@ from backend.app.identity.canonical_ids import (
 )
 from ingestion.metadata_graph import parse_metadata_graph
 from ingestion.sql.static_file import parse_sql_file
+
+ROUTES = Path(__file__).resolve().parents[1] / "backend" / "app" / "api" / "routes"
+
+
+def test_sql_qualified_names_skip_the_empty_database_slot():
+    """Static imports store database_name=''; SQL must not emit a leading dot.
+
+    ``database_name || '.' || schema_name`` produced ``.analytics.customers``
+    in column lineage, search results and personalization rows. Every builder
+    must use concat_ws/NULLIF or a Python join that drops empty parts.
+    """
+    offenders = [
+        path.name
+        for path in ROUTES.glob("*.py")
+        if "database_name || '.'" in path.read_text(encoding="utf-8")
+    ]
+    assert offenders == []
+
 
 # ── BUG-01: canonical identity ───────────────────────────────────────────────
 

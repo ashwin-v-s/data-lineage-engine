@@ -12,14 +12,13 @@ from __future__ import annotations
 
 import re
 import uuid
-from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
-from backend.app.auth import require_user
 from psycopg2.extras import RealDictCursor
 
-from backend.app.db import get_conn
 from backend.app.api.routes.membership import require_role
+from backend.app.auth import require_user
+from backend.app.db import get_conn
 from backend.app.schemas.asset import AssetResponse
 
 router = APIRouter(dependencies=[Depends(require_user)])
@@ -43,7 +42,7 @@ def get_asset(asset_id: str):
                     SELECT id::text,
                            name,
                            asset_type AS type,
-                           schema_name || '.' || database_name AS description
+                           concat_ws('.', NULLIF(database_name, ''), NULLIF(schema_name, ''), name) AS description
                     FROM   dataset
                     WHERE  id = %s::uuid
                     LIMIT  1
@@ -60,7 +59,7 @@ def get_asset(asset_id: str):
                 SELECT id::text,
                        name,
                        asset_type AS type,
-                       schema_name || '.' || database_name AS description
+                       concat_ws('.', NULLIF(database_name, ''), NULLIF(schema_name, ''), name) AS description
                 FROM   dataset
                 WHERE  lower(name) = lower(%s)
                 ORDER  BY created_at DESC

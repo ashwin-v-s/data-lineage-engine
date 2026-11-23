@@ -213,9 +213,9 @@ against production:
   21 Nov 2026, 17:06`. Screenshot `.demo-sources/visual/live-06-quality.png`.
 - 0 console errors during the check.
 
-**Remaining cosmetic issue:** with no scored checks the panel header prints
-"Average score: 0.00" instead of "not scored" (`frontend/app.js`
-`qualityPage()` computes the mean over an empty scored set). Not fixed yet.
+**Cosmetic issue fixed:** with no scored checks the panel header now prints
+"Average score: not recorded" rather than a fabricated 0.00
+(`frontend/app.js` `qualityPage()` only averages a non-empty scored set).
 
 ### BUG-03 — Column-level lineage cannot be produced (High for the brief) — **FIXED 2026-11-23**
 

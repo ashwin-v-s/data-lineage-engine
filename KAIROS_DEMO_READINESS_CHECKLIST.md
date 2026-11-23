@@ -10,8 +10,8 @@ infrastructure; **UNVERIFIED** = not executed.
 - [x] **VERIFIED** Frontend bundle is the current build (`index-BI-DWeko.js`, `index--HCZZvnV.css`)
 - [x] **VERIFIED** Database reachable (PostgreSQL 17.6)
 - [x] **VERIFIED** 44 tracked tables/columns/routines present (`verify_applied.py`)
-- [x] **VERIFIED** Backend suite 733 passed / 83 skipped
-- [x] **VERIFIED** Frontend suite 134 passed
+- [x] **VERIFIED** Backend suite 842 passed / 83 skipped
+- [x] **VERIFIED** Frontend suite 156 passed
 - [x] **VERIFIED** Production build clean
 - [ ] **BLOCKED** SMTP credentials for invitation/welcome email
 - [ ] **BLOCKED** `KAIROS_TOKEN_ENCRYPTION_KEY` + a reachable PG source
@@ -30,7 +30,7 @@ infrastructure; **UNVERIFIED** = not executed.
 - [x] **VERIFIED** Domain, term (APPROVED), term↔asset link, product with 2 assets
 - [x] **VERIFIED** Quality assertion + PASS result
 - [x] **VERIFIED** Freshness SLA (48/60/120 min)
-- [x] **VERIFIED** Catalog readback after identity reconciliation: 17 active assets / 23 edges / 23 dataset evidence + 19 column evidence
+- [x] **VERIFIED** Catalog readback after identity reconciliation: 17 active assets / 42 edges (23 dataset + 19 column) / 42 evidence rows / 1 quality check
 - [x] **PASS** PII classification — column fallback + classification ownership fixed and verified live (PR #15)
 - [ ] **PARTIAL** Run records — 0 in the demo workspace, 2 globally
 - [ ] **BLOCKED** Incidents and notifications — no scheduler/signal
@@ -163,7 +163,8 @@ Signed in to production with the configured demo account (never printed) and exe
 the demo paths over HTTPS, not localhost:
 
 - **Demo 1 prerequisites:** `/api/v1/me/workspace` `200`, `/api/v1/me/workspaces` `200`
-  (role `owner`), `/api/v1/catalog` `200` with 30 assets, asset detail + lineage +
+  (role `owner`), `/api/v1/catalog` `200` with 30 assets (before migration 0018;
+  now 17), asset detail + lineage +
   capabilities `200`, audit trail `200`, governance `terms`/`domains`/`products` `200`
   with real rows.
 - **Demo 3 prerequisites:** fixture verifier 5/5 PASS; ingestion subset **71 passed**;

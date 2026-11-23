@@ -245,7 +245,7 @@ Run against `https://data-lineage-engine-5i2x.vercel.app` (deployment `3WQdi955c
 | Demo sign-in | `POST {SUPABASE}/auth/v1/token?grant_type=password` | `200`, access token issued for the configured demo account |
 | Auto-provisioned workspace | `GET /api/v1/me/workspace` | `200`, personal workspace returned |
 | Workspace list | `GET /api/v1/me/workspaces` | `200`, membership list with role `owner` |
-| Catalog visible after sign-in | `GET /api/v1/catalog?page_size=5` | `200`, 30 assets |
+| Catalog visible after sign-in | `GET /api/v1/catalog?page_size=5` | `200`, 30 assets (before 0018; now 17) |
 | Asset detail / lineage | `GET /api/v1/assets/{id}`, `.../lineage`, `.../capabilities` | `200` each |
 | Audit trail | `GET /api/v1/audit/{id}/trail` | `200` |
 | Governance read paths | `GET /api/v1/governance/terms`, `/domains`, `/products` | `200` with real rows (GMV term, Finance domain, Executive Revenue Intelligence product) |

@@ -18,9 +18,9 @@ from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from backend.app.auth import require_user
 from psycopg2.extras import RealDictCursor
 
+from backend.app.auth import require_user
 from backend.app.db import get_conn
 from backend.app.schemas.lineage import LineageEdge, LineageNode, LineageResponse
 from backend.app.services.evidence_strength import STRENGTH_RULE_VERSION, evidence_strength
@@ -539,9 +539,9 @@ def evidence_at_time(
                 SELECT e.id::text AS id, e.evidence_id, e.evidence_type,
                        e.run_id, e.granularity, e.operator, e.coverage,
                        e.source_system,
-                       sd.database_name || '.' || sd.schema_name || '.' || sd.name AS source_dataset,
+                       concat_ws('.', NULLIF(sd.database_name, ''), NULLIF(sd.schema_name, ''), sd.name) AS source_dataset,
                        sc.column_name AS source_column,
-                       td.database_name || '.' || td.schema_name || '.' || td.name AS target_dataset,
+                       concat_ws('.', NULLIF(td.database_name, ''), NULLIF(td.schema_name, ''), td.name) AS target_dataset,
                        tc.column_name AS target_column,
                        etv.valid_from, etv.valid_to,
                        etv.transaction_from AS recorded_from,
@@ -619,9 +619,9 @@ def get_column_lineage(
                        e.run_id,
                        e.source_column_id::text AS source_column_id,
                        e.target_column_id::text AS target_column_id,
-                       sd.database_name || '.' || sd.schema_name || '.' || sd.name AS source_asset,
+                       concat_ws('.', NULLIF(sd.database_name, ''), NULLIF(sd.schema_name, ''), sd.name) AS source_asset,
                        sc.column_name AS source_column,
-                       td.database_name || '.' || td.schema_name || '.' || td.name AS target_asset,
+                       concat_ws('.', NULLIF(td.database_name, ''), NULLIF(td.schema_name, ''), td.name) AS target_asset,
                        tc.column_name AS target_column,
                        le.id::text AS edge_id,
                        le.valid_from,
