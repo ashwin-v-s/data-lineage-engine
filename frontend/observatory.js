@@ -183,9 +183,10 @@
       grassCtx.fillRect(x,y,2,3+(i%3));
     }
     const grassTex=new T.CanvasTexture(grassCanvas); grassTex.colorSpace=T.SRGBColorSpace;
+    const groundW=Math.max(420,contentW*6),groundH=Math.max(320,contentH*7);
     const ground=new T.Mesh(
-      new T.PlaneGeometry(Math.max(420,contentW*6),Math.max(320,contentH*7)),
-      new T.MeshStandardMaterial({map:grassTex,color:0xffffff,roughness:.95,metalness:0})
+      new T.PlaneGeometry(groundW,groundH),
+      new T.MeshStandardMaterial({map:grassTex,color:0xffffff,roughness:.95,metalness:0,envMapIntensity:.85})
     );
     ground.rotation.x=-Math.PI/2; ground.position.set(0,groundY,-70); ground.receiveShadow=true;
     scene.add(ground);
@@ -201,7 +202,7 @@
     /* Vegetation lives outside the graph's silhouette: side rows plus a far
        back row, so nothing ever grows in front of a lineage card. */
     const envRadius=Math.max(46,contentW/2+26);
-    const trunkMat=new T.MeshStandardMaterial({color:0x6b4b32,roughness:.9,metalness:0});
+    const trunkMat=new T.MeshStandardMaterial({color:0x8a6a4c,roughness:.9,metalness:0,envMapIntensity:.5});
     const leafMats=[0x3f7b34,0x4d8f3d,0x356d2c,0x5a9c47].map(c=>new T.MeshStandardMaterial({color:c,roughness:.85,metalness:0}));
     const treeSpots=[];
     const sideOffset=contentW/2+17;
@@ -244,13 +245,6 @@
     }
     /* Flowering beds at the near corners keep the foreground alive without
        ever stepping in front of a card. */
-    const bloomMats=[0xe9a7c3,0xf2dea0,0xc9c6f2,0xf4f0e6].map(c=>new T.MeshStandardMaterial({color:c,roughness:.75,metalness:0}));
-    for(let i=0;i<12;i++){
-      const side=i%2?1:-1;
-      const bloom=new T.Mesh(new T.SphereGeometry(.4+((i*11)%5)/14,12,9),bloomMats[i%bloomMats.length]);
-      bloom.position.set(side*(contentW*.18+((i*13)%9)*contentW*.045),groundY+.26,17+((i*7)%8)*2.4);
-      bloom.scale.y=.62; bloom.castShadow=true; scene.add(bloom);
-    }
     /* A low hedge line behind the graph gives the clearing a back edge. */
     const hedgeMat=new T.MeshStandardMaterial({color:0x3f7434,roughness:.92,metalness:0});
     for(let i=0;i<11;i++){
@@ -261,22 +255,180 @@
     }
 
     /* ---- sunlight -------------------------------------------------------- */
-    scene.add(new T.HemisphereLight(0xcfe6ff,0x50743a,1.2));
-    const sun=new T.DirectionalLight(0xfff4e0,2.5);
+    scene.add(new T.HemisphereLight(0xcfe6ff,0x5d7f42,.55));
+    const sun=new T.DirectionalLight(0xfff4e0,3.0);
     sun.position.set(-envRadius*.55,groundY+88,46);
     sun.castShadow=true;
-    const shadowSize=(window.innerWidth||1600)<900?1024:2048;
+    const shadowSize=(window.innerWidth||1600)<900?1024:((window.innerWidth||1600)>1200?4096:2048);
     sun.shadow.mapSize.set(shadowSize,shadowSize);
     sun.shadow.camera.left=-(contentW/2+22); sun.shadow.camera.right=contentW/2+22;
     sun.shadow.camera.top=contentH/2+26; sun.shadow.camera.bottom=-(contentH/2+26);
-    sun.shadow.camera.near=20; sun.shadow.camera.far=260; sun.shadow.bias=-0.0006;
-    if(sun.shadow.radius!==undefined) sun.shadow.radius=3;
+    sun.shadow.camera.near=20; sun.shadow.camera.far=260; sun.shadow.bias=-0.0002;
+    sun.shadow.normalBias=0.03;
+    if(sun.shadow.radius!==undefined) sun.shadow.radius=2;
     scene.add(sun);
     if(sun.target){
       sun.target.position.set(0,(bounds.minY+bounds.maxY)/2,0);
       scene.add(sun.target);
     }
     const fill=new T.PointLight(0xfff6e0,.5,120,2); fill.position.set(-10,groundY+12,22); scene.add(fill);
+
+    /* ---- photographic assets -------------------------------------------- */
+    /* Poly Haven CC0 maps replace the painted fallbacks as soon as they decode;
+       a failed request leaves the procedural scene exactly as it was. */
+    const textureAnisotropy=()=>{
+      try{return Math.min(8,renderer.capabilities.getMaxAnisotropy())}catch(error){return 1}
+    };
+    const loadTexture=(url,onLoad)=>{
+      if(!T.TextureLoader) return;
+      try{ new T.TextureLoader().load(url,onLoad,undefined,()=>{}); }catch(error){ /* keep fallback */ }
+    };
+    const tileTexture=(tex,repeatX,repeatY,srgb)=>{
+      if(srgb) tex.colorSpace=T.SRGBColorSpace;
+      if(T.RepeatWrapping){tex.wrapS=tex.wrapT=T.RepeatWrapping}
+      tex.repeat?.set?.(repeatX,repeatY);
+      tex.anisotropy=textureAnisotropy();
+      tex.needsUpdate=true;
+    };
+    const grassTiles=Math.max(8,groundW/9);
+    loadTexture('/assets/textures/grass/leafy_grass_diff_1k.jpg',tex=>{
+      tileTexture(tex,grassTiles,grassTiles,true);
+      ground.material.map=tex;
+      ground.material.color.setHex?.(0xd9ecc0);
+      ground.material.needsUpdate=true;
+    });
+    loadTexture('/assets/textures/grass/leafy_grass_nor_gl_1k.jpg',tex=>{
+      tileTexture(tex,grassTiles,grassTiles,false);
+      ground.material.normalMap=tex;
+      ground.material.normalScale?.set(0.8,0.8);
+      ground.material.needsUpdate=true;
+    });
+    loadTexture('/assets/textures/grass/leafy_grass_rough_1k.jpg',tex=>{
+      tileTexture(tex,grassTiles,grassTiles,false);
+      ground.material.roughnessMap=tex;
+      ground.material.roughness=1;
+      ground.material.needsUpdate=true;
+    });
+    loadTexture('/assets/textures/bark/bark_brown_02_diff_1k.jpg',tex=>{
+      tileTexture(tex,2,3,true);
+      trunkMat.map=tex;
+      trunkMat.color.setHex?.(0xffffff);
+      trunkMat.needsUpdate=true;
+    });
+
+    /* Radiance HDR sky: parsed in-page (core three only), then PMREM-filtered so
+       every PBR surface reflects the real sky instead of a flat colour. */
+    const HDR_URL='/assets/hdri/mpumalanga_veld_puresky_1k.hdr';
+    let hdrRT=null,hdrTex=null;
+    const parseHdr=(buffer)=>{
+      const bytes=new Uint8Array(buffer);
+      let pos=0;
+      const readLine=()=>{
+        let end=pos;
+        while(end<bytes.length&&bytes[end]!==10) end++;
+        const line=String.fromCharCode.apply(null,bytes.subarray(pos,end));
+        pos=end+1;
+        return line;
+      };
+      const magic=readLine();
+      if(!magic.startsWith('#?')) return null;
+      let width=0,height=0;
+      while(pos<bytes.length){
+        const header=readLine();
+        if(header==='') break;
+        if(header.startsWith('FORMAT=')&&header.indexOf('32-bit_rle_rgbe')<0) return null;
+      }
+      /* The resolution line sits after the blank line that ends the header. */
+      for(let attempt=0;attempt<4&&!width;attempt++){
+        const resolution=readLine();
+        if(!resolution) break;
+        const match=resolution.match(/^([-+])Y (\d+) ([+-])X (\d+)/);
+        if(match){height=Number(match[2]);width=Number(match[4])}
+      }
+      if(!width||!height||width>8192||height>4096) return null;
+      const data=new Float32Array(width*height*4);
+      const scan=new Uint8Array(width*4);
+      for(let y=0;y<height;y++){
+        const rle=width>=8&&width<32768&&bytes[pos]===2&&bytes[pos+1]===2&&(bytes[pos+2]&0x80)===0;
+        if(rle){
+          const scanWidth=(bytes[pos+2]<<8)|bytes[pos+3];
+          pos+=4;
+          if(scanWidth!==width) return null;
+          for(let channel=0;channel<4;channel++){
+            let x=0;
+            while(x<width){
+              let count=bytes[pos++];
+              if(count>128){
+                count-=128;
+                const value=bytes[pos++];
+                for(let i=0;i<count;i++) scan[channel*width+x++]=value;
+              }else{
+                for(let i=0;i<count;i++) scan[channel*width+x++]=bytes[pos++];
+              }
+            }
+          }
+        }else{
+          for(let x=0;x<width;x++){
+            for(let channel=0;channel<4;channel++) scan[channel*width+x]=bytes[pos++];
+          }
+        }
+        for(let x=0;x<width;x++){
+          const exponent=scan[3*width+x];
+          const scale=exponent?Math.pow(2,exponent-136):0;
+          const out=(y*width+x)*4;
+          data[out]=scan[x]*scale;
+          data[out+1]=scan[width+x]*scale;
+          data[out+2]=scan[2*width+x]*scale;
+          data[out+3]=1;
+        }
+      }
+      return {width,height,data};
+    };
+    const brightestDirection=(hdr)=>{
+      let best=-1,bx=0,by=0;
+      const rowLimit=Math.floor(hdr.height*.8);
+      for(let y=0;y<rowLimit;y+=2){
+        for(let x=0;x<hdr.width;x+=2){
+          const offset=(y*hdr.width+x)*4;
+          const luminance=hdr.data[offset]*.2126+hdr.data[offset+1]*.7152+hdr.data[offset+2]*.0722;
+          if(luminance>best){best=luminance;bx=x;by=y}
+        }
+      }
+      const theta=((bx+.5)/hdr.width)*Math.PI*2;
+      const phi=(1-(by+.5)/hdr.height)*Math.PI;
+      const dir=new T.Vector3(-Math.cos(theta)*Math.sin(phi),Math.cos(phi),Math.sin(theta)*Math.sin(phi));
+      if(dir.y<.2) dir.y=.2;
+      return dir.normalize();
+    };
+    const applyHdr=async()=>{
+      if(!T.PMREMGenerator||!T.DataTexture||!T.FloatType||typeof fetch!=='function') return;
+      try{
+        const response=await fetch(HDR_URL,{cache:'force-cache'});
+        if(!response.ok) return;
+        const hdr=parseHdr(await response.arrayBuffer());
+        if(!hdr||!host.isConnected) return;
+        hdrTex=new T.DataTexture(hdr.data,hdr.width,hdr.height,T.RGBAFormat,T.FloatType);
+        hdrTex.mapping=T.EquirectangularReflectionMapping;
+        hdrTex.minFilter=T.LinearFilter; hdrTex.magFilter=T.LinearFilter;
+        hdrTex.generateMipmaps=false; hdrTex.needsUpdate=true;
+        const generator=new T.PMREMGenerator(renderer);
+        hdrRT=generator.fromEquirectangular(hdrTex);
+        generator.dispose?.();
+        scene.environment=hdrRT.texture;
+        scene.background=hdrTex;
+        if(scene.backgroundIntensity!==undefined) scene.backgroundIntensity=1;
+        renderer.toneMappingExposure=.95;
+        envRT?.dispose?.(); envRT=null;
+        const sunDir=brightestDirection(hdr);
+        const reach=Math.max(120,envRadius*2.4);
+        sun.position.set(sunDir.x*reach,sunDir.y*reach,sunDir.z*reach);
+        sun.color.setHex?.(0xfff3df);
+        if(scene.fog){scene.fog.color.setHex?.(0xc7d9e8);scene.fog.near=150;scene.fog.far=480}
+      }catch(error){
+        if(window.console&&console.warn) console.warn('[observatory] HDR sky unavailable',error);
+      }
+    };
+    applyHdr();
 
     const root=new T.Group(); scene.add(root);
     const dataLayer=new T.Group(); root.add(dataLayer);
@@ -291,20 +443,20 @@
       const canvas=document.createElement('canvas'); canvas.width=512; canvas.height=168;
       const ctx=canvas.getContext('2d');
       const accent=KIND_HEX[asset.kind]||'#5b46c4';
-      ctx.fillStyle='rgba(250,247,238,.97)'; ctx.fillRect(2,2,508,164);
-      ctx.strokeStyle=accent; ctx.lineWidth=5; ctx.strokeRect(3,3,506,162);
-      ctx.fillStyle=accent; ctx.fillRect(3,3,14,162);
-      ctx.fillStyle='#15211b'; ctx.font='700 44px "Segoe UI",Arial,sans-serif';
+      ctx.fillStyle='#fbf8ef'; ctx.fillRect(2,2,508,164);
+      ctx.strokeStyle=accent; ctx.lineWidth=6; ctx.strokeRect(3,3,506,162);
+      ctx.fillStyle=accent; ctx.fillRect(3,3,15,162);
+      ctx.fillStyle='#0d1712'; ctx.font='700 56px "Segoe UI",Arial,sans-serif';
       const name=String(asset.name||asset.path||'asset');
-      ctx.fillText(name.length>24?name.slice(0,23)+'…':name,36,70);
-      ctx.fillStyle='#4c6257'; ctx.font='26px "Segoe UI",Arial,sans-serif';
+      ctx.fillText(name.length>21?name.slice(0,20)+'…':name,38,74);
+      ctx.fillStyle='#3b5145'; ctx.font='29px "Segoe UI",Arial,sans-serif';
       const sub=String(asset.schema||'default')+'  ·  '+String(asset.kind||'asset');
       ctx.fillText(sub.length>44?sub.slice(0,43)+'…':sub,36,114);
-      ctx.fillStyle=accent; ctx.font='700 21px "Segoe UI",Arial,sans-serif';
-      ctx.fillText(String(asset.kind||'asset').toUpperCase(),36,148);
+      ctx.fillStyle=accent; ctx.font='700 22px "Segoe UI",Arial,sans-serif';
+      ctx.fillText(String(asset.kind||'asset').toUpperCase(),38,150);
       const tex=new T.CanvasTexture(canvas); tex.colorSpace=T.SRGBColorSpace;
       const sprite=new T.Sprite(new T.SpriteMaterial({map:tex,transparent:true,depthWrite:false}));
-      sprite.scale.set(CARD_W*.96,CARD_W*.96*(168/512),1);
+      sprite.scale.set(CARD_W*.86,CARD_W*.86*(168/512),1);
       return sprite;
     }
 
@@ -339,7 +491,7 @@
       const group=new T.Group(); group.position.copy(pos); group.userData.asset=a; dataLayer.add(group);
       const color=KIND_COLOR[a.kind]||KIND_COLOR.transform;
       const isSelected=a.id===selected;
-      const bodyMat=new T.MeshPhysicalMaterial({color:0xf7f2e6,roughness:.5,metalness:.04,clearcoat:.4,clearcoatRoughness:.35,transparent:true,opacity:1});
+      const bodyMat=new T.MeshPhysicalMaterial({color:0xefe6d2,roughness:.68,metalness:.02,clearcoat:.08,clearcoatRoughness:.6,envMapIntensity:.25,transparent:true,opacity:1});
       const body=new T.Mesh(new T.BoxGeometry(CARD_W,CARD_H,.26),bodyMat);
       body.userData.asset=a; body.castShadow=true; body.receiveShadow=true; body.renderOrder=1; group.add(body); pickables.push(body);
       const strip=new T.Mesh(new T.BoxGeometry(.2,CARD_H,.3),new T.MeshStandardMaterial({color,roughness:.45,metalness:.1,transparent:true,opacity:1}));
@@ -360,7 +512,7 @@
 
       const orb=new T.Mesh(
         new T.SphereGeometry(.44,24,18),
-        new T.MeshPhysicalMaterial({color,roughness:.12,metalness:.16,clearcoat:1,clearcoatRoughness:.06,emissive:color,emissiveIntensity:.24,transparent:true,opacity:1})
+        new T.MeshPhysicalMaterial({color,roughness:.07,metalness:.82,clearcoat:1,clearcoatRoughness:.04,envMapIntensity:1.9,emissive:color,emissiveIntensity:.14,transparent:true,opacity:1})
       );
       orb.position.set(CARD_W/2-.62,CARD_H/2+.68,.22); orb.castShadow=true; group.add(orb);
       const orbit=new T.Mesh(new T.TorusGeometry(.57,.015,8,48),new T.MeshBasicMaterial({color,transparent:true,opacity:.4}));
@@ -614,6 +766,7 @@
     const storedMotionReduced=()=>{try{return localStorage.getItem('kairos_reduceMotion')==='true'}catch(e){return false}};
     const motionReduced=()=>motionQuery.matches||storedMotionReduced();
     let elapsed=0,previousTime=performance.now(),raf=0,alive=true;
+    let lastBox={w:0,h:0};
     const beadPoint=new T.Vector3();
     const animate=(now)=>{
       if(!alive) return;
@@ -622,6 +775,15 @@
       const delta=Math.min(Math.max((frameTime-previousTime)/1000,0),.05);
       previousTime=frameTime;
       if(hoverDirty&&!down){hoverDirty=false;updateHover()}
+      /* Layout can settle after mount (panels, sidebars, preview panes), so the
+         framed distance is reconciled with the live box every frame. */
+      const live=measure();
+      if(live.w!==lastBox.w||live.h!==lastBox.h){
+        lastBox=live;
+        renderer.setSize(live.w,live.h);
+        computeFit();
+        updateCamera();
+      }
       /* Movement is input, not decoration: it runs even for reduced motion. */
       if(keys.size){
         let forward=0,strafe=0,rise=0;
@@ -723,6 +885,8 @@
         }
       });
       envRT?.dispose?.();
+      hdrRT?.dispose?.();
+      hdrTex?.dispose?.();
       pmrem?.dispose?.();
       envTex?.dispose?.();
       skyTex.dispose?.();
