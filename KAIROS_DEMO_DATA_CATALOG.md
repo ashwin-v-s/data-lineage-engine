@@ -82,15 +82,23 @@ HTTP 200). Four demo pipeline runs were added later (see §5a).
 
 | Asset | Namespace | Type | Columns |
 | --- | --- | --- | --- |
-| `customers` | `raw_enterprise` | table | customer_id, email, full_name, signup_date, country_code, marketing_opt_in |
-| `orders_feed` | `raw_enterprise` | table | order_id, customer_id, order_total, currency, order_status, ordered_at |
-| `payments_feed` | `raw_enterprise` | table | payment_id, order_id, amount, payment_method, payment_status, captured_at |
-| `stg_orders_enriched` | `staging` | view | order_id, customer_id, gross_order_value, net_order_value, currency, payment_status, order_date |
-| `stg_customer_360` | `staging` | view | customer_id, masked_email, country_code, signup_date, lifetime_segment |
-| `fct_daily_revenue` | `analytics` | model | revenue_date, gross_merchandise_value, net_recognized_revenue, order_count, refund_amount, currency |
-| `dim_customer_segments` | `analytics` | model | customer_id, value_tier, lifetime_value, churn_risk_band, last_order_date |
-| `daily_revenue_kpi` | `executive` | dashboard | — |
-| `customer_retention_portal` | `reporting` | dashboard | — |
+| `customers` | `raw_enterprise` | TABLE | country_code, created_at, customer_id, email, full_name, phone_number |
+| `orders_feed` | `raw_enterprise` | TABLE | customer_id, order_amount_usd, order_id, order_status, order_timestamp, tax_amount_usd |
+| `payments_feed` | `raw_enterprise` | TABLE | order_id, payment_id, payment_method, payment_status, settled_amount_usd, settled_at |
+| `customer_transactions_schema` | `csv-upload` | TABLE | amount_usd, currency_code, customer_id, merchant_id, order_id, payment_gateway, risk_score, settlement_status, transaction_id, transaction_timestamp |
+| `stg_orders_enriched` | `staging` | VIEW | customer_id, gross_order_value, is_settled, net_settled_value, order_id, order_status, order_timestamp |
+| `stg_customer_360` | `staging` | VIEW | country_code, created_at, customer_id, customer_tier, email, masked_email, registered_date |
+| `fct_daily_revenue` | `analytics` | MODEL | accounting_date, calculated_at, gross_merchandise_value, net_recognized_revenue, total_orders_count, unique_customers_count |
+| `dim_customer_segments` | `analytics` | MODEL | customer_id, customer_segment, last_order_date, lifetime_value_usd, order_frequency_tier |
+| `daily_revenue_kpi` | `executive` | TABLE | kpi_date, mrr_run_rate, total_revenue |
+| `daily_revenue_kpi` | `executive` | DASHBOARD | — |
+| `daily_revenue_kpi` | `dbt/enterprise_revenue_lakehouse/exposure` | EXPOSURE | — |
+| `customer_retention_portal` | `reporting` | DASHBOARD | — |
+| `customer_transactions_schema.csv` | `filesystem` | FILE | — |
+| `dbt_production_manifest.json` | `filesystem` | FILE | — |
+| `enterprise_metadata_graph.json` | `filesystem` | FILE | — |
+| `enterprise_lineage_pipeline.sql` | `sql-file` | FILE | — |
+| `enterprise_lineage_pipeline.sql` | `filesystem` | FILE | — |
 
 All **17 active assets** now carry a description, named owner, steward and
 tags. Owners are the real project users **Pranav Samal**, **Jatin Shende** and
