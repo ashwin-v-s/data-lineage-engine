@@ -6,7 +6,7 @@
   const appScripts = [
     '/vendors/three.min.js',
     '/vendors/chart.umd.min.js',
-    '/observatory.js?v=310',
+    '/observatory.js?v=311',
     '/stewardship.js?v=304',
     '/evidence-semantics.js?v=1',
     '/lineage-investigation.js?v=1',

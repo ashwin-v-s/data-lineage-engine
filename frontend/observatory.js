@@ -290,26 +290,28 @@
       tex.anisotropy=textureAnisotropy();
       tex.needsUpdate=true;
     };
-    const grassTiles=Math.max(8,groundW/9);
-    loadTexture('/scene-assets/textures/grass/leafy_grass_diff_1k.jpg',tex=>{
+    /* Grass004's blades are fine, so a 9 m tile matches the blade size the
+       clearing was framed for and avoids shimmering in the middle distance. */
+    const grassTiles=Math.max(8,Math.round(groundW/9));
+    loadTexture('/scene-assets/textures/grass/grass005_diff_2k.jpg',tex=>{
       tileTexture(tex,grassTiles,grassTiles,true);
       ground.material.map=tex;
-      ground.material.color.setHex?.(0xd9ecc0);
+      ground.material.color.setHex?.(0xf4f8e6);
       ground.material.needsUpdate=true;
     });
-    loadTexture('/scene-assets/textures/grass/leafy_grass_nor_gl_1k.jpg',tex=>{
+    loadTexture('/scene-assets/textures/grass/grass005_nor_gl_1k.jpg',tex=>{
       tileTexture(tex,grassTiles,grassTiles,false);
       ground.material.normalMap=tex;
-      ground.material.normalScale?.set(0.8,0.8);
+      ground.material.normalScale?.set(.65,.65);
       ground.material.needsUpdate=true;
     });
-    loadTexture('/scene-assets/textures/grass/leafy_grass_rough_1k.jpg',tex=>{
+    loadTexture('/scene-assets/textures/grass/grass005_rough_1k.jpg',tex=>{
       tileTexture(tex,grassTiles,grassTiles,false);
       ground.material.roughnessMap=tex;
       ground.material.roughness=1;
       ground.material.needsUpdate=true;
     });
-    loadTexture('/scene-assets/textures/bark/bark_brown_02_diff_1k.jpg',tex=>{
+    loadTexture('/scene-assets/textures/bark/bark_brown_02_diff_2k.jpg',tex=>{
       tileTexture(tex,2,3,true);
       trunkMat.map=tex;
       trunkMat.color.setHex?.(0xffffff);
