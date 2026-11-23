@@ -139,6 +139,7 @@ function createCanvas(state) {
     getContext() {
       return {
         createLinearGradient: () => ({ addColorStop() {} }),
+        createRadialGradient: () => ({ addColorStop() {} }),
         fillRect() {}, strokeRect() {}, fillText() {},
       };
     },
@@ -244,6 +245,18 @@ describe('observatory orbit', () => {
 
     expect(app.camera.position.x).not.toBeCloseTo(before.x, 3);
     expect(app.camera.position.y).not.toBeCloseTo(before.y, 3);
+  });
+
+  it('orbits past 180° so the graph can be inspected from every side', () => {
+    app.canvas.fire('pointerdown', { clientX: 0, clientY: 100, pointerId: 9 });
+    for (let x = 100; x <= 600; x += 100) {
+      app.canvas.fire('pointermove', { clientX: x, clientY: 100, pointerId: 9 });
+    }
+    app.canvas.fire('pointerup', { pointerId: 9 });
+
+    // A 3-radian yaw swing puts the camera behind the graph; the old ±0.85
+    // clamp kept every view in front of it.
+    expect(app.camera.position.z).toBeLessThan(0);
   });
 
   it('resets drag state on pointerup, pointercancel and lostpointercapture', () => {
