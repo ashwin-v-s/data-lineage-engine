@@ -11,7 +11,7 @@
     '/evidence-semantics.js?v=1',
     '/lineage-investigation.js?v=1',
     '/lineage-edge-inspector.js?v=1',
-    '/app.js?v=318',
+    '/app.js?v=319',
     '/asset-removal.js?v=1',
   ];
   let config = null;
