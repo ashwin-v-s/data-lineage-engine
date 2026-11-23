@@ -187,6 +187,8 @@ def catalog_snapshot(
                 SELECT d.id::text AS id, d.source_system, d.namespace,
                        d.database_name, d.schema_name, d.name,
                        d.asset_type, d.created_at,
+                       d.owner_name, d.owner_id::text AS owner_id,
+                       d.steward_name, d.description, d.tags,
                        COUNT(DISTINCT cr.id)::int AS column_count
                 FROM dataset d
                 LEFT JOIN column_record cr ON cr.dataset_id = d.id
@@ -353,6 +355,7 @@ def catalog_snapshot(
                         "column_id": pc_row["column_id"],
                         "column_name": pc_row["column_name"],
                         "classification": pc_row["classification"],
+                        "sensitivity_classification": pc_row["classification"],
                         "evidence_state": pc_row["evidence_state"],
                         "provenance": pc_row["provenance"],
                         # UNKNOWN stays null so the UI shows "not classified"
@@ -400,14 +403,40 @@ def catalog_snapshot(
             "metadata": {"source_system": row.get("source_system"), "evidence_id": row.get("evidence_id")},
         })
 
+    # The asset badge should carry the strongest stored classification, not a
+    # generic "PII" marker.  A whole-dataset row and column rows can coexist.
+    pii_rank = {
+        "PII_CLEARED": 0, "UNKNOWN": 1, "PII_POTENTIAL": 2,
+        "PII_MASKED": 3, "PII_INHERITED": 4, "PII_SOURCE": 5,
+    }
+    pii_by_asset: dict[str, dict] = {}
+    for pc in column_classifications:
+        asset_id = str(pc.get("asset_id") or "")
+        if not asset_id:
+            continue
+        current = pii_by_asset.get(asset_id)
+        if current is None or pii_rank.get(pc["classification"], 1) > pii_rank.get(current["classification"], 1):
+            pii_by_asset[asset_id] = pc
+
     return {
         "ok": True,
         "assets": [
             {
                 **asset,
                 "qualified_name": _qualified_name(asset),
-                "owner_name": None,
-                "metadata": {"source_system": asset.get("source_system")},
+                "owner_name": asset.get("owner_name"),
+                "steward_name": asset.get("steward_name"),
+                "description": asset.get("description"),
+                "tags": list(asset.get("tags") or []),
+                "is_pii": pii_by_asset.get(str(asset["id"]), {}).get("is_pii"),
+                "sensitivity_classification": pii_by_asset.get(str(asset["id"]), {}).get("classification"),
+                "metadata": {
+                    "source_system": asset.get("source_system"),
+                    "owner": asset.get("owner_name"),
+                    "steward": asset.get("steward_name"),
+                    "description": asset.get("description"),
+                    "tags": list(asset.get("tags") or []),
+                },
             }
             for asset in assets
         ],

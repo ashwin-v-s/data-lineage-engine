@@ -92,8 +92,38 @@ HTTP 200). Four demo pipeline runs were added later (see §5a).
 | `daily_revenue_kpi` | `executive` | dashboard | — |
 | `customer_retention_portal` | `reporting` | dashboard | — |
 
-Metadata carried on each asset: description, owner, steward, tags (including
-`sox-in-scope`, `pii`), `domain`, `compliance_context`, retention policy.
+All **17 active assets** now carry a description, named owner, steward and
+tags. Owners are the real project users **Pranav Samal**, **Jatin Shende** and
+**Gauree Hatkar**; only the active workspace member (Pranav) is stored as
+`owner_id`, so the other names are descriptive assignments rather than silent
+access grants. See §3a for the complete mapping.
+
+### 3a. Ownership and PII coverage
+
+`scripts/db/seed_demo_ownership_pii.py` updates all 17 assets and replaces the
+demo PII rows with 16 curated classifications:
+
+| Owner | Assets |
+| --- | --- |
+| Pranav Samal (Customer Data Steward) | `customers`, `customer_retention_portal`, `stg_customer_360`, `enterprise_metadata_graph.json` |
+| Jatin Shende (Revenue Data Steward) | `customer_transactions_schema`, its CSV, `orders_feed`, `payments_feed`, `stg_orders_enriched`, `dbt_production_manifest.json`, `enterprise_lineage_pipeline.sql` |
+| Gauree Hatkar (Finance Analytics Steward) | `fct_daily_revenue`, `dim_customer_segments`, and the three `daily_revenue_kpi` kinds |
+
+PII rows:
+
+| Asset | Column | Classification | Evidence |
+| --- | --- | --- | --- |
+| `customers` | `email`, `phone_number`, `full_name`, `customer_id` | PII_SOURCE | OBSERVED |
+| `payments_feed` | `payment_id`, `payment_method` | PII_SOURCE | OBSERVED |
+| `stg_customer_360` | `email` / `masked_email` / `customer_id` | PII_SOURCE / PII_MASKED / PII_INHERITED | OBSERVED / OBSERVED / POSSIBLE |
+| `customer_transactions_schema` | `customer_id` / `risk_score` | PII_INHERITED / PII_POTENTIAL | POSSIBLE / POSSIBLE |
+| `orders_feed`, `stg_orders_enriched`, `dim_customer_segments` | `customer_id` | PII_INHERITED | POSSIBLE |
+| `fct_daily_revenue`, `daily_revenue_kpi` (TABLE) | whole dataset | PII_CLEARED | OBSERVED |
+
+Readback: `/api/v1/catalog` exposes `owner_name`, `steward_name`, `tags` and
+`is_pii`/`sensitivity_classification`; `/governance/classifications` joins the
+asset and column names and returns all 16 rows. Seven assets carry a PII badge;
+`fct_daily_revenue` and the KPI table are explicitly reviewed as not PII.
 
 ## 4. Lineage edges (declared, `dbt_model_ref` / `dashboard_upstream_dataset`)
 

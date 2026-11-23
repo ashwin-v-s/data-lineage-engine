@@ -191,7 +191,20 @@ def list_classifications(dataset_id: uuid.UUID | None = None, user: dict = Depen
     with get_conn() as conn:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
             _tables(cur, "pii_classification")
-            cur.execute("SELECT id::text,dataset_id::text,column_id::text,classification,evidence_state,provenance,classified_by::text,reviewed_by::text,reviewed_at,created_at FROM pii_classification WHERE (%s::uuid IS NULL OR dataset_id=%s::uuid) ORDER BY created_at DESC", (str(dataset_id) if dataset_id else None,str(dataset_id) if dataset_id else None))
+            cur.execute("""
+                SELECT pc.id::text, pc.dataset_id::text, pc.column_id::text,
+                       pc.classification, pc.classification AS sensitivity_classification,
+                       pc.evidence_state, pc.provenance, pc.classified_by::text,
+                       pc.reviewed_by::text, pc.reviewed_at, pc.created_at,
+                       d.name AS dataset_name,
+                       concat_ws('.', NULLIF(d.database_name, ''), NULLIF(d.schema_name, ''), d.name) AS qualified_asset_name,
+                       cr.column_name
+                FROM pii_classification pc
+                LEFT JOIN dataset d ON d.id = pc.dataset_id
+                LEFT JOIN column_record cr ON cr.id = pc.column_id
+                WHERE (%s::uuid IS NULL OR pc.dataset_id=%s::uuid)
+                ORDER BY pc.created_at DESC
+                """, (str(dataset_id) if dataset_id else None,str(dataset_id) if dataset_id else None))
             rows = [dict(row) for row in cur.fetchall()]
     return {"classifications": rows, "count": len(rows)}
 

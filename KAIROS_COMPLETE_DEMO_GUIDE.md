@@ -79,8 +79,11 @@ search, CSV export.
 **B/C.** Sidebar → **Catalog → All assets**. Type `fct` in the search field;
 open the row's name.
 
-**D (verified).** 7,150 characters of table content, 30 rows; the filtered row
-opens the asset profile.
+**D (verified).** 17 active assets, all with a named owner and steward;
+`daily_revenue_kpi` shows the table, dashboard and exposure kinds. The Owner
+filter lists **Pranav Samal**, **Jatin Shende** and **Gauree Hatkar**. PII
+badges appear for the 7 assets with person-level columns; aggregate models show
+**Reviewed: not PII** where a cleared review exists.
 
 **E.** "Filters are applied over persisted metadata; the export streams the same
 rows."
@@ -103,7 +106,9 @@ Evidence** tabs. Open the column list if the asset has columns.
 **D (verified).** The asset header renders; lineage tab shows the graph; columns
 appear on the single logical asset. BUG-01 is fixed: tables, views, models and
 sources of one dataset are reconciled into one row, so `customers` exposes its
-six columns regardless of which adapter imported them.
+six columns regardless of which adapter imported them. `customers` shows owner
+**Pranav Samal**, steward **Customer Data Steward**, a description, tags and
+**PII_SOURCE** from its email/phone/name columns.
 
 **E.** "Kairos shows only what was imported. A missing column list is reported as
 unavailable rather than guessed."
@@ -378,17 +383,33 @@ quality assertions hang off it."
 **B/C.** Sidebar → **Trust & governance → PII classification**. Choose a
 dataset, then a column.
 
-**D (verified).** The form loads; column lists come from
-`/governance/datasets/{id}/columns`. The BUG-01 merge means `customers` is one
-asset with six columns, so classification posts with provenance (origin + note)
-and readback against the column's owning asset.
+**D (verified).** The table returns **16 persisted classifications** across the
+customer and payment assets. Columns are **Asset, Column, Classification,
+Evidence, Provenance, Classified**. Examples:
+
+| Asset | Column | Classification | Evidence |
+| --- | --- | --- | --- |
+| `customers` | `email` | PII_SOURCE | OBSERVED |
+| `customers` | `phone_number` | PII_SOURCE | OBSERVED |
+| `customers` | `customer_id` | PII_SOURCE | OBSERVED |
+| `payments_feed` | `payment_method` | PII_SOURCE | OBSERVED |
+| `stg_customer_360` | `masked_email` | PII_MASKED | OBSERVED |
+| `customer_transactions_schema` | `risk_score` | PII_POTENTIAL | POSSIBLE |
+| `stg_orders_enriched` | `customer_id` | PII_INHERITED | POSSIBLE |
+| `fct_daily_revenue` | whole dataset | PII_CLEARED | OBSERVED |
+| `daily_revenue_kpi` | whole dataset | PII_CLEARED | OBSERVED |
+
+Each row carries a provenance note (for example "Email masked at ingestion").
+The PII badge on Assets is the strongest stored classification, not a generic
+label.
 
 **E.** "Classification requires provenance: who classified it and on what
-evidence. Inherited/Potential classes stay disabled until the evidence pipeline
-can support them."
+evidence. `PII_CLEARED` is a reviewed finding that the asset has no person-level
+fields, not an absence of classification."
 
-**G.** If the column list is empty, try the variant of the same dataset that
-shows columns; otherwise demonstrate the API contract and state the gap.
+**G.** If the column list is empty, confirm the selected asset is the variant
+that owns columns; otherwise demonstrate the persisted table instead of adding
+a guessed row.
 
 ---
 

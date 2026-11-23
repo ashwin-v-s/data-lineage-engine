@@ -38,7 +38,10 @@ class _Cursor:
                 "id": "11111111-1111-4111-8111-111111111111", "source_system": "upload",
                 "namespace": "analytics", "database_name": "", "schema_name": "analytics",
                 "name": "fct_daily_revenue", "asset_type": "TABLE", "created_at": None,
-                "column_count": 6,
+                "column_count": 6, "owner_name": "Gauree Hatkar", "owner_id": None,
+                "steward_name": "Finance Analytics Steward",
+                "description": "Certified daily revenue mart.",
+                "tags": ["revenue", "certified"],
             }]
         if "FROM quality_assertion qa" in self.query:
             return [{
@@ -103,7 +106,16 @@ def test_catalog_returns_stored_quality_results_and_classifications(monkeypatch)
     assert column["asset_id"] == "11111111-1111-4111-8111-111111111111"
     assert column["column_name"] == "email"
     assert column["classification"] == "PII_SOURCE"
+    assert column["sensitivity_classification"] == "PII_SOURCE"
     assert column["is_pii"] is True
+
+    asset = result["assets"][0]
+    assert asset["owner_name"] == "Gauree Hatkar"
+    assert asset["steward_name"] == "Finance Analytics Steward"
+    assert asset["tags"] == ["revenue", "certified"]
+    assert asset["is_pii"] is True
+    assert asset["sensitivity_classification"] == "PII_SOURCE"
+    assert asset["metadata"]["owner"] == "Gauree Hatkar"
     assert column["provenance"] == {"origin": "manual_steward", "note": "ERP customer master"}
 
     assert result["counts"]["quality_checks"] == 1

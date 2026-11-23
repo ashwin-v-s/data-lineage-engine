@@ -78,11 +78,11 @@ Status vocabulary used below:
 | Term ↔ asset assignment | `POST /governance/terms/{id}/assets` | **Verified** | `created: true` against `fct_daily_revenue` |
 | Domains | `GET/POST /governance/domains` → `?view=domains` | **Verified** | Created `Finance & Revenue` `f480e033-…`; page shows LIVE + rows |
 | Data products | `GET/POST /governance/products` → `?view=products` | **Verified (API)** | Created `Executive Revenue Intelligence` `f33bea44-…` with 2 assets |
-| PII classification | `POST /governance/classifications` → `?view=pii` | **Verified** | Existing classification resolves to merged `customers` column; import identity no longer splits columns (BUG-01) |
+| PII classification | `POST /governance/classifications` → `?view=pii` | **Verified (demo data)** | 16 rows across customer/payment assets; list joins asset + column names; table renders classification, evidence and provenance |
 | Contracts + assertion linking | `/governance/products/{id}/contracts`, `/contracts/{id}/assertions` | **Verified (API, 2 rows exist globally)** | Not yet created in the demo workspace |
 | Column chooser for PII | `GET /governance/datasets/{id}/columns` | **Verified** | Merged `customers` owns its 6 columns |
 | Stewardship requests | `/api/v1/stewardship/requests` → `?view=stewardship` | **Verified (empty state)** | 0 rows; page renders create/approve forms |
-| Ownership | `/api/v1/owner/*` | **Verified (API)** | 1 `owner_assignment` globally; assign/search/approve routes tested |
+| Ownership | `/api/v1/owner/*` | **Verified (demo data)** | All 17 demo assets have `owner_name` + `steward_name`; catalog returns them instead of `null`; 3 named owners in the Assets filter |
 
 ## 6. Quality, freshness, incidents
 

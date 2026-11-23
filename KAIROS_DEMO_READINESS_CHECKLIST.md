@@ -31,7 +31,7 @@ infrastructure; **UNVERIFIED** = not executed.
 - [x] **VERIFIED** Quality assertion + PASS result
 - [x] **VERIFIED** Freshness SLA (48/60/120 min)
 - [x] **VERIFIED** Catalog readback after identity reconciliation: 17 active assets / 42 edges (23 dataset + 19 column) / 42 evidence rows / 1 quality check
-- [x] **PASS** PII classification — column fallback + classification ownership fixed and verified live (PR #15)
+- [x] **PASS** Ownership + PII — all 17 assets have named owners/stewards; 16 PII classifications; catalog read model exposes real `owner_name` and per-asset classification (verified live 2026-11-23)
 - [x] **PASS** Run records — 4 persisted demo runs (2 SUCCESS, 1 WARNING, 1 FAILED), 1 stored event each, environment surfaced; signed-in Runs page verified with 4 rows
 - [x] **PASS** API keys — active `ci-readonly-catalog` key; catalog read 200, members/ingest 403, revoke 401; revoked name can be recreated with a new secret (verified live 2026-11-23)
 - [x] **PASS** Webhooks — endpoint subscribed to all 7 events; signed `test.ping` delivered HTTP 200 and recorded in History with `X-Kairos-Signature` (verified live 2026-11-23)
@@ -60,7 +60,7 @@ infrastructure; **UNVERIFIED** = not executed.
 ## Features — present with the stated caveat
 
 - [x] **PASS** Data quality panel — 1 recorded check, 1 PASS rendered live (BUG-02 fixed)
-- [x] **PASS** PII classification — one classification resolves to the merged `customers` asset and its column
+- [x] **PASS** PII classification — 16 evidence-backed rows across customer/payment assets; API joins asset + column, Assets shows strongest badge, and the PII table renders classification/evidence/provenance
 - [x] **PASS** Time travel — 8 dated dbt dependencies at today, 0 before 2026-11-16, 8 from 2026-11-18; 34 undated records reported separately
 - [x] **PASS** Lineage graph — one row per logical dataset; only genuinely different kinds (table/dashboard/exposure) share a name (BUG-01 fixed)
 - [ ] **PARTIAL** Notifications — empty state only, preferences work
