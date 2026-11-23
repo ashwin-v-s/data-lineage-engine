@@ -658,6 +658,24 @@ def get_column_lineage(
                 ORDER BY sd.database_name, sd.schema_name, sd.name, sc.column_name
             """, {"valid": ts_as_of, "recorded": ts_recorded})
             rows = [dict(row) for row in cur.fetchall()]
+            # These mappings are included through their transaction-time fallback,
+            # but their effective time is still unknown. Report that honestly
+            # instead of hardcoding zero, especially for a past valid-time query.
+            cur.execute("""
+                SELECT COUNT(DISTINCT e.id)::int AS count
+                FROM evidence e
+                JOIN lineage_edge le ON le.source_id = e.source_column_id
+                  AND le.target_id = e.target_column_id
+                  AND le.granularity = 'COLUMN'
+                JOIN edge_temporal_version etv
+                  ON etv.edge_id = le.id AND etv.evidence_id = e.id
+                WHERE e.source_column_id IS NOT NULL
+                  AND e.target_column_id IS NOT NULL
+                  AND etv.transaction_from <= %(recorded)s::timestamptz
+                  AND (etv.transaction_to IS NULL OR %(recorded)s::timestamptz < etv.transaction_to)
+                  AND etv.effective_time_status = 'UNKNOWN'
+            """, {"recorded": ts_recorded})
+            undated_count = int(cur.fetchone()["count"])
     mappings = []
     for row in rows:
         valid_from = row.get("valid_from")
@@ -677,7 +695,7 @@ def get_column_lineage(
             "recorded_from": transaction_from.isoformat() if transaction_from else None,
             "metadata": row["diagnostics"] or {},
         })
-    return {"ok": True, "mappings": mappings, "counts": {"total": len(mappings), "undated_valid_time": 0}}
+    return {"ok": True, "mappings": mappings, "counts": {"total": len(mappings), "undated_valid_time": undated_count}}
 
 
 @router.get("/lineage/{asset_id}/{direction}", response_model=LineageResponse)

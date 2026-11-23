@@ -20,6 +20,7 @@ class _Cursor:
     def __init__(self, rows):
         self.rows = rows
         self.executed_sql = None
+        self.executed_sqls = []
         self.params = None
 
     def __enter__(self):
@@ -30,10 +31,14 @@ class _Cursor:
 
     def execute(self, sql, params=None):
         self.executed_sql = sql
+        self.executed_sqls.append((sql, params))
         self.params = params
 
     def fetchall(self):
         return list(self.rows)
+
+    def fetchone(self):
+        return {"count": 0}
 
 
 class _Connection:
@@ -88,14 +93,15 @@ def test_projection_only_references_aliases_declared_in_the_from_clause(monkeypa
 
     lineage_module.get_column_lineage(user={"id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"})
 
-    scope_missing = _projected_qualifiers(cursor.executed_sql) - _declared_aliases(cursor.executed_sql)
+    mapping_sql = cursor.executed_sqls[0][0]
+    scope_missing = _projected_qualifiers(mapping_sql) - _declared_aliases(mapping_sql)
     assert scope_missing == set(), (
         "column-lineage projection references aliases that no top-level FROM/JOIN declares: "
         f"{sorted(scope_missing)}"
     )
     # the edge/temporal join must still be present, not dropped with the subquery
-    assert "JOIN LATERAL" in cursor.executed_sql.upper()
-    assert "edge_temporal_version" in cursor.executed_sql
+    assert "JOIN LATERAL" in mapping_sql.upper()
+    assert "edge_temporal_version" in mapping_sql
 
 
 def test_mappings_expose_edge_metadata_from_the_joined_edge_version(monkeypatch):
@@ -141,4 +147,8 @@ def test_mappings_expose_edge_metadata_from_the_joined_edge_version(monkeypatch)
     assert mapping["valid_from"] == valid_from.isoformat()
     assert mapping["recorded_from"] == recorded_from.isoformat()
     assert mapping["metadata"] == {"adapter": "kairos.openlineage"}
-    assert cursor.params == {"valid": "2026-11-15T00:00:00Z", "recorded": "2026-11-15T00:00:00Z"}
+    assert cursor.executed_sqls[0][1] == {
+        "valid": "2026-11-15T00:00:00Z",
+        "recorded": "2026-11-15T00:00:00Z",
+    }
+    assert cursor.executed_sqls[1][1] == {"recorded": "2026-11-15T00:00:00Z"}
