@@ -6,12 +6,12 @@
   const appScripts = [
     '/vendors/three.min.js',
     '/vendors/chart.umd.min.js',
-    '/observatory.js?v=305',
+    '/observatory.js?v=306',
     '/stewardship.js?v=304',
     '/evidence-semantics.js?v=1',
     '/lineage-investigation.js?v=1',
     '/lineage-edge-inspector.js?v=1',
-    '/app.js?v=316',
+    '/app.js?v=317',
     '/asset-removal.js?v=1',
   ];
   let config = null;

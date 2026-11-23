@@ -72,6 +72,7 @@ function createFakeThree(state) {
     constructor() { this.domElement = state.canvas; this.shadowMap = { enabled: false }; }
     setPixelRatio() {}
     setSize() {}
+    setClearColor() {}
     render() { state.renders += 1; }
     dispose() {}
   }
@@ -96,11 +97,13 @@ function createFakeThree(state) {
     TorusGeometry: geometry('TorusGeometry'),
     SphereGeometry: geometry('SphereGeometry'),
     CylinderGeometry: geometry('CylinderGeometry'),
+    ConeGeometry: geometry('ConeGeometry'),
     PlaneGeometry: geometry('PlaneGeometry'),
     OctahedronGeometry: geometry('OctahedronGeometry'),
     TubeGeometry: geometry('TubeGeometry'),
     BufferGeometry: class { setFromPoints() { return this; } dispose() {} },
     CatmullRomCurve3: class { getPoint() { return new V3(); } },
+    CubicBezierCurve3: class { getPoint() { return new V3(); } },
     Line: Node,
     CanvasTexture: class { constructor() { this.colorSpace = null; } dispose() {} },
     MeshPhysicalMaterial: Material,

@@ -1,180 +1,436 @@
-(()=> {
+/*
+ * Kairos 3D lineage graph.
+ *
+ * The same persisted catalog edges that drive the 2D explorer are drawn here as
+ * a layered left-to-right DAG: every column is one lineage hop, cards carry the
+ * asset label, and curved arrows run from a dependency into its consumer.  The
+ * point of the view is to make the connection legible at a glance, so the layout
+ * is derived from the edge list and nothing is positioned by asset id or schema
+ * name.
+ */
+(()=>{
   const T = window.THREE;
-  if (!T) return;
+  if(!T) return;
   const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
-  function mount({host,assets,edges,selected,mode='overview',filter='all',onSelect=()=>{}}){
-    if(!host || !T) return ()=>{};
+  const CARD_W=5.6, CARD_H=1.8, PITCH_Y=2.35, LAYER_GAP=2.4, INNER_GAP=1.3, MAX_ROWS=9;
+  const KIND_COLOR={source:0x2dd4bf, transform:0xa78bfa, output:0x60a5fa};
+  const KIND_HEX={source:'#2dd4bf', transform:'#a78bfa', output:'#60a5fa'};
+  const EDGE_BASE=0x3f7396;
+
+  /* Longest-path layering, bounded by the node count so a cycle cannot loop. */
+  function layerMap(list,edges){
+    const layerById={};
+    list.forEach(a=>{layerById[a.id]=0});
+    for(let pass=0;pass<list.length;pass++){
+      let moved=false;
+      edges.forEach(e=>{
+        if(layerById[e[0]]===undefined||layerById[e[1]]===undefined) return;
+        const next=layerById[e[0]]+1;
+        if(next>layerById[e[1]]){layerById[e[1]]=next;moved=true}
+      });
+      if(!moved) break;
+    }
+    return layerById;
+  }
+
+  /* Assets within `hops` of the selected node in either direction. */
+  function neighborhood(list,edges,startId,hops){
+    const allowed=new Set(list.map(a=>a.id));
+    if(!startId||!allowed.has(startId)||!hops) return allowed;
+    const down=new Map(),up=new Map();
+    edges.forEach(e=>{
+      if(!allowed.has(e[0])||!allowed.has(e[1])) return;
+      if(!down.has(e[0])) down.set(e[0],[]);
+      down.get(e[0]).push(e[1]);
+      if(!up.has(e[1])) up.set(e[1],[]);
+      up.get(e[1]).push(e[0]);
+    });
+    const seen=new Set([startId]);
+    let frontier=[startId];
+    for(let hop=0;hop<hops;hop++){
+      const next=[];
+      frontier.forEach(id=>{
+        (down.get(id)||[]).concat(up.get(id)||[]).forEach(other=>{
+          if(!seen.has(other)){seen.add(other);next.push(other)}
+        });
+      });
+      if(!next.length) break;
+      frontier=next;
+    }
+    return seen;
+  }
+
+  function mount({host,assets,edges,selected,mode='layered',filter='all',depth='full',onSelect=()=>{}}){
+    if(!host||!T) return ()=>{};
     host.querySelectorAll('canvas[data-kairos-scene]').forEach(c=>c.remove());
+
     const scene=new T.Scene();
-    const skyCanvas = document.createElement('canvas'); skyCanvas.width=2; skyCanvas.height=512;
-    const skyCtx = skyCanvas.getContext('2d');
-    const skyGrad = skyCtx.createLinearGradient(0,0,0,512);
-    skyGrad.addColorStop(0, '#1e4877'); skyGrad.addColorStop(0.5, '#4a8fe7');
-    skyGrad.addColorStop(0.7, '#d8e5f2'); skyGrad.addColorStop(1, '#a8b6c4');
-    skyCtx.fillStyle=skyGrad; skyCtx.fillRect(0,0,2,512);
-    const skyTex=new T.CanvasTexture(skyCanvas); skyTex.colorSpace=T.SRGBColorSpace;
-    scene.background=skyTex; scene.fog=new T.FogExp2(0xd8e5f2,.015);
-    const camera=new T.PerspectiveCamera(43,Math.max(1,host.clientWidth)/Math.max(1,host.clientHeight),.1,180);
-    camera.position.set(0,13,26);
+    scene.fog=new T.FogExp2(0x05080f,.005);
+    const camera=new T.PerspectiveCamera(43,Math.max(1,host.clientWidth)/Math.max(1,host.clientHeight),.1,400);
     const renderer=new T.WebGLRenderer({antialias:true,alpha:false,powerPreference:'high-performance'});
-    renderer.domElement.dataset.kairosScene='true'; renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,1.75)); renderer.setSize(host.clientWidth||720,host.clientHeight||490);
-    renderer.outputColorSpace=T.SRGBColorSpace; renderer.toneMapping=T.ACESFilmicToneMapping; renderer.toneMappingExposure=1.1; renderer.shadowMap.enabled=true; renderer.shadowMap.type=T.PCFSoftShadowMap;
+    renderer.domElement.dataset.kairosScene='true';
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,1.75));
+    renderer.setSize(host.clientWidth||720,host.clientHeight||490);
+    renderer.setClearColor?.(0x05080f,1);
+    renderer.outputColorSpace=T.SRGBColorSpace;
     host.prepend(renderer.domElement);
-    scene.add(new T.HemisphereLight(0xffffff,0xa8b6c4,1.8));
-    const sun=new T.DirectionalLight(0xfff5e6,4.5); sun.position.set(-20,40,30); sun.castShadow=true;
-    const shadowSize=(window.innerWidth||1600)<900?1024:2048; sun.shadow.mapSize.set(shadowSize,shadowSize); sun.shadow.camera.left=-35; sun.shadow.camera.right=35;
-    sun.shadow.camera.top=35; sun.shadow.camera.bottom=-35; sun.shadow.camera.near=10; sun.shadow.camera.far=120; sun.shadow.bias=-0.0005;
-    scene.add(sun);
-    const bounce=new T.PointLight(0xd8e5f2,2.0,50,2); bounce.position.set(10,5,-10); scene.add(bounce);
-    const root=new T.Group();scene.add(root); const structure=new T.Group();root.add(structure);const dataLayer=new T.Group();root.add(dataLayer);
-    const mats={
-      floor:new T.MeshPhysicalMaterial({color:0xe6e4df,roughness:0.18,metalness:0.05,clearcoat:0.3,clearcoatRoughness:0.2}),
-      wall:new T.MeshPhysicalMaterial({color:0xfaf9f5,roughness:0.6,metalness:0.05}),
-      dark:new T.MeshStandardMaterial({color:0x222222,roughness:0.7,metalness:0.4}),
-      glass:new T.MeshPhysicalMaterial({color:0xffffff,roughness:0.05,metalness:0.1,transmission:0.95,ior:1.5,thickness:0.2}),
-      trim:new T.MeshStandardMaterial({color:0x888888,roughness:0.3,metalness:0.8}),
-      grass:new T.MeshStandardMaterial({color:0x5e7c48,roughness:1.0}),
-      source:new T.MeshPhysicalMaterial({color:0x20c997,roughness:0.15,metalness:0.3,clearcoat:1.0,emissive:0x20c997,emissiveIntensity:0.2}),
-      transform:new T.MeshPhysicalMaterial({color:0x845ef7,roughness:0.15,metalness:0.3,clearcoat:1.0,emissive:0x845ef7,emissiveIntensity:0.2}),
-      output:new T.MeshPhysicalMaterial({color:0x339af0,roughness:0.15,metalness:0.3,clearcoat:1.0,emissive:0x339af0,emissiveIntensity:0.2})
+
+    scene.add(new T.HemisphereLight(0x9dc7ff,0x0a0f18,1.7));
+    const key=new T.DirectionalLight(0xffffff,2.1); key.position.set(-14,20,26); scene.add(key);
+    const rim=new T.PointLight(0x3b82f6,1.1,120,2); rim.position.set(14,-12,18); scene.add(rim);
+
+    const root=new T.Group(); scene.add(root);
+    const dataLayer=new T.Group(); root.add(dataLayer);
+    const positions={};
+    const nodeMeshes=[];
+    const edgeMeshes=[];
+    const pickables=[];
+    const animated=[];
+
+    /* ---- layout ---------------------------------------------------------- */
+    const filtered=(assets||[]).filter(a=>filter==='all'||a.schema===filter);
+    const hopLimit=depth==='full'||!depth?0:(Number(depth)||0);
+    const visibleIds=neighborhood(filtered,edges||[],selected,hopLimit);
+    const list=filtered.filter(a=>visibleIds.has(a.id));
+    const visEdges=(edges||[]).filter(e=>visibleIds.has(e[0])&&visibleIds.has(e[1]));
+    const layerById=list.length?layerMap(list,visEdges):{};
+    const layerIds=[...new Set(Object.values(layerById))].sort((a,b)=>a-b);
+    const layerGroups={};
+    list.forEach(a=>{
+      const layer=layerById[a.id]||0;
+      (layerGroups[layer]||(layerGroups[layer]=[])).push(a);
+    });
+    layerIds.forEach(layer=>layerGroups[layer].sort((a,b)=>String(a.name).localeCompare(String(b.name))));
+    const rowsCap=list.length<=8?8:MAX_ROWS;
+    const bands=layerIds.map(layer=>{
+      const group=layerGroups[layer]||[];
+      const chunks=[];
+      for(let i=0;i<group.length;i+=rowsCap) chunks.push(group.slice(i,i+rowsCap));
+      const width=Math.max(CARD_W,chunks.length*CARD_W+(chunks.length-1)*INNER_GAP);
+      return {layer,group,chunks,width,rows:chunks.reduce((m,c)=>Math.max(m,c.length),0)};
+    });
+    const totalW=bands.reduce((sum,b)=>sum+b.width,0)+Math.max(0,bands.length-1)*LAYER_GAP;
+    let xCursor=-totalW/2;
+    const bounds={minY:Infinity,maxY:-Infinity};
+    bands.forEach(band=>{
+      band.x0=xCursor;
+      band.chunks.forEach((chunk,ci)=>{
+        const cx=xCursor+ci*(CARD_W+INNER_GAP)+CARD_W/2;
+        chunk.forEach((a,ri)=>{
+          const y=((chunk.length-1)/2-ri)*PITCH_Y;
+          positions[a.id]=new T.Vector3(cx,y,0);
+          bounds.minY=Math.min(bounds.minY,y); bounds.maxY=Math.max(bounds.maxY,y);
+        });
+      });
+      xCursor+=band.width+LAYER_GAP;
+    });
+    if(!Number.isFinite(bounds.minY)){bounds.minY=0;bounds.maxY=0}
+    const contentH=Math.max(4,bounds.maxY-bounds.minY)+CARD_H*2;
+    const contentW=Math.max(6,totalW)+CARD_W;
+
+    /* ---- labels and cards ------------------------------------------------ */
+    function makeLabel(asset){
+      const canvas=document.createElement('canvas'); canvas.width=512; canvas.height=168;
+      const ctx=canvas.getContext('2d');
+      const accent=KIND_HEX[asset.kind]||'#93c5fd';
+      ctx.fillStyle='rgba(8,13,20,.95)'; ctx.fillRect(2,2,508,164);
+      ctx.strokeStyle=accent; ctx.lineWidth=4; ctx.strokeRect(3,3,506,162);
+      ctx.fillStyle=accent; ctx.fillRect(3,3,12,162);
+      ctx.fillStyle='#f2f6fb'; ctx.font='700 44px "Segoe UI",Arial,sans-serif';
+      const name=String(asset.name||asset.path||'asset');
+      ctx.fillText(name.length>24?name.slice(0,23)+'…':name,34,70);
+      ctx.fillStyle='#a7b8cb'; ctx.font='26px "Segoe UI",Arial,sans-serif';
+      const sub=String(asset.schema||'default')+'  ·  '+String(asset.kind||'asset');
+      ctx.fillText(sub.length>44?sub.slice(0,43)+'…':sub,34,114);
+      ctx.fillStyle=accent; ctx.font='700 21px "Segoe UI",Arial,sans-serif';
+      ctx.fillText(String(asset.kind||'asset').toUpperCase(),34,148);
+      const tex=new T.CanvasTexture(canvas); tex.colorSpace=T.SRGBColorSpace;
+      const sprite=new T.Sprite(new T.SpriteMaterial({map:tex,transparent:true,depthWrite:false}));
+      sprite.scale.set(CARD_W*.96,CARD_W*.96*(168/512),1);
+      return sprite;
+    }
+
+    function makeBandLabel(text){
+      const canvas=document.createElement('canvas'); canvas.width=256; canvas.height=64;
+      const ctx=canvas.getContext('2d');
+      ctx.fillStyle='#7f95ac'; ctx.font='700 28px "Segoe UI",Arial,sans-serif';
+      ctx.textAlign='center'; ctx.fillText(text,128,42);
+      const tex=new T.CanvasTexture(canvas); tex.colorSpace=T.SRGBColorSpace;
+      const sprite=new T.Sprite(new T.SpriteMaterial({map:tex,transparent:true,depthWrite:false}));
+      sprite.scale.set(4.4,1.1,1);
+      return sprite;
+    }
+
+    bands.forEach((band,index)=>{
+      const bandHeight=Math.max(2.4,band.rows*PITCH_Y+1.1);
+      const bandMesh=new T.Mesh(
+        new T.PlaneGeometry(band.width+1.1,bandHeight),
+        new T.MeshBasicMaterial({color:0x0b1622,transparent:true,opacity:.55,depthWrite:false})
+      );
+      bandMesh.position.set(band.x0+band.width/2,(bounds.minY+bounds.maxY)/2,-.55);
+      dataLayer.add(bandMesh);
+      const caption=makeBandLabel(index===0?'ROOTS':'HOP '+index);
+      caption.position.set(band.x0+band.width/2,(bounds.minY+bounds.maxY)/2+bandHeight/2+.75,.06);
+      dataLayer.add(caption);
+    });
+
+    list.forEach(a=>{
+      const pos=positions[a.id];
+      const group=new T.Group(); group.position.copy(pos); group.userData.asset=a; dataLayer.add(group);
+      const color=KIND_COLOR[a.kind]||KIND_COLOR.transform;
+      const isSelected=a.id===selected;
+      const bodyMat=new T.MeshStandardMaterial({color,roughness:.42,metalness:.22,emissive:color,emissiveIntensity:isSelected?.4:.14,transparent:true,opacity:1});
+      const body=new T.Mesh(new T.BoxGeometry(CARD_W,CARD_H,.26),bodyMat);
+      body.userData.asset=a; group.add(body); pickables.push(body);
+      const strip=new T.Mesh(new T.BoxGeometry(.18,CARD_H,.3),new T.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:.6}));
+      strip.position.set(-CARD_W/2+.09,0,.02); group.add(strip);
+      const halo=new T.Mesh(
+        new T.TorusGeometry(1,.035,10,72),
+        new T.MeshBasicMaterial({color:isSelected?0xffffff:0x5b7f9c,transparent:true,opacity:isSelected?.95:.3})
+      );
+      halo.scale.set(CARD_W/2+.3,CARD_H/2+.3,1); halo.position.z=-.2;
+      halo.visible=isSelected; group.add(halo);
+      const label=makeLabel(a); label.position.z=.2; group.add(label);
+      nodeMeshes.push({id:a.id,group,body,label,halo});
+    });
+
+    /* ---- edges with directional arrowheads ------------------------------- */
+    visEdges.forEach(e=>{
+      const from=positions[e[0]],to=positions[e[1]];
+      if(!from||!to) return;
+      const start=new T.Vector3(from.x+CARD_W/2,from.y,.03);
+      const end=new T.Vector3(to.x-CARD_W/2-.3,to.y,.03);
+      const dx=end.x-start.x;
+      const c1=new T.Vector3(start.x+dx*.45,start.y,0);
+      const c2=new T.Vector3(end.x-dx*.45,end.y,0);
+      const curve=new T.CubicBezierCurve3(start,c1,c2,end);
+      const mat=new T.MeshStandardMaterial({color:EDGE_BASE,roughness:.3,metalness:.15,emissive:0x1d3a4d,emissiveIntensity:.7,transparent:true,opacity:.9});
+      const tube=new T.Mesh(new T.TubeGeometry(curve,26,.07,8,false),mat);
+      tube.userData={from:e[0],to:e[1]}; dataLayer.add(tube);
+      const theta=Math.atan2(end.y-c2.y,end.x-c2.x);
+      const arrow=new T.Mesh(new T.ConeGeometry(.24,.7,10),mat);
+      arrow.position.set(end.x-Math.cos(theta)*.2,end.y-Math.sin(theta)*.2,.03);
+      arrow.rotation.z=theta-Math.PI/2; dataLayer.add(arrow);
+      const bead=new T.Mesh(new T.SphereGeometry(.13,10,8),new T.MeshBasicMaterial({color:0xbfe8ff}));
+      dataLayer.add(bead);
+      animated.push({bead,curve,phase:Math.random()});
+      edgeMeshes.push({tube,arrow,mat,from:e[0],to:e[1]});
+    });
+
+    /* ---- camera ---------------------------------------------------------- */
+    const center=new T.Vector3(0,(bounds.minY+bounds.maxY)/2,0);
+    let baseRadius=24;
+    const computeFit=()=>{
+      const aspect=Math.max(.2,(host.clientWidth||720)/(host.clientHeight||490));
+      const vFov=43*Math.PI/180;
+      const byHeight=contentH/(2*Math.tan(vFov/2));
+      const byWidth=contentW/(2*Math.tan(vFov/2)*aspect);
+      baseRadius=Math.max(byHeight,byWidth)*1.08;
     };
-    function box(parent,x,y,z,w,h,d,mat){const m=new T.Mesh(new T.BoxGeometry(w,h,d),mat);m.position.set(x,y,z);m.castShadow=true;m.receiveShadow=true;parent.add(m);return m}
-    function line(parent,pts,color=0x7ca7a6,opacity=.48){const g=new T.BufferGeometry().setFromPoints(pts.map(p=>new T.Vector3(...p)));const m=new T.Line(g,new T.LineBasicMaterial({color,transparent:true,opacity}));parent.add(m);return m}
-    box(structure,0,-1.25,0,50,.5,35,mats.floor);
-    box(structure,0,-1.3,-22.5,60,.4,10,mats.grass);
-    box(structure,0,-1.3,22.5,60,.4,10,mats.grass);
-    const pool=new T.Mesh(new T.PlaneGeometry(28,12), new T.MeshPhysicalMaterial({color:0x005577, transmission:0.95, opacity:1, metalness:0.1, roughness:0.02, ior:1.33, thickness:1.5}));
-    pool.rotation.x=-Math.PI/2; pool.position.set(0,-0.99, -10); structure.add(pool);
-    box(structure,0,-1.15,-10,28.2,.1,12.2, mats.dark);
-    for(let x=-22; x<=22; x+=11) box(structure,x,4,-18, 1.2,10.5,1.2, mats.wall);
-    for(let x=-22; x<=22; x+=11) box(structure,x,9.4,0, 0.4,0.4,36, mats.trim);
-    const canopy=new T.Mesh(new T.PlaneGeometry(46,36), mats.glass);
-    canopy.rotation.x=-Math.PI/2; canopy.position.set(0,9.6,0); structure.add(canopy);
-    const med=new T.Mesh(new T.CylinderGeometry(5.5,5.5,.15,64),new T.MeshStandardMaterial({color:0xffffff,roughness:0.2,metalness:0.1}));
-    med.position.set(0,-0.92,0); med.receiveShadow=true; structure.add(med);
-    for(const r of [4.0,4.8]){const ring=new T.Mesh(new T.TorusGeometry(r,.03,16,100),mats.trim);ring.rotation.x=Math.PI/2;ring.position.y=-0.8;ring.receiveShadow=true;structure.add(ring)}
-    const filtered=assets.filter(a=>filter==='all'||a.schema===filter);
-    const positions={},nodeMeshes=[],animated=[],edgeMeshes=[],pickables=[];
-    const schemas=[...new Set(filtered.map(a=>String(a.schema||'default')))];const clusters=Object.fromEntries(schemas.map((schema,i)=>{const angle=i/Math.max(1,schemas.length)*Math.PI*2;return[schema,[Math.cos(angle)*8,Math.sin(angle)*6]]}));
-    // Derive lineage layers from the actual edge list; asset IDs and schema names are never assumed.
-    const layerById=Object.fromEntries(filtered.map(a=>[a.id,0]));for(let pass=0;pass<filtered.length;pass++){let changed=false;edges.forEach(e=>{if(layerById[e[0]]!==undefined&&layerById[e[1]]!==undefined){const next=layerById[e[0]]+1;if(next>layerById[e[1]]){layerById[e[1]]=next;changed=true}}});if(!changed)break}const layerGroups={};filtered.forEach(a=>{const layer=layerById[a.id]||0;(layerGroups[layer]||(layerGroups[layer]=[])).push(a)});const maxLayer=Math.max(0,...Object.keys(layerGroups).map(Number));
-    filtered.forEach((a,i)=>{
-      let x,z;
-      if(mode==='lineage'){const layer=layerById[a.id]||0,group=layerGroups[layer]||[a],index=group.findIndex(item=>item.id===a.id);x=maxLayer===0?0:-12+(layer/maxLayer)*24;z=(index-(group.length-1)/2)*3.4}
-      else if(mode==='clusters'){const c=clusters[String(a.schema||'default')]||[0,0],schemaItems=filtered.filter(item=>String(item.schema||'default')===String(a.schema||'default')),index=schemaItems.findIndex(item=>item.id===a.id);x=c[0]+Math.cos(index*2.4)*1.6;z=c[1]+Math.sin(index*2.4)*1.6}
-      else {const ang=i/Math.max(1,filtered.length)*Math.PI*2;x=Math.cos(ang)*9.3;z=Math.sin(ang)*6.6}
-      const y=.35+(i%3)*.15;positions[a.id]=new T.Vector3(x,y,z);
-      // Each asset is a compact physical-looking instrument/server plinth, not a floating sphere.
-      const group=new T.Group();group.position.copy(positions[a.id]);group.scale.setScalar(1.12);dataLayer.add(group);
-      const colorMat=mats[a.kind]||mats.transform;
-      box(group,0,-.12,0,1.65,.2,1.12,mats.dark);
-      const body=box(group,0,.13,0,1.42,.42,.94,colorMat);
-      box(group,0,.37,0,1.12,.055,.72,mats.trim);
-      for(let k=-1;k<=1;k++){const led=new T.Mesh(new T.SphereGeometry(.045,10,8),new T.MeshBasicMaterial({color:a.kind==='source'?0x9cebd2:a.kind==='output'?0xa8d3ff:0xd2c3ff}));led.position.set(k*.22,.42,.39);group.add(led)}
-      const halo=new T.Mesh(new T.TorusGeometry(a.id===selected?1.05:.84,.018,6,48),new T.MeshBasicMaterial({color:a.id===selected?0xf0d6a2:0x8da6a0,transparent:true,opacity:a.id===selected?.95:.42}));halo.rotation.x=Math.PI/2;halo.position.y=-.03;group.add(halo);
-      group.userData.asset=a;pickables.push(body);nodeMeshes.push(group);
-      const canvas=document.createElement('canvas');canvas.width=512;canvas.height=128;const ctx=canvas.getContext('2d');
-      ctx.fillStyle='rgba(17,27,32,.94)';ctx.fillRect(5,5,502,118);ctx.strokeStyle=a.id===selected?'#e7d2a7':'#687d7c';ctx.lineWidth=2;ctx.strokeRect(6,6,500,116);
-      ctx.fillStyle='#f1f1e9';ctx.font='600 29px Arial';ctx.fillText(a.name.length>25?a.name.slice(0,24)+'…':a.name,22,49);
-      ctx.fillStyle='#b7c4bd';ctx.font='22px Arial';ctx.fillText(a.schema+'  /  '+a.kind,22,83);
-      const tex=new T.CanvasTexture(canvas);tex.colorSpace=T.SRGBColorSpace;
-      const sprite=new T.Sprite(new T.SpriteMaterial({map:tex,transparent:true,depthTest:false}));sprite.position.set(x,1.55,z);sprite.scale.set(3.75,.94,1);dataLayer.add(sprite);
-    });
-    // Structural conduit lines are routed through low, tidy waypoints; particles move along real relationships.
-    edges.forEach(e=>{const from=positions[e[0]],to=positions[e[1]];if(!from||!to)return;
-      const distance = from.distanceTo(to);
-      const arcHeight = Math.max(from.y, to.y) + distance * 0.25 + 0.8;
-      const mid1=new T.Vector3(from.x + (to.x-from.x)*0.33, arcHeight, from.z + (to.z-from.z)*0.33);
-      const mid2=new T.Vector3(from.x + (to.x-from.x)*0.66, arcHeight, from.z + (to.z-from.z)*0.66);
-      const curve=new T.CatmullRomCurve3([from.clone().add(new T.Vector3(0,.2,0)),mid1,mid2,to.clone().add(new T.Vector3(0,.2,0))]);
-      const tube=new T.Mesh(new T.TubeGeometry(curve,32,.06,8,false),new T.MeshStandardMaterial({color:0x3b82f6,metalness:.2,roughness:.2,emissive:0x2563eb,emissiveIntensity:0.6,transparent:true,opacity:.75}));tube.userData={from:e[0],to:e[1]};edgeMeshes.push(tube);dataLayer.add(tube);
-      const bead=new T.Mesh(new T.SphereGeometry(.15,12,12),new T.MeshBasicMaterial({color:0xffffff}));dataLayer.add(bead);animated.push({bead,curve,phase:Math.random()});
-    });
-    // Custom 3D Rendered Model: Kairos Data Core Monolith & Holographic Pulsar Rings
-    const coreGroup = new T.Group();
-    coreGroup.position.set(0, 1.2, 0);
-    structure.add(coreGroup);
-
-    // Central Monolith Pillar
-    const monolithGeo = new T.BoxGeometry(1.4, 4.2, 1.4);
-    const monolithMat = new T.MeshStandardMaterial({color: 0x1f2937, roughness: 0.2, metalness: 0.85, emissive: 0x0f172a, emissiveIntensity: 0.6});
-    const monolith = new T.Mesh(monolithGeo, monolithMat);
-    monolith.castShadow = true;
-    monolith.receiveShadow = true;
-    coreGroup.add(monolith);
-
-    // Glowing vertical energy runed fins on monolith
-    for(let a=0; a<4; a++) {
-      const angle = (a / 4) * Math.PI * 2;
-      const fin = new T.Mesh(new T.BoxGeometry(0.08, 3.8, 0.4), new T.MeshBasicMaterial({color: 0x5eead4}));
-      fin.position.set(Math.cos(angle) * 0.74, 0, Math.sin(angle) * 0.74);
-      fin.rotation.y = -angle;
-      coreGroup.add(fin);
-    }
-
-    // Floating Pulsar Rings
-    const rings = [];
-    for(let r=0; r<3; r++) {
-      const radius = 2.2 + r * 0.75;
-      const ringGeo = new T.TorusGeometry(radius, 0.04, 16, 100);
-      const ringMat = new T.MeshBasicMaterial({color: r===0? 0x38bdf8 : r===1? 0x00ff9c : 0xa855f7, transparent: true, opacity: 0.75});
-      const ringMesh = new T.Mesh(ringGeo, ringMat);
-      ringMesh.rotation.x = Math.PI / 2 + (r * 0.2);
-      ringMesh.position.y = -0.5 + (r * 0.6);
-      coreGroup.add(ringMesh);
-      rings.push({mesh: ringMesh, speed: (r % 2 === 0 ? 1 : -1) * (0.42 + r * 0.18)});
-    }
-
-    // Floating Data Crystal Orbiters
-    const crystalGeo = new T.OctahedronGeometry(0.32, 0);
-    const crystalMat = new T.MeshStandardMaterial({color: 0x00ff9c, roughness: 0.1, metalness: 0.9, emissive: 0x00ff9c, emissiveIntensity: 0.8});
-    const crystals = [];
-    for(let c=0; c<5; c++) {
-      const crystal = new T.Mesh(crystalGeo, crystalMat);
-      const angle = (c / 5) * Math.PI * 2;
-      crystals.push({mesh: crystal, angle, dist: 3.8 + (c % 2 * 0.8), speed: 0.65 + (c * 0.12), height: (c % 2 === 0 ? 0.8 : -0.6)});
-      coreGroup.add(crystal);
-    }
-    // Background architectural consoles removed for bright daylit plaza.
-    const ray=new T.Raycaster(),pointer=new T.Vector2();let down=false,lastX=0,lastY=0,downX=0,downY=0,rotY=0,rotX=.1,zoom=1,target=new T.Vector3(0,0,0),raf=0,alive=true,dragMoved=false,suppressClick=false;
-    const updateCamera=()=>{const radius=23/zoom;camera.position.set(target.x+Math.sin(rotY)*radius,target.y+Math.max(-.1,Math.cos(rotX)*radius*.43),target.z+Math.cos(rotY)*radius);camera.lookAt(target)};
-    /* Open the scene framed on the asset the caller already selected (for example
-       when the asset selector remounts the view), instead of always starting from
-       the centre of the room. */
-    if(selected&&positions[selected])target.copy(positions[selected]);
+    computeFit();
+    const target=new T.Vector3(center.x,center.y,center.z);
+    if(selected&&positions[selected]) target.copy(positions[selected]);
+    let rotY=0,rotX=.12,zoom=1;
+    const updateCamera=()=>{
+      const r=baseRadius/zoom;
+      camera.position.set(
+        target.x+Math.sin(rotY)*Math.cos(rotX)*r,
+        target.y+Math.sin(rotX)*r,
+        target.z+Math.cos(rotY)*Math.cos(rotX)*r
+      );
+      camera.lookAt(target);
+    };
     updateCamera();
-    /* Capture the pointer on the canvas that owns the listeners. Capturing on the
-       parent stage retargets pointermove/pointerup away from the canvas, which
-       silently disables orbit drag and node selection. */
+
+    /* ---- interaction ----------------------------------------------------- */
+    const ray=new T.Raycaster(),pointer=new T.Vector2();
+    let down=false,lastX=0,lastY=0,downX=0,downY=0,dragMoved=false,suppressClick=false;
     const pointerDown=e=>{down=true;dragMoved=false;suppressClick=false;lastX=e.clientX;lastY=e.clientY;downX=e.clientX;downY=e.clientY;renderer.domElement.setPointerCapture?.(e.pointerId)};
-    let hovered=null,hoverDirty=false,hoverX=0,hoverY=0;const updateHover=()=>{const rect=renderer.domElement.getBoundingClientRect();pointer.set((hoverX-rect.left)/rect.width*2-1,-(hoverY-rect.top)/rect.height*2+1);ray.setFromCamera(pointer,camera);const hits=ray.intersectObjects(pickables,false);let o=hits[0]?.object;while(o&&!o.userData.asset)o=o.parent;const next=o?.userData.asset?o:null;if(next!==hovered){if(hovered)hovered.scale.setScalar(1.12);hovered=next;if(hovered)hovered.scale.setScalar(1.18)}renderer.domElement.style.cursor=hovered?'pointer':'grab'};const pointerMove=e=>{if(!down){hoverX=e.clientX;hoverY=e.clientY;hoverDirty=true;return}const dx=e.clientX-lastX,dy=e.clientY-lastY;/* Measure from the press point, so a slow drag made of sub-pixel steps is still recognised as a drag and cannot fall through to selection. */if(Math.abs(e.clientX-downX)+Math.abs(e.clientY-downY)>3)dragMoved=true;rotY-=dx*.005;rotX=clamp(rotX+dy*.003,-.5,1.0);lastX=e.clientX;lastY=e.clientY;updateCamera()};
+    let hovered=null,hoverDirty=false,hoverX=0,hoverY=0;
+    const updateHover=()=>{
+      const rect=renderer.domElement.getBoundingClientRect();
+      pointer.set((hoverX-rect.left)/rect.width*2-1,-(hoverY-rect.top)/rect.height*2+1);
+      ray.setFromCamera(pointer,camera);
+      const hits=ray.intersectObjects(pickables,false);
+      let o=hits[0]?.object;
+      while(o&&!o.userData.asset) o=o.parent;
+      const next=o?.userData.asset?nodeMeshes.find(n=>n.id===o.userData.asset.id):null;
+      if(next!==hovered){
+        if(hovered) hovered.group.scale.setScalar(1);
+        hovered=next;
+        if(hovered) hovered.group.scale.setScalar(1.04);
+      }
+      renderer.domElement.style.cursor=hovered?'pointer':'grab';
+    };
+    const pointerMove=e=>{
+      if(!down){hoverX=e.clientX;hoverY=e.clientY;hoverDirty=true;return}
+      const dx=e.clientX-lastX,dy=e.clientY-lastY;
+      if(Math.abs(e.clientX-downX)+Math.abs(e.clientY-downY)>3) dragMoved=true;
+      rotY=clamp(rotY-dx*.005,-.9,.9);
+      rotX=clamp(rotX+dy*.003,-.5,.8);
+      lastX=e.clientX;lastY=e.clientY;
+      updateCamera();
+    };
     const pointerUp=()=>{if(!down)return;down=false;suppressClick=dragMoved;dragMoved=false};
     const wheel=e=>{e.preventDefault();zoom=clamp(zoom*(e.deltaY>0?.92:1.08),.55,1.75);updateCamera()};
-    const click=e=>{if(suppressClick){suppressClick=false;return}if(dragMoved)return;const rect=renderer.domElement.getBoundingClientRect();pointer.set((e.clientX-rect.left)/rect.width*2-1,-(e.clientY-rect.top)/rect.height*2+1);ray.setFromCamera(pointer,camera);const hits=ray.intersectObjects(pickables,false);if(hits.length){let o=hits[0].object;while(o&&!o.userData.asset)o=o.parent;if(o?.userData.asset){const id=o.userData.asset.id;if(positions[id])target.copy(positions[id]);const downSet=new Set(), upSet=new Set();const dq=[id]; while(dq.length){const cur=dq.pop();downSet.add(cur);edges.filter(ed=>ed[0]===cur).forEach(ed=>{if(!downSet.has(ed[1]))dq.push(ed[1])});} const uq=[id]; while(uq.length){const cur=uq.pop();upSet.add(cur);edges.filter(ed=>ed[1]===cur).forEach(ed=>{if(!upSet.has(ed[0]))uq.push(ed[0])});} nodeMeshes.forEach(n=>{const h=n.children.find(c=>c.geometry?.type==='TorusGeometry');if(h){const nid=n.userData.asset.id;let c=0x223344,op=0.15;if(nid===id){c=0xffffff;op=1.0}else if(downSet.has(nid)){c=0xff3333;op=0.9}else if(upSet.has(nid)){c=0x3388ff;op=0.9} h.material.color.setHex(c);h.material.opacity=op;h.material.needsUpdate=true}}); edgeMeshes.forEach(t=>{const f=t.userData.from,to=t.userData.to;let c=0x223344,em=0x000000,op=0.15;if(downSet.has(f)&&downSet.has(to)){c=0xff3333;em=0xff0000;op=0.9;}else if(upSet.has(f)&&upSet.has(to)){c=0x3388ff;em=0x0055ff;op=0.9;} t.material.color.setHex(c);t.material.emissive.setHex(em);t.material.opacity=op;t.material.needsUpdate=true});updateCamera();onSelect(id)}}};
-    const zoomIn=()=>{zoom=clamp(zoom*1.15,.55,1.75);updateCamera()},zoomOut=()=>{zoom=clamp(zoom/1.15,.55,1.75);updateCamera()},resetCamera=()=>{target.set(0,0,0);rotY=0;rotX=.1;zoom=1;updateCamera()};
-    const zoomInButtons=host.querySelectorAll('[data-action="zoom-in"]'),zoomOutButtons=host.querySelectorAll('[data-action="zoom-out"]'),resetButtons=host.querySelectorAll('[data-action="reset-3d"]');zoomInButtons.forEach(b=>b.addEventListener('click',zoomIn));zoomOutButtons.forEach(b=>b.addEventListener('click',zoomOut));resetButtons.forEach(b=>b.addEventListener('click',resetCamera));
-    renderer.domElement.addEventListener('pointerdown',pointerDown);renderer.domElement.addEventListener('pointermove',pointerMove);renderer.domElement.addEventListener('pointerup',pointerUp);renderer.domElement.addEventListener('pointercancel',pointerUp);renderer.domElement.addEventListener('lostpointercapture',pointerUp);renderer.domElement.addEventListener('click',click);renderer.domElement.addEventListener('wheel',wheel,{passive:false});
-    const motionQuery=(window.matchMedia?window.matchMedia('(prefers-reduced-motion: reduce)'):{matches:false});const storedMotionReduced=()=>{try{return localStorage.getItem('kairos_reduceMotion')==='true'}catch(e){return false}};const motionReduced=()=>motionQuery.matches||storedMotionReduced();let elapsed=0,previousTime=performance.now();const beadPoint=new T.Vector3();const animate=(now)=>{if(!alive)return;raf=requestAnimationFrame(animate);const frameTime=Number.isFinite(now)?now:performance.now();const delta=Math.min(Math.max((frameTime-previousTime)/1000,0),0.05);previousTime=frameTime;if(hoverDirty&&!down){hoverDirty=false;updateHover()}if(!motionReduced()){elapsed+=delta;const t=elapsed*0.08;animated.forEach(p=>{const u=(t+p.phase)%1;if(!Number.isFinite(u))return;p.bead.position.copy(p.curve.getPoint(u,beadPoint))});if(coreGroup){coreGroup.rotation.y+=delta*0.30;rings.forEach(r=>{r.mesh.rotation.z+=delta*r.speed});crystals.forEach(c=>{c.angle+=delta*c.speed;c.mesh.position.x=Math.cos(c.angle)*c.dist;c.mesh.position.z=Math.sin(c.angle)*c.dist;c.mesh.position.y=c.height+Math.sin(elapsed*2+c.angle)*0.2;c.mesh.rotation.x+=delta*1.2;c.mesh.rotation.y+=delta*1.8})}}renderer.render(scene,camera)};
-    raf=requestAnimationFrame(animate);
-    const resize=()=>{if(!host.isConnected)return;renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,1.75));camera.aspect=Math.max(1,host.clientWidth)/Math.max(1,host.clientHeight);camera.updateProjectionMatrix();renderer.setSize(host.clientWidth,host.clientHeight)};
-    window.addEventListener('resize',resize);
-    const n=document.querySelector('#sceneNodes'),ed=document.querySelector('#sceneEdges');if(n)n.textContent=filtered.length;if(ed)ed.textContent=edges.filter(e=>positions[e[0]]&&positions[e[1]]).length;
-    const roomTitle=host.querySelector('.observatory-caption strong');if(roomTitle)roomTitle.textContent=mode==='lineage'?'Lineage Map (Updated v4)':mode==='clusters'?'Cluster Laboratory (Updated v4)':'Central Observatory (Updated v4)';
-    
-    /* Selection cascade highlighting: upstream (blue) + downstream (cyan) */
-    let currentSelected = selected;
-    const applyHighlights=(activeId)=>{
-      if(!activeId) return;
-      const downSet=new Set(),upSet=new Set();
-      const dq=[activeId];while(dq.length){const cur=dq.pop();downSet.add(cur);edges.filter(ed=>ed[0]===cur).forEach(ed=>{if(!downSet.has(ed[1]))dq.push(ed[1])})};
-      const uq=[activeId];while(uq.length){const cur=uq.pop();upSet.add(cur);edges.filter(ed=>ed[1]===cur).forEach(ed=>{if(!upSet.has(ed[0]))uq.push(ed[0])})};
-      nodeMeshes.forEach(n=>{const h=n.children.find(c=>c.geometry?.type==='TorusGeometry');if(h){const nid=n.userData.asset.id;let c=0x8da6a0,op=0.42;if(nid===activeId){c=0xffffff;op=1.0}else if(downSet.has(nid)){c=0xef4444;op=0.9}else if(upSet.has(nid)){c=0x06b6d4;op=0.9}h.material.color.setHex(c);h.material.opacity=op;h.material.needsUpdate=true}});
-      edgeMeshes.forEach(t=>{const f=t.userData.from,to=t.userData.to;let c=0x3b82f6,em=0x2563eb,op=0.25;if((downSet.has(f)&&downSet.has(to))||f===activeId){c=0xef4444;em=0xdc2626;op=0.95}else if((upSet.has(f)&&upSet.has(to))||to===activeId){c=0x06b6d4;em=0x0891b2;op=0.95}t.material.color.setHex(c);t.material.emissive.setHex(em);t.material.opacity=op;t.material.needsUpdate=true});
-    };
-    if(currentSelected) applyHighlights(currentSelected);
 
-    
-    return ()=>{alive=false;cancelAnimationFrame(raf);window.removeEventListener('resize',resize);renderer.domElement.removeEventListener('pointerdown',pointerDown);renderer.domElement.removeEventListener('pointermove',pointerMove);renderer.domElement.removeEventListener('pointerup',pointerUp);renderer.domElement.removeEventListener('pointercancel',pointerUp);renderer.domElement.removeEventListener('lostpointercapture',pointerUp);renderer.domElement.removeEventListener('click',click);renderer.domElement.removeEventListener('wheel',wheel);zoomInButtons.forEach(b=>b.removeEventListener('click',zoomIn));zoomOutButtons.forEach(b=>b.removeEventListener('click',zoomOut));resetButtons.forEach(b=>b.removeEventListener('click',resetCamera));scene.traverse(o=>{o.geometry?.dispose?.();if(o.material){if(Array.isArray(o.material))o.material.forEach(m=>m.dispose?.());else o.material.dispose?.()}if(o.material?.map)o.material.map.dispose?.()});skyTex.dispose?.();renderer.dispose();/* dispose() leaves the WebGL context alive; remounting the room repeatedly would exhaust the browser's context limit and blank the view. */renderer.forceContextLoss?.();renderer.domElement.remove()};
+    const focusOn=(id)=>{
+      if(!positions[id]) return;
+      target.copy(positions[id]);
+      updateCamera();
+    };
+
+    const applyHighlights=(activeId)=>{
+      if(!activeId||!positions[activeId]) return;
+      const downSet=new Set(),upSet=new Set();
+      const dq=[activeId];
+      while(dq.length){
+        const cur=dq.pop(); downSet.add(cur);
+        (edges||[]).forEach(ed=>{if(ed[0]===cur&&!downSet.has(ed[1]))dq.push(ed[1])});
+      }
+      const uq=[activeId];
+      while(uq.length){
+        const cur=uq.pop(); upSet.add(cur);
+        (edges||[]).forEach(ed=>{if(ed[1]===cur&&!upSet.has(ed[0]))uq.push(ed[0])});
+      }
+      nodeMeshes.forEach(node=>{
+        const onPath=node.id===activeId||downSet.has(node.id)||upSet.has(node.id);
+        const dim=onPath?1:.24;
+        node.body.material.opacity=dim;
+        node.label.material.opacity=dim;
+        node.body.material.emissiveIntensity=node.id===activeId?.6:onPath?.34:.06;
+        node.halo.visible=node.id===activeId;
+        let color=0x5b7f9c,opacity=onPath?.3:.12;
+        if(node.id===activeId){color=0xffffff;opacity=1}
+        else if(downSet.has(node.id)){color=0xf87171;opacity=.95}
+        else if(upSet.has(node.id)){color=0x22d3ee;opacity=.95}
+        node.halo.material.color.setHex(color);
+        node.halo.material.opacity=opacity;
+        node.halo.material.needsUpdate=true;
+      });
+      edgeMeshes.forEach(edge=>{
+        const downstream=downSet.has(edge.from)&&downSet.has(edge.to);
+        const upstream=upSet.has(edge.from)&&upSet.has(edge.to);
+        let color=EDGE_BASE,emissive=0x1d3a4d,opacity=downstream||upstream?.95:.16;
+        if(downstream||edge.from===activeId){color=0xf87171;emissive=0xb91c1c;opacity=.95}
+        else if(upstream||edge.to===activeId){color=0x22d3ee;emissive=0x0891b2;opacity=.95}
+        edge.mat.color.setHex(color);
+        edge.mat.emissive.setHex(emissive);
+        edge.mat.opacity=opacity;
+        edge.mat.needsUpdate=true;
+      });
+    };
+
+    const click=e=>{
+      if(suppressClick){suppressClick=false;return}
+      if(dragMoved) return;
+      const rect=renderer.domElement.getBoundingClientRect();
+      pointer.set((e.clientX-rect.left)/rect.width*2-1,-(e.clientY-rect.top)/rect.height*2+1);
+      ray.setFromCamera(pointer,camera);
+      const hits=ray.intersectObjects(pickables,false);
+      if(!hits.length) return;
+      let o=hits[0].object;
+      while(o&&!o.userData.asset) o=o.parent;
+      if(!o?.userData.asset) return;
+      const id=o.userData.asset.id;
+      focusOn(id);
+      applyHighlights(id);
+      onSelect(id);
+    };
+
+    const zoomIn=()=>{zoom=clamp(zoom*1.15,.55,1.75);updateCamera()};
+    const zoomOut=()=>{zoom=clamp(zoom/1.15,.55,1.75);updateCamera()};
+    const resetCamera=()=>{target.copy(center);rotY=0;rotX=.12;zoom=1;updateCamera()};
+    const zoomInButtons=host.querySelectorAll('[data-action="zoom-in"]');
+    const zoomOutButtons=host.querySelectorAll('[data-action="zoom-out"]');
+    const resetButtons=host.querySelectorAll('[data-action="reset-3d"]');
+    zoomInButtons.forEach(b=>b.addEventListener('click',zoomIn));
+    zoomOutButtons.forEach(b=>b.addEventListener('click',zoomOut));
+    resetButtons.forEach(b=>b.addEventListener('click',resetCamera));
+
+    renderer.domElement.addEventListener('pointerdown',pointerDown);
+    renderer.domElement.addEventListener('pointermove',pointerMove);
+    renderer.domElement.addEventListener('pointerup',pointerUp);
+    renderer.domElement.addEventListener('pointercancel',pointerUp);
+    renderer.domElement.addEventListener('lostpointercapture',pointerUp);
+    renderer.domElement.addEventListener('click',click);
+    renderer.domElement.addEventListener('wheel',wheel,{passive:false});
+
+    /* ---- animation ------------------------------------------------------- */
+    const motionQuery=(window.matchMedia?window.matchMedia('(prefers-reduced-motion: reduce)'):{matches:false});
+    const storedMotionReduced=()=>{try{return localStorage.getItem('kairos_reduceMotion')==='true'}catch(e){return false}};
+    const motionReduced=()=>motionQuery.matches||storedMotionReduced();
+    let elapsed=0,previousTime=performance.now(),raf=0,alive=true;
+    const beadPoint=new T.Vector3();
+    const animate=(now)=>{
+      if(!alive) return;
+      raf=requestAnimationFrame(animate);
+      const frameTime=Number.isFinite(now)?now:performance.now();
+      const delta=Math.min(Math.max((frameTime-previousTime)/1000,0),.05);
+      previousTime=frameTime;
+      if(hoverDirty&&!down){hoverDirty=false;updateHover()}
+      if(!motionReduced()){
+        elapsed+=delta;
+        const t=elapsed*.07;
+        animated.forEach(p=>{
+          const u=(t+p.phase)%1;
+          if(!Number.isFinite(u)) return;
+          p.bead.position.copy(p.curve.getPoint(u,beadPoint));
+        });
+      }
+      renderer.render(scene,camera);
+    };
+    raf=requestAnimationFrame(animate);
+
+    const resize=()=>{
+      if(!host.isConnected) return;
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,1.75));
+      camera.aspect=Math.max(1,host.clientWidth)/Math.max(1,host.clientHeight);
+      camera.updateProjectionMatrix();
+      renderer.setSize(host.clientWidth,host.clientHeight);
+      computeFit();
+      updateCamera();
+    };
+    window.addEventListener('resize',resize);
+
+    const sceneNodes=document.querySelector('#sceneNodes'),sceneEdgeCount=document.querySelector('#sceneEdges');
+    if(sceneNodes) sceneNodes.textContent=list.length;
+    if(sceneEdgeCount) sceneEdgeCount.textContent=visEdges.filter(e=>positions[e[0]]&&positions[e[1]]).length;
+    const captionTitle=host.querySelector('.observatory-caption strong');
+    if(captionTitle) captionTitle.textContent='Lineage Graph';
+    const captionBody=host.querySelector('.observatory-caption p');
+    if(captionBody) captionBody.textContent='Left to right: dependencies to consumers. Click a node to trace its upstream and downstream paths. Drag to orbit, scroll to zoom.';
+
+    if(selected) applyHighlights(selected);
+
+    return ()=>{
+      alive=false;
+      cancelAnimationFrame(raf);
+      window.removeEventListener('resize',resize);
+      renderer.domElement.removeEventListener('pointerdown',pointerDown);
+      renderer.domElement.removeEventListener('pointermove',pointerMove);
+      renderer.domElement.removeEventListener('pointerup',pointerUp);
+      renderer.domElement.removeEventListener('pointercancel',pointerUp);
+      renderer.domElement.removeEventListener('lostpointercapture',pointerUp);
+      renderer.domElement.removeEventListener('click',click);
+      renderer.domElement.removeEventListener('wheel',wheel);
+      zoomInButtons.forEach(b=>b.removeEventListener('click',zoomIn));
+      zoomOutButtons.forEach(b=>b.removeEventListener('click',zoomOut));
+      resetButtons.forEach(b=>b.removeEventListener('click',resetCamera));
+      scene.traverse(o=>{
+        o.geometry?.dispose?.();
+        if(o.material){
+          if(Array.isArray(o.material)) o.material.forEach(m=>{m.map?.dispose?.();m.dispose?.()});
+          else {o.material.map?.dispose?.();o.material.dispose?.()}
+        }
+      });
+      renderer.dispose();
+      /* dispose() leaves the WebGL context alive; remounting repeatedly would
+         exhaust the browser's context limit and blank the view. */
+      renderer.forceContextLoss?.();
+      renderer.domElement.remove();
+    };
   }
+
   window.KairosObservatory={mount};
 })();
