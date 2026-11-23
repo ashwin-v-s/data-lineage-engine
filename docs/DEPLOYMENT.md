@@ -283,9 +283,10 @@ Be explicit about these before treating any deployment as production:
   returns 503 (see Â§3 and Â§5).
 - **No Docker image** is provided; hosting is Vercel (Python function) +
   Supabase. There is no container build in this repository.
-- **The persistent import API is not implemented.** Migration
-  `0004_ingestion_import_runs.sql` is an unapplied proposal; the M3
-  persistent import/preview flow is application work that is not done.
+- **Persistent import is implemented.** Migration
+  `0004_ingestion_import_runs.sql` is applied, and preview/commit/replay is
+  served by `/api/v1/ingest/*`. See `backend/migrations/README.md` for the
+  applied migration list.
 - **Serverless database pooling caveats.** `backend/app/db.py` uses a
   `psycopg2` `ThreadedConnectionPool` created lazily per process. Under
   serverless concurrency each function instance holds its own pool against the

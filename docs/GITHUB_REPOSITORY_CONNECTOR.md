@@ -14,7 +14,7 @@ The longer-term private repository integration should use a GitHub App configure
 
 The Integrations page includes a browser for **public repositories** and an authenticated private GitHub App flow. When configured, a signed-in user can authorize the App, store a workspace-scoped encrypted connection, list authorized repositories and branches, inspect the file tree, preview a UTF-8 file, and disconnect. Installation tokens are minted on the server and never returned to the browser. Neither public nor private preview persists content or catalog records.
 
-Automatic sync, parsing GitHub files through the dbt/SQL adapters, and persistent catalog import are not implemented. GitHub sign-in to Kairos does not grant repository access. Do not label a file preview as an imported catalog source.
+Explicit catalog import of a previewed SQL/dbt file is implemented through the same reviewed import endpoint; automatic sync and refresh cursors are not. GitHub sign-in to Kairos does not grant repository access, and a bare file preview is not an imported catalog source.
 
 ## Security and implementation requirements for private repositories
 

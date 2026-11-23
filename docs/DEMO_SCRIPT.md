@@ -353,9 +353,10 @@ in the report itself."*
 
 | Feature | Status |
 |---|---|
-| Deployed public URL | Pending Vercel infrastructure (M1 Jatin / Ashwin) |
+| Deployed public URL | Live at `https://data-lineage-engine-5i2x.vercel.app` |
 | `run_real()` experiment | Protocol filled; benchmark cases written; runner not yet wired |
 | Automatic freshness scheduler | Not running — on-demand only |
 | ProvSQL ground truth | Downgraded to ReferenceInterpreterProvider (RESEARCH_LOG.md R-01) |
-| Playwright E2E against deployed URL | Pending deployed URL |
-| Quality assertions, glossary, domains, notifications | Not implemented |
+| Playwright E2E | App-shell suite runs against Vite; signed-in sweep is manual |
+| Quality assertions, glossary, domains | Implemented and verified against the deployed API |
+| Notifications | Storage and UI implemented; empty until a scheduler emits an event |
