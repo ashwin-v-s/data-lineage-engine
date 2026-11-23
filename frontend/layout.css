@@ -57,7 +57,10 @@
 .nav-group[data-nav-group="settings"] .nav-sublist{border-left-color:var(--line)}
 .health-card{padding:10px 12px;margin-bottom:8px}
 .health-card p{margin:6px 0 8px;font-size:.78rem}
-@media(max-height:780px){.health-card p{display:none}}
+/* The description is dropped on short viewports, so the source row must keep
+   its own separation instead of sitting flush against the badge row. */
+.health-card .health-foot{margin-top:8px;padding-top:7px;border-top:1px solid var(--line)}
+@media(max-height:780px){.health-card p{display:none}.health-card .health-foot{margin-top:6px}}
 .topbar{height:var(--topbar);padding:0 var(--pad)}
 /* the mode is already shown by the data selector, the sidebar card and the footer */
 .environment{display:none}
@@ -285,6 +288,10 @@ td,th{overflow-wrap:break-word}
 
 /* ---- Empty states inside dashboard panels: compact, still legible ---- */
 .empty-state.compact{padding:18px 10px}
+/* The bundled empty-state artwork is a large decorative PNG whose transparent
+   padding reads as stray blobs and pushes the copy down inside table panels. */
+.empty-state img{display:none}
+#mainContent .table-wrap .empty-state{padding:32px 24px}
 .empty-state.compact strong{display:block;margin-bottom:4px;color:var(--ink)}
 
 /* ---- Sidebar navigation: labels never wrap or clip the group chevron ---- */
