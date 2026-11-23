@@ -24,6 +24,7 @@ import psycopg2
 from dotenv import load_dotenv
 from psycopg2.extras import Json, RealDictCursor
 
+from backend.app.identity.canonical_ids import canonical_import_identity
 from ingestion.static_files import parse_static_file
 
 
@@ -88,14 +89,13 @@ def seed_workspace(conn, workspace_id: str, user_id: str) -> dict:
         for asset in payload["assets"]:
             namespace = str(asset.get("namespace") or "general")
             name = str(asset.get("name") or asset["qualified_name"].rsplit("/", 1)[-1])
-            asset_type = str(asset.get("type") or "table").upper()
-            database_name = "enterprise_dw"
+            database_name, schema_name, asset_type = canonical_import_identity(asset)
 
             cur.execute(
                 """
                 SELECT public.kairos_upsert_dataset(%s, %s, %s, %s, %s, %s)::text AS id
                 """,
-                (source_kind, namespace, database_name, namespace, name, asset_type),
+                (source_kind, namespace, database_name, schema_name, name, asset_type),
             )
             ds_id = cur.fetchone()["id"]
             dataset_ids[asset["id"]] = ds_id

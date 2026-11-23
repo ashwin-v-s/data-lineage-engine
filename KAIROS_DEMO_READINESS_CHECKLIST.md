@@ -30,11 +30,11 @@ infrastructure; **UNVERIFIED** = not executed.
 - [x] **VERIFIED** Domain, term (APPROVED), term↔asset link, product with 2 assets
 - [x] **VERIFIED** Quality assertion + PASS result
 - [x] **VERIFIED** Freshness SLA (48/60/120 min)
-- [x] **VERIFIED** Catalog readback: 30 assets / 23 edges / 23 evidence
+- [x] **VERIFIED** Catalog readback after identity reconciliation: 17 active assets / 23 edges / 23 dataset evidence + 19 column evidence
 - [x] **PASS** PII classification — column fallback + classification ownership fixed and verified live (PR #15)
 - [ ] **PARTIAL** Run records — 0 in the demo workspace, 2 globally
 - [ ] **BLOCKED** Incidents and notifications — no scheduler/signal
-- [ ] **BLOCKED** Column-level lineage — the column-level evidence lives in the seeded workspace, not this one (BUG-03)
+- [x] **PASS** Column-level lineage — SQLGlot projections emitted 19 COLUMN evidence rows and edges in this workspace (BUG-03 fixed)
 - [ ] **PARTIAL** Dated/temporal evidence — undated rows are counted, not silently excluded (BUG-04)
 
 ## Features — presentable now
@@ -58,9 +58,9 @@ infrastructure; **UNVERIFIED** = not executed.
 ## Features — present with the stated caveat
 
 - [x] **PASS** Data quality panel — 1 recorded check, 1 PASS rendered live (BUG-02 fixed)
-- [ ] **PARTIAL** PII classification — use a dataset variant that has columns
+- [x] **PASS** PII classification — one classification resolves to the merged `customers` asset and its column
 - [ ] **PARTIAL** Time travel — mechanism only, empty dated set
-- [ ] **PARTIAL** Lineage graph — duplicate nodes must be explained (BUG-01)
+- [x] **PASS** Lineage graph — one row per logical dataset; only genuinely different kinds (table/dashboard/exposure) share a name (BUG-01 fixed)
 - [ ] **PARTIAL** Notifications — empty state only, preferences work
 - [ ] **PARTIAL** Incidents — empty state only
 - [ ] **PARTIAL** Sources — form only, no connection
@@ -71,12 +71,13 @@ infrastructure; **UNVERIFIED** = not executed.
 
 | # | Defect | Owner action |
 | --- | --- | --- |
-| BUG-01 | One dataset becomes 2–3 assets; columns/edges split | Normalise adapter asset types + reconcile on qualified name (migration + backfill) |
+| BUG-01 | One dataset becomes 2–3 assets; columns/edges split | **Fixed** — migration 0018 canonical identity + merge; adapters write declared schema; demo merged 30 → 17 |
 | BUG-02 | `catalog` hardcoded `quality_checks: []` and `column_classifications: []` | **Fixed, deployed, verified live** (PR #14) — 1 recorded check, PASS, and no fake 0.00 average |
-| BUG-03 | Demo workspace has no COLUMN-granularity evidence (the 12 column edges are in the seeded workspace) | Produce column evidence in the demo workspace (SQLGlot / OpenLineage); no query fix exists |
+| BUG-03 | Demo workspace has no COLUMN-granularity evidence | **Fixed** — SQL file adapter emits column projections; 19 mappings backfilled and confirmed through the API query |
 | BUG-06 | dbt v10 schema URL warns `UNRECOGNISED_DBT_MANIFEST_VERSION` | **Fixed, deployed** — `…/v10.json` parses with 0 warnings |
 | BUG-07 | Committed test credentials in `scripts/get_test_token.py` | **Code fixed** (env-only); the exposed password still needs rotating in Supabase |
-| BUG-08 | 12–19 s per URL navigation | Click navigation in demos; split 3D/chart bundles later |
+| BUG-05 | Webhook URLs accepted any HTTPS host | **Fixed** — literal private hosts rejected at registration and DNS re-checked at delivery (tests cover both) |
+| BUG-08 | 12–19 s per URL navigation | **Fixed** — `three.min.js` (670 KB) and `observatory.js` now load only when the 3D view opens |
 
 ## Presenter readiness
 
@@ -96,7 +97,7 @@ infrastructure; **UNVERIFIED** = not executed.
 | Application runs against real auth + DB | ✅ |
 | Demonstration data prepared and traceable | ✅ |
 | Core workflow (ingest → catalog → lineage → evidence → governance) executed | ✅ |
-| Quality and PII demos | ✅ working (BUG-02/01 symptom fixed); temporal demo is partial (BUG-04) |
+| Quality, PII and column-lineage demos | ✅ working (BUG-01/02/03 fixed); temporal demo is partial (BUG-04, by design) |
 | External integrations | ⛔ blocked on credentials |
 | Documentation (6 deliverables) | ✅ |
 

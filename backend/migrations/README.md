@@ -253,3 +253,39 @@ unavailable:
 ```sql
 psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f backend/migrations/0017_stewardship_requests.sql
 ```
+
+### 0018_dataset_identity_reconciliation.sql
+
+**Status:** applied to shared Supabase (2026-11-23)
+**Naming:** `{number}_{feature}.sql`
+
+Makes one catalog row represent one logical dataset (BUG-01):
+
+- asset type becomes a mutable attribute; identity is
+  `(workspace, schema_key, name_key, identity_kind)`, where SOURCE/TABLE/VIEW/MODEL
+  share the `DATASET` group and dashboards/exposures/files stay distinct;
+- generated `name_key`, `schema_key` and `identity_kind` columns plus a unique
+  `dataset_workspace_logical_identity_key` enforce it;
+- the import path's artifact name is no longer stored as `database_name`, and
+  the declared schema is recovered from the immutable `raw_event`;
+- `kairos_merge_duplicate_datasets(uuid)` merges existing variants, moving
+  columns, evidence, edges, temporal versions and governance rows to the
+  survivor (no cascade-delete before repointing), then the migration calls it;
+- `kairos_upsert_dataset(...)` now reconciles by logical identity.
+
+**Requires:**
+- the `raw_event` and `import_run` history of the imports being repaired
+- `kairos_app` role from migration 0008
+
+**To apply:**
+```sql
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f backend/migrations/0018_dataset_identity_reconciliation.sql
+```
+
+After applying, existing SQL imports can be given column-level evidence without
+re-uploading the file:
+
+```bash
+python scripts/db/backfill_column_lineage.py --workspace <workspace-uuid> --dry-run
+python scripts/db/backfill_column_lineage.py --workspace <workspace-uuid>
+```

@@ -117,6 +117,11 @@ MIGRATION_TABLES: dict[str, list[str]] = {
 
 MIGRATION_COLUMNS: dict[str, list[tuple[str, str]]] = {
     "0015_dataset_soft_removal": [("dataset", "removed_at"), ("dataset", "removed_by")],
+    "0018_dataset_identity_reconciliation": [
+        ("dataset", "name_key"),
+        ("dataset", "schema_key"),
+        ("dataset", "identity_kind"),
+    ],
 }
 
 # Migrations whose header says PROPOSAL ONLY / NOT APPLIED.  Their tables are

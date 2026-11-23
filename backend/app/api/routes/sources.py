@@ -41,6 +41,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from backend.app.api.routes.membership import require_role
 from backend.app.auth import require_user
 from backend.app.db import get_conn
+from backend.app.identity.canonical_ids import asset_identity_kind, canonical_import_identity
 from backend.app.services.token_crypto import decrypt_token, encrypt_token
 from ingestion.postgres_source import (
     SOURCE_KIND,
@@ -216,13 +217,12 @@ def _load_config(cur, source_id: uuid.UUID) -> PostgresSourceConfig:
 def _insert_asset(cur, asset: dict[str, Any], source_kind: str, source_ref: str) -> str:
     namespace = str(asset.get("namespace") or "general")
     name = str(asset.get("name") or asset["qualified_name"].rsplit("/", 1)[-1])
-    asset_type = str(asset.get("type") or "table").upper()
-    database_name = source_ref or "kairos-import"
+    database_name, schema_name, asset_type = canonical_import_identity(asset)
     cur.execute(
         """
         SELECT public.kairos_upsert_dataset(%s, %s, %s, %s, %s, %s)::text AS id
         """,
-        (source_kind, namespace, database_name, namespace, name, asset_type),
+        (source_kind, namespace, database_name, schema_name, name, asset_type),
     )
     dataset_id = cur.fetchone()["id"]
     for column in asset.get("metadata", {}).get("columns", []):
@@ -849,16 +849,16 @@ def sync_source(source_id: uuid.UUID, user: dict = Depends(require_user)):
             created_count = 0
             existing_count = 0
             for asset in payload["assets"]:
-                namespace = str(asset.get("namespace") or "general")
                 name = str(asset.get("name") or asset["qualified_name"].rsplit("/", 1)[-1])
+                _database_name, schema_name, asset_type = canonical_import_identity(asset)
                 cur.execute(
                     """
                     SELECT 1 FROM dataset
-                     WHERE database_name = %s AND schema_name = %s AND name = %s
-                       AND removed_at IS NULL
+                     WHERE schema_key = lower(%s) AND name_key = lower(%s)
+                       AND identity_kind = %s AND removed_at IS NULL
                      LIMIT 1
                     """,
-                    (source_ref or "kairos-import", namespace, name),
+                    (schema_name, name, asset_identity_kind(asset_type)),
                 )
                 existed = cur.fetchone() is not None
                 dataset_ids[asset["id"]] = _insert_asset(cur, asset, "database", source_ref)

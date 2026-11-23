@@ -142,7 +142,11 @@ def _no_migration_conn():
     yield _Conn(_Cursor(rows=[{"import_run": None}]))
 
 
-def _commit_rows(num_assets: int, num_relationships: int) -> list:
+def _commit_rows(
+    num_assets: int,
+    num_relationships: int,
+    num_column_relationships: int = 0,
+) -> list:
     """
     Build the fetchone() return sequence for a full commit.
 
@@ -154,11 +158,15 @@ def _commit_rows(num_assets: int, num_relationships: int) -> list:
          INSERT raw_event                   → no fetchone
       × num_assets:
         ✓ INSERT dataset                   → {"id": dataset_id}
-           (SQL/dbt adapters produce 0 columns, so no column_record inserts)
       × num_relationships:
         ✓ INSERT lineage_edge              → {"id": edge_id}  (non-conflict path)
         ✓ INSERT evidence                  → {"id": evidence_id}
            INSERT edge_temporal_version    → no fetchone
+      × num_column_relationships:
+        ✓ INSERT column_record (source)    → {"id": column_id}
+        ✓ INSERT column_record (target)    → {"id": column_id}
+        ✓ INSERT lineage_edge              → {"id": edge_id}
+        ✓ INSERT evidence                  → {"id": evidence_id}
          UPDATE import_run                 → no fetchone
     """
     run_id = str(uuid.uuid4())
@@ -172,17 +180,23 @@ def _commit_rows(num_assets: int, num_relationships: int) -> list:
     for _ in range(num_assets):
         rows.append({"id": str(uuid.uuid4())})   # INSERT dataset ✓
 
+    # The dataset block runs for every relationship, including a column one.
     for _ in range(num_relationships):
         rows.append({"id": str(uuid.uuid4())})   # INSERT lineage_edge ✓
         rows.append({"id": str(uuid.uuid4())})   # INSERT evidence ✓
         # INSERT edge_temporal_version — no fetchone
+    for _ in range(num_column_relationships):
+        rows.append({"id": str(uuid.uuid4())})   # source column ✓
+        rows.append({"id": str(uuid.uuid4())})   # target column ✓
+        rows.append({"id": str(uuid.uuid4())})   # COLUMN lineage_edge ✓
+        rows.append({"id": str(uuid.uuid4())})   # COLUMN evidence ✓
     # UPDATE import_run — no fetchone
     return rows
 
 
 @contextmanager
-def _commit_conn(num_assets: int = 4, num_relationships: int = 2):
-    yield _Conn(_Cursor(rows=_commit_rows(num_assets, num_relationships)))
+def _commit_conn(num_assets: int = 4, num_relationships: int = 2, num_column_relationships: int = 0):
+    yield _Conn(_Cursor(rows=_commit_rows(num_assets, num_relationships, num_column_relationships)))
 
 
 # ── Test client ───────────────────────────────────────────────────────────────
@@ -337,15 +351,21 @@ class TestSqlFilePreview:
         assert "original_sql" in file_assets[0]["metadata"]
         assert "demo_order_revenue" in file_assets[0]["metadata"]["original_sql"]
 
-    def test_s9_sql_relationships_use_sql_static_candidate_edge_type(self):
+    def test_s9_sql_relationships_use_dataset_and_column_candidate_edge_types(self):
         with patch("backend.app.api.routes.ingest.get_conn", side_effect=_preview_conn):
             resp = _preview("sql_file", SQL_FIXTURE, "demo_revenue.sql")
 
         normalized = resp.json()["normalized"]
-        for rel in normalized["relationships"]:
-            assert rel["edge_type"] == "sql_static_candidate", (
-                f"SQL relationships must use 'sql_static_candidate', got {rel['edge_type']!r}"
-            )
+        dataset_relationships = [rel for rel in normalized["relationships"] if not rel.get("source_column")]
+        column_relationships = [rel for rel in normalized["relationships"] if rel.get("source_column")]
+        assert dataset_relationships and all(
+            rel["edge_type"] == "sql_static_candidate" for rel in dataset_relationships
+        )
+        assert column_relationships and all(
+            rel["edge_type"] == "sql_column_candidate"
+            and rel.get("source_column") and rel.get("target_column")
+            for rel in column_relationships
+        )
 
     def test_s10_unauthenticated_returns_401(self):
         resp = client.post(
@@ -463,7 +483,7 @@ class TestCommitPath:
         # demo_revenue.sql → 4 assets (file + target + 2 sources) + 2 relationships
         with patch(
             "backend.app.api.routes.ingest.get_conn",
-            side_effect=lambda: _commit_conn(num_assets=4, num_relationships=2),
+            side_effect=lambda: _commit_conn(num_assets=4, num_relationships=4, num_column_relationships=2),
         ):
             resp = _commit("sql_file", SQL_FIXTURE, "demo_revenue.sql")
 
@@ -503,7 +523,7 @@ class TestCommitPath:
             call_n["n"] += 1
             if call_n["n"] == 1:
                 # First call: new run — full commit rows
-                yield _Conn(_Cursor(rows=_commit_rows(4, 2)))
+                yield _Conn(_Cursor(rows=_commit_rows(4, 4, 2)))
             else:
                 # Second call: existing run found on idempotency check
                 # fetchone sequence:

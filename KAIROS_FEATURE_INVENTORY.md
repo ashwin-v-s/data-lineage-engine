@@ -32,10 +32,10 @@ Status vocabulary used below:
 
 | Feature | Route / page | Purpose | Required data | Status | Notes |
 | --- | --- | --- | --- | --- | --- |
-| Catalog snapshot | `GET /api/v1/catalog` → Overview, All assets | One payload for KPIs, tables, graph | `dataset`, `lineage_edge`, `evidence`, `execution_run` | **Verified** | 200, 30 assets / 23 edges / 23 evidence in the demo workspace |
+| Catalog snapshot | `GET /api/v1/catalog` → Overview, All assets | One payload for KPIs, tables, graph | `dataset`, `lineage_edge`, `evidence`, `execution_run` | **Verified** | 200, 17 active assets after identity reconciliation (was 30 duplicates), 23 dataset edges, 19 column edges |
 | Asset list, search, filters, CSV export | `All assets` (`?view=assets`) | Browse persisted assets | catalog | **Verified** | 7,150 chars rendered, 0 errors |
-| Asset detail + profile tabs | `Asset profile` (`?view=asset_detail`) | Columns, lineage, evidence, quality, runs, capabilities | `dataset`, `column_record`, capabilities | **Partial** | Duplicate assets split columns from lineage (see BUG-01) |
-| Capability registry | `GET /api/v1/assets/{id}/capabilities` | Tells the UI which tabs are真实ly supported | dataset, columns, edges, quality | **Verified (API)** | Returns `supported/available/reason`; `schema.available=false` on duplicated nodes |
+| Asset detail + profile tabs | `Asset profile` (`?view=asset_detail`) | Columns, lineage, evidence, quality, runs, capabilities | `dataset`, `column_record`, capabilities | **Verified** | One asset row owns its columns and edges; BUG-01 merge applied |
+| Capability registry | `GET /api/v1/assets/{id}/capabilities` | Tells the UI which tabs are truly supported | dataset, columns, edges, quality | **Verified (API)** | Returns `supported/available/reason`; columns are available on the merged asset |
 | Catalog structure | `?view=catalog` | Schema/owner grouping | catalog | **Verified** | 742 chars, no error |
 | Keyword search | `GET /api/v1/search?q=` → `?view=search` | Persisted keyword search | catalog | **Verified** | `q=revenue` → 13 results |
 | Hybrid/vector search | `GET /api/v1/search/hybrid` | pgvector + keyword | migration 0012, embeddings | **Partial** | Route exists; no embeddings were generated in the demo workspace |
@@ -65,10 +65,10 @@ Status vocabulary used below:
 | Edge evidence inspector | `GET /api/v1/lineage/edges/{id}/evidence` | **Verified** | Returns evidence rows for edge `5a9abd50-…` |
 | Four-state reasoning (OBSERVED/POSSIBLE/REFUTED/UNKNOWN) | `evidence-semantics.js`, evidence view | **Verified** | 6,487 chars; states composed from stored evidence |
 | Downstream impact | `GET /api/v1/assets/{id}/downstream-impact` | **Verified** | `customers` → `total_affected: 4` across depth levels |
-| Column-level lineage | `GET /api/v1/column-lineage` | **Blocked (data, not code)** | `{"total":0}` — the 12 COLUMN edges live in the seeded workspace, this workspace has dataset-level evidence only (BUG-03) |
+| Column-level lineage | `GET /api/v1/column-lineage` | **Verified** | 19 mappings in the demo workspace (SQLGlot projections backfilled with `scripts/db/backfill_column_lineage.py`) |
 | Bitemporal / as-of lineage | `?view=history`, `?as_of=`/`recorded_as_of=` | **Partial** | `evidence-at-time` returns `included: 0, undated_valid_time: 23` — all rows are `effective_time_status='UNKNOWN'`, reported honestly (BUG-04) |
 | Time-travel comparison UI | `?view=history` | **Partial** | Renders, but compares an empty dated set |
-| 3D observatory | `?view=observatory` | **Verified** | Loads with persisted graph, no null-node error |
+| 3D observatory | `?view=observatory` | **Verified** | Loads with persisted graph; three.js + observatory.js are fetched only on first open (BUG-08) |
 
 ## 5. Governance
 
@@ -78,9 +78,9 @@ Status vocabulary used below:
 | Term ↔ asset assignment | `POST /governance/terms/{id}/assets` | **Verified** | `created: true` against `fct_daily_revenue` |
 | Domains | `GET/POST /governance/domains` → `?view=domains` | **Verified** | Created `Finance & Revenue` `f480e033-…`; page shows LIVE + rows |
 | Data products | `GET/POST /governance/products` → `?view=products` | **Verified (API)** | Created `Executive Revenue Intelligence` `f33bea44-…` with 2 assets |
-| PII classification | `POST /governance/classifications` → `?view=pii` | **Partial** | Endpoint validated; blocked in this workspace because the imported columns sit on a duplicate asset id (BUG-01) |
+| PII classification | `POST /governance/classifications` → `?view=pii` | **Verified** | Existing classification resolves to merged `customers` column; import identity no longer splits columns (BUG-01) |
 | Contracts + assertion linking | `/governance/products/{id}/contracts`, `/contracts/{id}/assertions` | **Verified (API, 2 rows exist globally)** | Not yet created in the demo workspace |
-| Column chooser for PII | `GET /governance/datasets/{id}/columns` | **Partial** | Returns 0 columns for the `TABLE` duplicate of `customers` |
+| Column chooser for PII | `GET /governance/datasets/{id}/columns` | **Verified** | Merged `customers` owns its 6 columns |
 | Stewardship requests | `/api/v1/stewardship/requests` → `?view=stewardship` | **Verified (empty state)** | 0 rows; page renders create/approve forms |
 | Ownership | `/api/v1/owner/*` | **Verified (API)** | 1 `owner_assignment` globally; assign/search/approve routes tested |
 
@@ -91,7 +91,7 @@ Status vocabulary used below:
 | Quality assertions | `POST /api/v1/quality/assertions` | **Verified** | `Revenue mart schema contract` `480a9715-…` |
 | Metadata-only evaluation | `POST /quality/assertions/{id}/evaluate` | **Verified** | Result `54a0cd91-…` `PASS`, checked 1, failed 0 |
 | Quality results readback | `GET /quality/assertions/{id}/results` | **Verified (API)** | 1 `quality_result` row |
-| **Quality page / KPI** | `?view=quality`, Overview | **Fixed locally, awaiting deploy** | `catalog` now loads latest results per assertion (BUG-02); production still serves the old empty array |
+| **Quality page / KPI** | `?view=quality`, Overview | **Verified live** | `catalog` loads latest results per assertion (BUG-02); deployed and serving 1 PASS result |
 | Freshness SLA | `POST /governance/slas` | **Verified** | `fct_daily_revenue` 48/60/120 min, `e0f15710-…` |
 | Freshness evaluation | `GET /governance/freshness`, `/datasets/{id}/evaluate` | **Partial** | SLA stored; no runtime signal → evaluations `UNKNOWN`; scheduler `manual` |
 | Incident lifecycle | `/governance/incidents` + ack/investigate/resolve/assign/comments | **Verified (empty state)** | 0 incidents; page reads live API |

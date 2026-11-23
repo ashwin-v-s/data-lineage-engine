@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 class StrictModel(BaseModel):
@@ -33,6 +33,14 @@ class ImportRelationship(StrictModel):
     target_id: str = Field(min_length=1, max_length=200)
     type: str = Field(default="declared_dependency", min_length=1, max_length=120)
     provenance: str | None = Field(default=None, max_length=1000)
+    source_column: str | None = Field(default=None, min_length=1, max_length=256)
+    target_column: str | None = Field(default=None, min_length=1, max_length=256)
+
+    @model_validator(mode="after")
+    def column_pairs_are_complete(self):
+        if (self.source_column is None) != (self.target_column is None):
+            raise ValueError("source_column and target_column must be provided together")
+        return self
 
 
 class ImportSource(StrictModel):

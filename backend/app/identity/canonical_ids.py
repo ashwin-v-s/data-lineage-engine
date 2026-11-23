@@ -7,13 +7,76 @@ import hashlib
 import uuid
 from typing import Optional, Tuple
 
-
 # Namespace UUIDs for different entity types
 # Generated once with uuid.uuid4(), then frozen
 NAMESPACE_DATASET = uuid.UUID("6ba7b810-9dad-11d1-80b4-00c04fd430c8")
 NAMESPACE_COLUMN = uuid.UUID("6ba7b811-9dad-11d1-80b4-00c04fd430c9")
 NAMESPACE_JOB = uuid.UUID("6ba7b812-9dad-11d1-80b4-00c04fd430ca")
 NAMESPACE_EDGE = uuid.UUID("6ba7b813-9dad-11d1-80b4-00c04fd430cb")
+
+
+# Asset types a catalog row can carry.  Unknown values are upper-cased and
+# kept, so a new adapter type is never silently rewritten into a wrong kind.
+CANONICAL_ASSET_TYPES = {
+    "TABLE": "TABLE",
+    "VIEW": "VIEW",
+    "MODEL": "MODEL",
+    "SOURCE": "SOURCE",
+    "DASHBOARD": "DASHBOARD",
+    "EXPOSURE": "EXPOSURE",
+    "FILE": "FILE",
+    "DATASET": "TABLE",
+    "SEED": "TABLE",
+    "SNAPSHOT": "MODEL",
+    "MATERIALIZED_VIEW": "VIEW",
+}
+
+# Types that describe the same physical/logical dataset.  A dbt model, its
+# materialised table and a SQL file target are one catalog asset, not three;
+# dashboards, exposures and files stay distinct from the data they reference.
+DATASET_IDENTITY_TYPES = frozenset({"TABLE", "VIEW", "MODEL", "SOURCE"})
+
+
+def canonical_asset_type(value: str | None) -> str:
+    """Normalise an adapter asset type to the stored canonical spelling."""
+    raw = str(value or "table").strip().upper().replace(" ", "_").replace("-", "_")
+    return CANONICAL_ASSET_TYPES.get(raw, raw or "TABLE")
+
+
+def asset_identity_kind(value: str | None) -> str:
+    """Return the reconciliation group for an asset type.
+
+    ``SOURCE``/``TABLE``/``VIEW``/``MODEL`` all describe one dataset and share
+    the ``DATASET`` group.  Anything else is its own kind, so a dashboard named
+    after its source table is not merged into that table.
+    """
+    asset_type = canonical_asset_type(value)
+    return "DATASET" if asset_type in DATASET_IDENTITY_TYPES else asset_type
+
+
+def canonical_import_identity(asset: dict) -> tuple[str, str, str]:
+    """Return ``(database_name, schema_name, asset_type)`` for a static import.
+
+    A static upload has no connected database, so the database slot stays empty
+    instead of storing the import artifact's name (the old behaviour, which made
+    the same table look like a different dataset on every import).  The schema
+    comes from the source declaration when it has one (dbt resources carry
+    ``metadata.schema``) and otherwise from the last namespace path segment.
+    """
+    metadata = asset.get("metadata")
+    metadata = metadata if isinstance(metadata, dict) else {}
+    declared_schema = metadata.get("schema")
+    schema = declared_schema.strip() if isinstance(declared_schema, str) else ""
+    namespace = str(asset.get("namespace") or "").strip()
+    if not schema:
+        parts = [part for part in namespace.replace("\\", "/").split("/") if part]
+        if namespace.lower().startswith("dbt/") and len(parts) >= 3:
+            schema = parts[2]
+        else:
+            # A non-dbt namespace is the schema path already ("warehouse.raw"),
+            # so keep it whole.  Qualified names depend on it.
+            schema = namespace
+    return ("", schema[:200], canonical_asset_type(asset.get("type") or asset.get("asset_type")))
 
 
 def normalize_identifier(name: str) -> str:

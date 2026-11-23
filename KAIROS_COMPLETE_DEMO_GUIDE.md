@@ -55,9 +55,9 @@ evidence coverage, recognised runs, metadata attention.
 **B/C.** Sidebar → **Home**. Wait for LIVE. Point at the KPI row, then the
 "Assets discovered" table.
 
-**D (verified).** With the demo workspace: 30 assets in the catalog payload, 23
-edges, 23 evidence rows; the table lists `customers`, `orders_feed`,
-`fct_daily_revenue`, dashboards, etc.
+**D (verified).** With the demo workspace after identity reconciliation: 17
+active assets, 23 dataset edges plus 19 column edges, and 42 evidence rows; the
+table lists `customers`, `orders_feed`, `fct_daily_revenue`, dashboards, etc.
 
 **E.** "Every number here is computed from the same `/api/v1/catalog` payload the
 rest of the app uses. Nothing is hard-coded."
@@ -100,9 +100,9 @@ evidence, capability-driven tabs.
 Evidence** tabs. Open the column list if the asset has columns.
 
 **D (verified).** The asset header renders; lineage tab shows the graph; columns
-appear for the metadata-graph variants. **Known limitation:** duplicated assets
-(BUG-01) mean the `TABLE` variant of `customers` may show no columns while the
-`SOURCE` variant does — pick the row whose type shows columns.
+appear on the single logical asset. BUG-01 is fixed: tables, views, models and
+sources of one dataset are reconciled into one row, so `customers` exposes its
+six columns regardless of which adapter imported them.
 
 **E.** "Kairos shows only what was imported. A missing column list is reported as
 unavailable rather than guessed."
@@ -186,8 +186,9 @@ status. Static imports are DECLARED metadata, not runtime observation."
 `/api/v1/lineage/edges/{edge}/evidence` reproduce the screen.
 
 **G.** Empty graph → the workspace has no edges; confirm you are in the demo
-workspace. **Do not promise column-level lineage** — it is not implemented
-(BUG-03).
+workspace. Column-level lineage is available: the SQL projection backfill
+produced 19 mappings for the demo workspace (BUG-03 fixed). Show them with
+`GET /api/v1/column-lineage`.
 
 ---
 
@@ -236,16 +237,16 @@ validity, freshness), with stored results.
 
 **B/C.** Sidebar → **Trust & governance → Data quality**.
 
-**D (verified API, broken UI).** An assertion exists
+**D (verified live).** An assertion exists
 ("Revenue mart schema contract", `480a9715-…`) and evaluating it stored a PASS
-result (`54a0cd91-…`), but the catalog payload hardcodes `quality_checks: []`,
-so the page says none exist (BUG-02).
+result (`54a0cd91-…`). The catalog payload now returns the latest result per
+assertion, so the page shows Recorded 1 · Passed 1 (BUG-02 fixed and deployed).
 
-**Present it honestly:** show `POST /quality/assertions` + `/evaluate` and the
-`quality_result` row (via `GET /quality/assertions/{id}/results`), and say the
-dashboard wiring for this panel is the next fix.
+**Present it honestly:** the page reads `quality_checks`; the same row is
+reproducible with `GET /quality/assertions/{id}/results`.
 
-**G.** Do not claim the page shows results until BUG-02 is fixed and deployed.
+**G.** Scored checks are not invented: metadata assertions store `score: null`
+and the UI shows the count, not a fake average.
 
 ---
 
@@ -339,10 +340,10 @@ quality assertions hang off it."
 **B/C.** Sidebar → **Trust & governance → PII classification**. Choose a
 dataset, then a column.
 
-**D (verified partial).** The form loads; column lists come from
-`/governance/datasets/{id}/columns`, which returns 0 for the duplicated `TABLE`
-variant (BUG-01). Where columns exist, classification posts with provenance
-(origin + note) and readback.
+**D (verified).** The form loads; column lists come from
+`/governance/datasets/{id}/columns`. The BUG-01 merge means `customers` is one
+asset with six columns, so classification posts with provenance (origin + note)
+and readback against the column's owning asset.
 
 **E.** "Classification requires provenance: who classified it and on what
 evidence. Inherited/Potential classes stay disabled until the evidence pipeline
@@ -477,5 +478,5 @@ scheduler running there is nothing to show, and we do not fake one."
 | 401 on any API | expired session | sign out, sign in |
 | Empty everywhere | wrong workspace selected | workspace switcher → prepared workspace |
 | Governance panel NOT CONNECTED | catalogue request still in flight | click Refresh, wait 5 s |
-| Quality page says "not available" | BUG-02 | present the API + DB proof instead |
-| Lineage has duplicate nodes | BUG-01 | explain adapter type reconciliation, use one adapter family per workspace |
+| Quality page says "not available" | BUG-02 was fixed and deployed | hard reload once; if it persists, show the API + DB proof |
+| Lineage has duplicate nodes | old rows from before migration 0018 | apply `0018_dataset_identity_reconciliation.sql`; new imports reconcile by schema + name |

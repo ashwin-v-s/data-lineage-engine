@@ -42,7 +42,7 @@ import logging
 import os
 import secrets
 import uuid
-from typing import Any, AsyncGenerator, List, Literal, Optional
+from typing import Any, AsyncGenerator, Literal, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
@@ -55,6 +55,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from backend.app.api.errors import api_error
 from backend.app.auth import require_user
 from backend.app.db import get_conn, reset_workspace_id, set_workspace_id
+from backend.app.identity.canonical_ids import canonical_import_identity
 from backend.app.services.openlineage_ingest import (
     MAX_BATCH_SIZE,
     ingest_openlineage_events,
@@ -369,16 +370,40 @@ def preview_import(request: ImportInput, user: dict = Depends(require_user)):
     }
 
 
+def _ensure_column(cur, dataset_id: str, column_name: str) -> str:
+    """Return the column_record id, creating the column when absent."""
+    cur.execute(
+        """
+        INSERT INTO column_record (dataset_id, schema_version, column_name)
+        VALUES (%s::uuid, 'v1', %s)
+        ON CONFLICT (dataset_id, schema_version, column_name) DO NOTHING
+        RETURNING id::text AS id
+        """,
+        (dataset_id, column_name),
+    )
+    row = cur.fetchone()
+    if row:
+        return row["id"]
+    cur.execute(
+        """
+        SELECT id::text AS id FROM column_record
+        WHERE dataset_id = %s::uuid AND schema_version = 'v1' AND column_name = %s
+        LIMIT 1
+        """,
+        (dataset_id, column_name),
+    )
+    return cur.fetchone()["id"]
+
+
 def _insert_asset(cur, asset: dict[str, Any], source_kind: str, source_ref: str) -> str:
     namespace = str(asset.get("namespace") or "general")
     name = str(asset.get("name") or asset["qualified_name"].rsplit("/", 1)[-1])
-    asset_type = str(asset.get("type") or asset.get("asset_type") or "table").upper()
-    database_name = source_ref or "kairos-import"
+    database_name, schema_name, asset_type = canonical_import_identity(asset)
     cur.execute(
         """
         SELECT public.kairos_upsert_dataset(%s, %s, %s, %s, %s, %s)::text AS id
         """,
-        (source_kind, namespace, database_name, namespace, name, asset_type),
+        (source_kind, namespace, database_name, schema_name, name, asset_type),
     )
     dataset_id = cur.fetchone()["id"]
     columns = asset.get("metadata", {}).get("columns", [])
@@ -519,6 +544,74 @@ def _commit_import(
                     VALUES (%s::uuid, now(), 'UNKNOWN', now(), %s::uuid, %s)
                     """,
                     (edge_id, normalized_evidence_id, source_kind),
+                )
+
+                # A static projection carries a column pair; persist it as a
+                # COLUMN edge so /column-lineage reads real stored evidence.
+                source_column = relationship.get("source_column")
+                target_column = relationship.get("target_column")
+                if not source_column or not target_column:
+                    continue
+                source_column_id = _ensure_column(cur, source_id, str(source_column))
+                target_column_id = _ensure_column(cur, target_id, str(target_column))
+                cur.execute(
+                    """
+                    INSERT INTO lineage_edge
+                        (source_id, target_id, granularity, operator_fingerprint)
+                    VALUES (%s::uuid, %s::uuid, 'COLUMN', %s)
+                    ON CONFLICT DO NOTHING
+                    RETURNING id::text
+                    """,
+                    (source_column_id, target_column_id, edge_type),
+                )
+                column_edge = cur.fetchone()
+                if column_edge:
+                    column_edge_id = column_edge["id"]
+                else:
+                    cur.execute(
+                        """
+                        SELECT id::text FROM lineage_edge
+                        WHERE source_id = %s::uuid AND target_id = %s::uuid
+                          AND granularity = 'COLUMN'
+                          AND operator_fingerprint IS NOT DISTINCT FROM %s
+                          AND query_fingerprint IS NULL
+                        LIMIT 1
+                        """,
+                        (source_column_id, target_column_id, edge_type),
+                    )
+                    column_edge_id = cur.fetchone()["id"]
+
+                column_evidence_id = f"{import_id}:col:{index}"
+                cur.execute(
+                    """
+                    INSERT INTO evidence
+                        (evidence_id, evidence_type, source_system, source_dataset_id,
+                         target_dataset_id, source_column_id, target_column_id,
+                         granularity, operator, parser_status, diagnostics, raw_event_id)
+                    VALUES (%s, 'STATIC_DEPENDENCY', %s, %s::uuid, %s::uuid,
+                            %s::uuid, %s::uuid, 'COLUMN', %s, 'SUPPORTED', %s, %s)
+                    RETURNING id::text
+                    """,
+                    (
+                        column_evidence_id, source_kind, source_id, target_id,
+                        source_column_id, target_column_id, edge_type,
+                        Json({
+                            "classification": "DECLARED_METADATA",
+                            "source_column": str(source_column),
+                            "target_column": str(target_column),
+                        }),
+                        raw_event_id,
+                    ),
+                )
+                column_evidence_row = cur.fetchone()["id"]
+                cur.execute(
+                    """
+                    INSERT INTO edge_temporal_version
+                        (edge_id, valid_from, effective_time_status, transaction_from,
+                         evidence_id, source_system)
+                    VALUES (%s::uuid, now(), 'UNKNOWN', now(), %s::uuid, %s)
+                    """,
+                    (column_edge_id, column_evidence_row, source_kind),
                 )
 
             summary["persisted_assets"] = len(dataset_ids)

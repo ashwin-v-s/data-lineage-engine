@@ -7,8 +7,8 @@ path.  These tests pin the identity the lineage graph depends on, for rows
 written before and after the fix, and for the legacy catalog.
 """
 
-from backend.app.api.routes.ingestion import _split_namespace
 from backend.app.api.routes.search import _qualified_name
+from backend.app.identity.canonical_ids import canonical_import_identity
 
 
 def _asset(**overrides):
@@ -50,8 +50,12 @@ def test_placeholder_database_without_namespace_is_preserved():
     assert _qualified_name(asset) == "metadata.demo.table_a"
 
 
+def _identity(namespace):
+    return canonical_import_identity({"namespace": namespace, "name": "orders", "type": "table"})
+
+
 def test_namespace_maps_onto_the_not_null_identity_tuple():
-    assert _split_namespace("warehouse.raw") == ("", "warehouse.raw")
-    assert _split_namespace("analytics") == ("", "analytics")
-    assert _split_namespace("") == ("", "")
-    assert _split_namespace("x" * 400)[1] == "x" * 200
+    assert _identity("warehouse.raw") == ("", "warehouse.raw", "TABLE")
+    assert _identity("analytics") == ("", "analytics", "TABLE")
+    assert _identity("") == ("", "", "TABLE")
+    assert _identity("x" * 400)[1] == "x" * 200

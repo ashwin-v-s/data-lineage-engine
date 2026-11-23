@@ -68,12 +68,13 @@ the demo can be re-run safely.
 **Catalog readback after all five commits:** 30 assets, 23 lineage edges, 23
 evidence rows, 0 runs (`GET /api/v1/catalog?limit=200`, HTTP 200).
 
-> **Why 30 assets for 9 logical tables:** the three metadata adapters describe
-> the same entities with different `asset_type` values (`table`, `source`,
-> `model`, `view`, `exposure`), and the canonical upsert keys on that type. That
-> is defect **BUG-01** in the test report, and it is visible in the catalog as
-> e.g. three `fct_daily_revenue` rows. Demonstrate the metadata-graph assets
-> (`TABLE`/`VIEW`/`MODEL` from the graph) and explain the duplication if asked.
+> **Resolved 2026-11-23 (BUG-01):** migration 0018 reconciles the adapters'
+> variants by logical identity, and the demo workspace was merged from 30 rows
+> to **17 active assets**. Tables, views, models and sources of one dataset are
+> a single row; a table, its dashboard and its exposure legitimately remain
+> three rows because they are different kinds. Column records, edges, temporal
+> versions, PII, quality, freshness, terms and product links were moved to the
+> surviving row, not dropped.
 
 ## 3. Assets and columns (from the metadata graph)
 
@@ -122,7 +123,7 @@ committed file.
 | `GET /api/v1/assets/{customers SOURCE}/downstream-impact?depth=4` | `total_affected: 4` across depth levels |
 | `GET /api/v1/lineage/edges/5a9abd50-…/evidence` | evidence rows returned |
 | `GET /api/v1/evidence-at-time?valid_as_of=now&recorded_as_of=now` | `included: 0, undated_valid_time: 23` (static evidence has no effective time) |
-| `GET /api/v1/column-lineage?valid_as_of=now` | `total: 0` (no COLUMN-granularity evidence exists) |
+| `GET /api/v1/column-lineage?valid_as_of=now` | `total: 19` after the SQL projection backfill (was 0) |
 
 ## 5. Governance records created in this workspace
 
@@ -144,11 +145,11 @@ Readbacks: `/governance/terms` 4 rows, `/governance/domains` 3 rows,
 
 | Item | Reason |
 | --- | --- |
-| PII classification on `customers.email` | The imported columns live on the `SOURCE` duplicate of `customers`, while the UI/`TABLE` duplicate exposes none (`BUG-01`). The endpoint itself is verified. |
+| PII classification on `customers.email` | **Created** — after the BUG-01 merge, `customers` is one asset with 6 columns and the classification resolves to it. |
 | Data contract version | Available, but a contract needs an assertion id and clause JSON; prepared steps are in the demo guide. |
 | Incidents / notifications | No scheduler or runtime freshness signal exists in this deployment, so nothing legitimately triggers them. |
 | Sync jobs, source connections | Requires a reachable PostgreSQL source and `KAIROS_TOKEN_ENCRYPTION_KEY`. |
-| Column-level lineage | No adapter emits column-granularity evidence (`BUG-03`). |
+| Column-level lineage | **Available** — 19 SQL projection mappings backfilled; no longer a gap. |
 
 ## 6. Historical / temporal data
 

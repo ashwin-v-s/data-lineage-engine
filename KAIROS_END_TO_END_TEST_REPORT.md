@@ -118,7 +118,7 @@ Presenters should navigate by clicking, not by editing the URL.
 
 ## 7. Defects
 
-### BUG-01 — One logical dataset becomes 2–3 catalog assets (High, demo-blocking) — **READ SIDE FIXED, DEPLOYED**
+### BUG-01 — One logical dataset becomes 2–3 catalog assets (High, demo-blocking) — **FIXED AND APPLIED 2026-11-23**
 
 The demo-blocking *symptom* is fixed (PR #15): the asset variant the UI opens may
 carry no `column_record` rows, so `GET /governance/datasets/{id}/columns` and
@@ -149,6 +149,18 @@ on another, so:
 on qualified name + namespace before upsert; or stop including `asset_type` in
 the identity tuple and treat it as a mutable attribute. This needs a migration
 and a backfill — do not hot-patch it before a demo.
+
+**Resolution (2026-11-23):** `0018_dataset_identity_reconciliation.sql` makes
+asset type a mutable attribute and keys identity on
+`(workspace, schema, name, kind group)`, where SOURCE/TABLE/VIEW/MODEL share the
+DATASET group and dashboards/exposures/files stay distinct. It recovers the
+declared schema from `raw_event`, merges existing variants while repointing
+columns, evidence, edges, temporal versions and governance rows, and replaces
+`kairos_upsert_dataset`. All import paths now write the declared schema and an
+empty database slot (a static upload has no connected database). The demo
+workspace merged from 30 rows to 17 active assets; the remaining repeated names
+are a table plus its dashboard and exposure. Verified with the RLS-scoped
+catalog and column reads.
 
 **Demo workaround:** ingest only *one* adapter family per workspace. The
 metadata graph alone yields 9 assets with 41 columns and 9 edges, and no
@@ -201,7 +213,7 @@ against production:
 "Average score: 0.00" instead of "not scored" (`frontend/app.js`
 `qualityPage()` computes the mean over an empty scored set). Not fixed yet.
 
-### BUG-03 — Column-level lineage cannot be produced (High for the brief) — **NOT A QUERY BUG; DATA IS IN ANOTHER WORKSPACE**
+### BUG-03 — Column-level lineage cannot be produced (High for the brief) — **FIXED 2026-11-23**
 
 Investigated 2026-11-21 after the demo deployment: the endpoint is correct. The
 twelve COLUMN-granularity edges and their twelve column-level evidence rows
@@ -225,6 +237,15 @@ backed by the stored data.
 exposes column lineage in its qualifier output). Until then, present dataset
 lineage and say column lineage is not yet implemented.
 
+**Resolution (2026-11-23):** the SQL file adapter now expands each `SELECT`
+projection into `source_column`/`target_column` pairs and records those columns
+on the assets. The metadata-graph contract accepts and validates the pair (the
+relationship identity includes it, so many mappings between two tables are not
+mistaken for duplicates), and both commit paths persist a COLUMN edge plus
+COLUMN evidence and its temporal version. `scripts/db/backfill_column_lineage.py`
+replayed the stored SQL of the demo import, producing **19 mappings**; the
+workspace-scoped query used by `GET /api/v1/column-lineage` returns all 19.
+
 ### BUG-04 — Static evidence is undated, so time travel returns nothing (Medium) — **BY DESIGN, NOT SILENT**
 
 All 23 `edge_temporal_version` rows in the demo workspace carry
@@ -241,13 +262,20 @@ workspace shows `included: 0, undated_valid_time: 23`. The bitemporal endpoint
 is correct; the data has no timestamps. Use a runtime source or add an explicit
 `effective_time` to the import contract.
 
-### BUG-05 — Webhook URLs accept any HTTPS host (Low, security)
+### BUG-05 — Webhook URLs accept any HTTPS host (Low, security) — **FIXED (fd1ec98)**
 
 `backend/app/api/routes/webhooks.py:54-60` validates only the `https://` prefix
 and the server then fetches that URL
 (`backend/app/services/webhook_delivery.py:93-100`), storing 400 bytes of the
 response. Add private/loopback/link-local/metadata blocking after DNS
 resolution, or an allowlist.
+
+**Resolution:** registration rejects localhost, `.local`/`.internal` names and
+literal loopback, RFC1918, link-local and metadata addresses; delivery calls
+`assert_public_destination`, which resolves the host at delivery time and
+refuses every non-public result, so a DNS record cannot be repointed after
+registration. Redirects stay disabled. `tests/test_api_keys_webhooks.py` covers
+both the registration and delivery paths.
 
 ### BUG-06 — dbt manifest version parser misses the canonical URL (Low) — **FIXED, DEPLOYED AND VERIFIED**
 
@@ -277,12 +305,19 @@ for the shared Supabase project. Rotate the password and read the values from
 the environment. (This report used that account deliberately, as the only
 available test identity; it is not reproduced in any deliverable.)
 
-### BUG-08 — Slow first paint per URL navigation (Medium, demo risk)
+### BUG-08 — Slow first paint per URL navigation (Medium, demo risk) — **FIXED 2026-11-23**
 
 Each `?view=` navigation reloads `app.js`, `three.min.js`, `chart.umd.min.js`
 and refetches the catalog: 12–19 s to a stable page. Presenters must navigate
 in-app. Longer-term: code-split the 3D/chart bundles and cache the catalog
 snapshot per session.
+
+**Resolution (2026-11-23):** `three.min.js` (≈670 KB) and `observatory.js` were
+removed from the startup script list. `three()` now shows a loading state and
+fetches both once, on first entry to `?view=observatory`, with a cached promise
+and the existing unavailable fallback. Non-3D navigation no longer downloads or
+parses the 3D runtime. The production build confirms the startup list contains
+only chart, stewardship, evidence, lineage, app and removal scripts.
 
 ## 8. What is still unverified, and why
 

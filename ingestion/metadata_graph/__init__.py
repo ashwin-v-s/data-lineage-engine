@@ -13,7 +13,6 @@ import re
 from dataclasses import dataclass
 from typing import Any, Mapping
 
-
 CONTRACT_VERSION = "kairos.ingest.v1"
 MAX_FILE_BYTES = 2 * 1024 * 1024
 MAX_ASSETS = 1_000
@@ -285,7 +284,7 @@ def parse_metadata_graph(
             normalized_assets.append(cleaned)
 
     normalized_relationships: list[dict[str, Any]] = []
-    relationship_keys: set[tuple[str, str, str]] = set()
+    relationship_keys: set[tuple[str, str, str, str, str]] = set()
     for index, relationship in enumerate(relationships):
         path = f"relationships[{index}]"
         if not isinstance(relationship, dict):
@@ -295,12 +294,32 @@ def parse_metadata_graph(
         target_id = _text(relationship.get("target_id"), max_length=MAX_ID_LENGTH, path=f"{path}.target_id", label="target_id", errors=errors)
         rel_type = relationship.get("edge_type", relationship.get("type", "declared_dependency"))
         rel_type = _text(rel_type, max_length=128, path=f"{path}.edge_type", label="relationship type", errors=errors)
+        source_column = relationship.get("source_column")
+        target_column = relationship.get("target_column")
+        if source_column is not None:
+            source_column = _text(
+                source_column, max_length=256, path=f"{path}.source_column",
+                label="source_column", errors=errors,
+            )
+        if target_column is not None:
+            target_column = _text(
+                target_column, max_length=256, path=f"{path}.target_column",
+                label="target_column", errors=errors,
+            )
+        if (source_column is None) != (target_column is None):
+            errors.append(Diagnostic(
+                "INCOMPLETE_COLUMN_RELATIONSHIP",
+                "A column relationship must declare both source_column and target_column.",
+                path,
+            ))
         if source_id and source_id not in asset_ids:
             errors.append(Diagnostic("UNKNOWN_RELATIONSHIP_SOURCE", f"Relationship source {source_id!r} is not in this asset batch.", f"{path}.source_id"))
         if target_id and target_id not in asset_ids:
             errors.append(Diagnostic("UNKNOWN_RELATIONSHIP_TARGET", f"Relationship target {target_id!r} is not in this asset batch.", f"{path}.target_id"))
         if source_id and target_id and rel_type:
-            key = (source_id, target_id, rel_type)
+            # Two tables can have many column relationships; identity includes
+            # the column pair, so a projection is not mistaken for a duplicate.
+            key = (source_id, target_id, rel_type, source_column or "", target_column or "")
             if key in relationship_keys:
                 errors.append(Diagnostic("DUPLICATE_RELATIONSHIP", "Duplicate relationship in this batch.", path))
             relationship_keys.add(key)
@@ -308,6 +327,9 @@ def parse_metadata_graph(
             cleaned_rel["source_id"] = source_id
             cleaned_rel["target_id"] = target_id
             cleaned_rel["edge_type"] = rel_type
+            if source_column is not None and target_column is not None:
+                cleaned_rel["source_column"] = source_column
+                cleaned_rel["target_column"] = target_column
             cleaned_rel["evidence_class"] = "DECLARED_METADATA"
             normalized_relationships.append(cleaned_rel)
 

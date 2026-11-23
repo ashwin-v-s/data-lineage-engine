@@ -8343,6 +8343,32 @@
               }
             ],
             "title": "Provenance"
+          },
+          "source_column": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 256,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Column"
+          },
+          "target_column": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 256,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Column"
           }
         },
         "additionalProperties": false,

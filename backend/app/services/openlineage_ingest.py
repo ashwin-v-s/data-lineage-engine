@@ -291,9 +291,8 @@ def _resolve_dataset(cur, namespace: str, name: str) -> str | None:
         """
         INSERT INTO dataset
             (source_system, namespace, database_name, schema_name, name, asset_type)
-        VALUES ('openlineage', %s, %s, %s, %s, 'table')
-        ON CONFLICT (workspace_id, source_system, namespace, database_name, schema_name, name, asset_type)
-        DO UPDATE SET name = EXCLUDED.name
+        VALUES ('openlineage', %s, %s, %s, %s, 'TABLE')
+        ON CONFLICT DO NOTHING
         RETURNING id::text AS id
         """,
         (
@@ -302,6 +301,20 @@ def _resolve_dataset(cur, namespace: str, name: str) -> str | None:
             identity["schema_name"],
             identity["name"],
         ),
+    )
+    row = cur.fetchone()
+    if row:
+        return str(row["id"])
+    # A concurrent event, or an existing row whose asset type differs, won the
+    # insert; resolve by the same logical identity the unique index enforces.
+    cur.execute(
+        """
+        SELECT id::text AS id FROM dataset
+        WHERE schema_key = lower(%s) AND name_key = lower(%s)
+          AND identity_kind = 'DATASET'
+        LIMIT 1
+        """,
+        (identity["schema_name"], identity["name"]),
     )
     row = cur.fetchone()
     return str(row["id"]) if row else None

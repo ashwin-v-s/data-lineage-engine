@@ -27,6 +27,7 @@ from psycopg2.extras import Json, RealDictCursor
 
 from backend.app.auth import require_user
 from backend.app.db import get_conn
+from backend.app.identity.canonical_ids import canonical_import_identity
 from backend.app.schemas.ingestion import ImportEnvelope, ImportRelationship
 
 router = APIRouter(prefix="/ingestion", tags=["ingestion"], dependencies=[Depends(require_user)])
@@ -100,17 +101,29 @@ def _evidence_key(workspace_id: str, content_sha256: str, index: int, edge: Impo
     return f"upload:{workspace_id}:{digest}"
 
 
-def _split_namespace(namespace: str) -> tuple[str, str]:
-    """Map an artifact namespace onto the dataset identity tuple.
-
-    An uploaded artifact has no database: the dotted namespace already holds the
-    schema path (``warehouse.raw``).  ``dataset.database_name`` and
-    ``schema_name`` are NOT NULL, so the database is stored as an empty string
-    and the namespace as the schema.  The catalog builds qualified names by
-    skipping empty parts, which yields ``warehouse.raw.orders`` rather than the
-    old ``metadata.warehouse.raw.orders`` placeholder.
-    """
-    return ("", str(namespace or "")[:200])
+def _ensure_column(cur, dataset_id: str, column_name: str) -> str:
+    """Return the column_record id, creating the column when absent."""
+    cur.execute(
+        """
+        INSERT INTO column_record (dataset_id, schema_version, column_name)
+        VALUES (%s, 'v1', %s)
+        ON CONFLICT (dataset_id, schema_version, column_name) DO NOTHING
+        RETURNING id::text AS id
+        """,
+        (dataset_id, column_name),
+    )
+    row = cur.fetchone()
+    if row:
+        return row["id"]
+    cur.execute(
+        """
+        SELECT id::text AS id FROM column_record
+        WHERE dataset_id = %s AND schema_version = 'v1' AND column_name = %s
+        LIMIT 1
+        """,
+        (dataset_id, column_name),
+    )
+    return cur.fetchone()["id"]
 
 
 @router.post("/preview")
@@ -205,7 +218,7 @@ def _persist_import(
 
     ids: dict[str, str] = {}
     for asset in payload.assets:
-        database_name, schema_name = _split_namespace(asset.namespace)
+        database_name, schema_name, asset_type = canonical_import_identity(asset.model_dump())
         cur.execute(
             """
             SELECT public.kairos_upsert_dataset(
@@ -217,12 +230,17 @@ def _persist_import(
                 database_name,
                 schema_name,
                 asset.name,
-                asset.type.upper(),
+                asset_type,
                 asset.description,
                 asset.tags,
             ),
         )
-        ids[asset.id] = cur.fetchone()["id"]
+        dataset_id = cur.fetchone()["id"]
+        ids[asset.id] = dataset_id
+        columns = asset.metadata.get("columns", [])
+        for column in columns if isinstance(columns, list) else []:
+            if isinstance(column, dict) and isinstance(column.get("name"), str):
+                _ensure_column(cur, dataset_id, column["name"])
 
     edge_count = 0
     for index, edge in enumerate(payload.relationships):
@@ -278,6 +296,71 @@ def _persist_import(
             (edge_row["id"], now, now, evidence_row["id"], edge_row["id"], evidence_row["id"]),
         )
         edge_count += 1
+
+        if not edge.source_column or not edge.target_column:
+            continue
+        source_column_id = _ensure_column(cur, ids[edge.source_id], edge.source_column)
+        target_column_id = _ensure_column(cur, ids[edge.target_id], edge.target_column)
+        cur.execute(
+            """
+            INSERT INTO lineage_edge (source_id, target_id, granularity, operator_fingerprint)
+            VALUES (%s, %s, 'COLUMN', %s) ON CONFLICT DO NOTHING
+            RETURNING id::text AS id
+            """,
+            (source_column_id, target_column_id, edge.type),
+        )
+        column_edge = cur.fetchone()
+        if column_edge is None:
+            cur.execute(
+                """
+                SELECT id::text AS id FROM lineage_edge
+                WHERE source_id=%s AND target_id=%s AND granularity='COLUMN'
+                  AND operator_fingerprint=%s AND query_fingerprint IS NULL
+                LIMIT 1
+                """,
+                (source_column_id, target_column_id, edge.type),
+            )
+            column_edge = cur.fetchone()
+        column_evidence_key = f"upload:{workspace_id}:{content_sha256}:col:{index}"
+        cur.execute(
+            """
+            INSERT INTO evidence (evidence_id, evidence_type, source_system, granularity,
+                operator, parser_status, diagnostics, raw_event_id,
+                source_dataset_id, target_dataset_id, source_column_id, target_column_id)
+            VALUES (%s, 'STATIC_DEPENDENCY', 'upload', 'COLUMN', %s, 'SUPPORTED', %s, %s,
+                    %s, %s, %s, %s)
+            ON CONFLICT (workspace_id, evidence_id) DO NOTHING
+            RETURNING id::text AS id
+            """,
+            (
+                column_evidence_key, edge.type,
+                Json({
+                    "provenance": edge.provenance or _STATIC_CLASSIFICATION,
+                    "source_column": edge.source_column,
+                    "target_column": edge.target_column,
+                }),
+                event_id, ids[edge.source_id], ids[edge.target_id],
+                source_column_id, target_column_id,
+            ),
+        )
+        column_evidence_row = cur.fetchone()
+        if column_evidence_row is None:
+            cur.execute(
+                "SELECT id::text AS id FROM evidence WHERE workspace_id=%s AND evidence_id=%s",
+                (workspace_id, column_evidence_key),
+            )
+            column_evidence_row = cur.fetchone()
+        cur.execute(
+            """
+            INSERT INTO edge_temporal_version (edge_id, valid_from, effective_time_status,
+                transaction_from, evidence_id, source_system)
+            SELECT %s, %s, 'UNKNOWN', %s, %s, 'upload'
+            WHERE NOT EXISTS (SELECT 1 FROM edge_temporal_version WHERE edge_id=%s
+                AND evidence_id=%s AND transaction_to IS NULL)
+            """,
+            (column_edge["id"], now, now, column_evidence_row["id"],
+             column_edge["id"], column_evidence_row["id"]),
+        )
 
     summary = {"assets": len(payload.assets), "relationships": edge_count}
     cur.execute("UPDATE import_run SET result_summary=%s WHERE id=%s", (Json(summary), import_id))
