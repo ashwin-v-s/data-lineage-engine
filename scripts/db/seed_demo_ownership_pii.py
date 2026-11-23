@@ -103,6 +103,13 @@ PII = (
     ("dim_customer_segments", "MODEL", "customer_id", "PII_INHERITED", "POSSIBLE", "Customer key inherited into the segment dimension."),
     ("fct_daily_revenue", "MODEL", None, "PII_CLEARED", "OBSERVED", "Aggregate revenue mart; reviewed and contains no person-level fields."),
     ("daily_revenue_kpi", "TABLE", None, "PII_CLEARED", "OBSERVED", "Aggregate KPI table; reviewed and contains no person-level fields."),
+    ("daily_revenue_kpi", "DASHBOARD", None, "PII_CLEARED", "OBSERVED", "Aggregate executive dashboard; reviewed and contains no person-level fields."),
+    ("daily_revenue_kpi", "EXPOSURE", None, "PII_CLEARED", "OBSERVED", "dbt exposure metadata; reviewed and contains no person-level fields."),
+    ("customer_retention_portal", "DASHBOARD", None, "PII_INHERITED", "POSSIBLE", "Retention dashboard exposes customer cohort metrics derived from the customer master."),
+    ("customer_transactions_schema.csv", "FILE", None, "PII_INHERITED", "POSSIBLE", "CSV header fixture mirrors the customer-keyed transaction schema."),
+    ("dbt_production_manifest.json", "FILE", None, "PII_CLEARED", "OBSERVED", "dbt manifest metadata; reviewed and contains no person-level fields."),
+    ("enterprise_metadata_graph.json", "FILE", None, "PII_CLEARED", "OBSERVED", "Metadata graph fixture; reviewed and contains no person-level fields."),
+    ("enterprise_lineage_pipeline.sql", "FILE", None, "PII_CLEARED", "OBSERVED", "SQL lineage fixture; reviewed and contains no person-level fields."),
 )
 
 ORIGIN = {
@@ -161,41 +168,45 @@ def main(argv=None) -> int:
             cur.execute("DELETE FROM pii_classification WHERE workspace_id=%s::uuid", (args.workspace,))
             inserted = 0
             for name, asset_type, column, classification, evidence, note in PII:
+                # A name/type can have more than one physical import row (the
+                # SQL fixture was committed twice).  Classify every visible
+                # variant, otherwise one row remains "Not classified".
                 cur.execute(
-                    "SELECT id::text FROM dataset WHERE workspace_id=%s::uuid AND name=%s AND asset_type=%s LIMIT 1",
+                    "SELECT id::text FROM dataset WHERE workspace_id=%s::uuid AND name=%s AND asset_type=%s",
                     (args.workspace, name, asset_type),
                 )
-                dataset = cur.fetchone()
-                if not dataset:
+                datasets = cur.fetchall()
+                if not datasets:
                     raise RuntimeError(f"Asset not found: {name} ({asset_type})")
-                column_id = None
-                if column:
+                for dataset in datasets:
+                    column_id = None
+                    if column:
+                        cur.execute(
+                            "SELECT cr.id::text FROM column_record cr "
+                            "WHERE cr.dataset_id=%s::uuid AND cr.column_name=%s LIMIT 1",
+                            (dataset["id"], column),
+                        )
+                        column_row = cur.fetchone()
+                        if not column_row:
+                            raise RuntimeError(f"Column not found: {name}.{column}")
+                        column_id = column_row["id"]
+                    origin = ORIGIN.get(classification, "manual_steward")
+                    provenance = Json({"origin": origin, "note": note, "seed": "demo-ownership-pii-v1"})
+                    reviewed = classification == "PII_CLEARED"
                     cur.execute(
-                        "SELECT cr.id::text FROM column_record cr "
-                        "WHERE cr.dataset_id=%s::uuid AND cr.column_name=%s LIMIT 1",
-                        (dataset["id"], column),
+                        """
+                        INSERT INTO pii_classification
+                            (workspace_id, dataset_id, column_id, classification,
+                             evidence_state, provenance, classified_by, reviewed_by, reviewed_at)
+                        VALUES (%s::uuid, %s::uuid, %s, %s, %s, %s, %s::uuid, %s, %s)
+                        """,
+                        (
+                            args.workspace, dataset["id"], column_id, classification, evidence,
+                            provenance, actor, actor if reviewed else None,
+                            datetime.now(timezone.utc) if reviewed else None,
+                        ),
                     )
-                    column_row = cur.fetchone()
-                    if not column_row:
-                        raise RuntimeError(f"Column not found: {name}.{column}")
-                    column_id = column_row["id"]
-                origin = ORIGIN.get(classification, "manual_steward")
-                provenance = Json({"origin": origin, "note": note, "seed": "demo-ownership-pii-v1"})
-                reviewed = classification == "PII_CLEARED"
-                cur.execute(
-                    """
-                    INSERT INTO pii_classification
-                        (workspace_id, dataset_id, column_id, classification,
-                         evidence_state, provenance, classified_by, reviewed_by, reviewed_at)
-                    VALUES (%s::uuid, %s::uuid, %s, %s, %s, %s, %s::uuid, %s, %s)
-                    """,
-                    (
-                        args.workspace, dataset["id"], column_id, classification, evidence,
-                        provenance, actor, actor if reviewed else None,
-                        datetime.now(timezone.utc) if reviewed else None,
-                    ),
-                )
-                inserted += 1
+                    inserted += 1
 
             # Domain and product records already carry an owner column; point
             # them at the active workspace owner so the governance screens do

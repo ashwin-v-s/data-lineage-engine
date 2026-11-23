@@ -383,9 +383,10 @@ quality assertions hang off it."
 **B/C.** Sidebar → **Trust & governance → PII classification**. Choose a
 dataset, then a column.
 
-**D (verified).** The table returns **16 persisted classifications** across the
-customer and payment assets. Columns are **Asset, Column, Classification,
-Evidence, Provenance, Classified**. Examples:
+**D (verified).** The table returns **24 persisted classifications**. Every one
+of the 17 active assets now has a classification: 9 carry PII and 8 are
+explicitly reviewed as not PII. Columns are **Asset, Column,
+Classification, Evidence, Provenance, Classified**. Examples:
 
 | Asset | Column | Classification | Evidence |
 | --- | --- | --- | --- |
@@ -397,7 +398,9 @@ Evidence, Provenance, Classified**. Examples:
 | `customer_transactions_schema` | `risk_score` | PII_POTENTIAL | POSSIBLE |
 | `stg_orders_enriched` | `customer_id` | PII_INHERITED | POSSIBLE |
 | `fct_daily_revenue` | whole dataset | PII_CLEARED | OBSERVED |
-| `daily_revenue_kpi` | whole dataset | PII_CLEARED | OBSERVED |
+| `daily_revenue_kpi` | whole dataset (table, dashboard, exposure) | PII_CLEARED | OBSERVED |
+| `customer_retention_portal` | whole dataset | PII_INHERITED | POSSIBLE |
+| `dbt_production_manifest.json`, metadata/SQL fixtures | whole dataset | PII_CLEARED | OBSERVED |
 
 Each row carries a provenance note (for example "Email masked at ingestion").
 The PII badge on Assets is the strongest stored classification, not a generic

@@ -101,7 +101,7 @@ access grants. See §3a for the complete mapping.
 ### 3a. Ownership and PII coverage
 
 `scripts/db/seed_demo_ownership_pii.py` updates all 17 assets and replaces the
-demo PII rows with 16 curated classifications:
+demo PII rows with 24 curated classifications covering every active asset:
 
 | Owner | Assets |
 | --- | --- |
@@ -118,12 +118,15 @@ PII rows:
 | `stg_customer_360` | `email` / `masked_email` / `customer_id` | PII_SOURCE / PII_MASKED / PII_INHERITED | OBSERVED / OBSERVED / POSSIBLE |
 | `customer_transactions_schema` | `customer_id` / `risk_score` | PII_INHERITED / PII_POTENTIAL | POSSIBLE / POSSIBLE |
 | `orders_feed`, `stg_orders_enriched`, `dim_customer_segments` | `customer_id` | PII_INHERITED | POSSIBLE |
-| `fct_daily_revenue`, `daily_revenue_kpi` (TABLE) | whole dataset | PII_CLEARED | OBSERVED |
+| `fct_daily_revenue`, `daily_revenue_kpi` (table/dashboard/exposure) | whole dataset | PII_CLEARED | OBSERVED |
+| `customer_retention_portal` | whole dataset | PII_INHERITED | POSSIBLE |
+| `customer_transactions_schema.csv` | whole dataset | PII_INHERITED | POSSIBLE |
+| `dbt_production_manifest.json`, metadata graph, SQL fixtures | whole dataset | PII_CLEARED | OBSERVED |
 
 Readback: `/api/v1/catalog` exposes `owner_name`, `steward_name`, `tags` and
 `is_pii`/`sensitivity_classification`; `/governance/classifications` joins the
-asset and column names and returns all 16 rows. Seven assets carry a PII badge;
-`fct_daily_revenue` and the KPI table are explicitly reviewed as not PII.
+asset and column names and returns all 24 rows. Nine assets carry a PII badge
+and eight are explicitly reviewed as not PII, so no asset is left unclassified.
 
 ## 4. Lineage edges (declared, `dbt_model_ref` / `dashboard_upstream_dataset`)
 

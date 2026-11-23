@@ -78,7 +78,7 @@ Status vocabulary used below:
 | Term ↔ asset assignment | `POST /governance/terms/{id}/assets` | **Verified** | `created: true` against `fct_daily_revenue` |
 | Domains | `GET/POST /governance/domains` → `?view=domains` | **Verified** | Created `Finance & Revenue` `f480e033-…`; page shows LIVE + rows |
 | Data products | `GET/POST /governance/products` → `?view=products` | **Verified (API)** | Created `Executive Revenue Intelligence` `f33bea44-…` with 2 assets |
-| PII classification | `POST /governance/classifications` → `?view=pii` | **Verified (demo data)** | 16 rows across customer/payment assets; list joins asset + column names; table renders classification, evidence and provenance |
+| PII classification | `POST /governance/classifications` → `?view=pii` | **Verified (demo data)** | 24 rows covering all 17 assets; list joins asset + column names; table renders classification, evidence and provenance; 9 PII badges + 8 reviewed PII_CLEARED |
 | Contracts + assertion linking | `/governance/products/{id}/contracts`, `/contracts/{id}/assertions` | **Verified (API, 2 rows exist globally)** | Not yet created in the demo workspace |
 | Column chooser for PII | `GET /governance/datasets/{id}/columns` | **Verified** | Merged `customers` owns its 6 columns |
 | Stewardship requests | `/api/v1/stewardship/requests` → `?view=stewardship` | **Verified (empty state)** | 0 rows; page renders create/approve forms |
