@@ -3,35 +3,27 @@ Audit Trail & Version History API Routes
 Comprehensive change tracking and version management with validation, logging, and error handling
 """
 
-import logging
-import json
 import hashlib
+import json
+import logging
 import time
-from uuid import UUID
 from datetime import datetime, timedelta
-from typing import Optional, Dict, Any
+from typing import Any, Dict, Optional
+from uuid import UUID
 
-from fastapi import APIRouter, Query, HTTPException, Request
-from fastapi import Depends
-from fastapi.responses import JSONResponse
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.encoders import jsonable_encoder
-from sqlalchemy import text
-from psycopg2.extras import RealDictCursor
+from fastapi.responses import JSONResponse
+from psycopg2.extras import Json, RealDictCursor
 
-from backend.app.db import get_db_connection, get_conn
+from backend.app.api.routes.membership import require_role
 from backend.app.auth import require_user
-from backend.app.api.errors import api_error
+from backend.app.db import get_conn, get_db_connection
 from backend.app.schemas.audit import (
-    AuditTrailResponse,
-    AuditLogEntry,
-    VersionHistory,
-    AssetVersion,
-    VersionDiff,
     RollbackRequest,
     RollbackResponse,
-    AuditStatistics,
-    ComplianceReport,
 )
+from backend.app.services.asset_versions import record_asset_version
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/audit", tags=["audit"], dependencies=[Depends(require_user)])
@@ -430,7 +422,7 @@ def get_audit_trail(
         
         # Add pagination
         offset = (page - 1) * page_size
-        query += f" ORDER BY created_at DESC LIMIT %s OFFSET %s"
+        query += " ORDER BY created_at DESC LIMIT %s OFFSET %s"
         params.extend([page_size, offset])
         
         # Execute main query
@@ -1051,14 +1043,66 @@ def get_compliance_report(
 # Rollback Endpoint
 # ═══════════════════════════════════════════════════════════════════
 
-@router.post("/{asset_id}/rollback")
+_ROLLBACK_COLUMNS = """
+    r.id::text AS id, r.asset_id::text AS asset_id, d.name AS asset_name,
+    r.from_version, r.to_version, r.rollback_reason, r.requested_by,
+    r.status, r.approved_by, r.approved_at, r.created_at
+"""
+
+
+def _rollback_response(row: dict, message: str) -> RollbackResponse:
+    return RollbackResponse(
+        rollback_id=UUID(row["id"]),
+        asset_id=UUID(row["asset_id"]),
+        from_version=row["from_version"],
+        to_version=row["to_version"],
+        status=row["status"],
+        requested_by=row["requested_by"],
+        created_at=row["created_at"],
+        message=message,
+    )
+
+
+def _rollback_row(cur, asset_id: str, rollback_id: UUID, *, lock: bool = False) -> dict | None:
+    cur.execute(
+        f"""
+        SELECT {_ROLLBACK_COLUMNS}
+        FROM rollback_record r
+        JOIN dataset d ON d.id = r.asset_id
+        WHERE r.id=%s::uuid AND r.asset_id=%s::uuid
+        {"FOR UPDATE OF r" if lock else ""}
+        """,
+        (str(rollback_id), str(asset_id)),
+    )
+    row = cur.fetchone()
+    return dict(row) if row else None
+
+
+def _rollback_event(cur, asset_id: str, event_type: str, user: dict, rollback: dict, detail: dict | None = None) -> None:
+    cur.execute(
+        """
+        INSERT INTO audit_event(asset_id, event_type, severity, description, actor, metadata)
+        VALUES (%s::uuid, %s, 'INFO', %s, %s, %s)
+        """,
+        (
+            str(asset_id),
+            event_type,
+            f"Rollback {rollback['id']} {event_type.lower().replace('_', ' ')}",
+            user.get("email") or user["id"],
+            Json({"rollback_id": rollback["id"], **(detail or {})}),
+        ),
+    )
+
+
+@router.post("/{asset_id}/rollback", status_code=202, response_model=RollbackResponse,
+             dependencies=[Depends(require_role("owner", "admin", "editor"))])
 def request_rollback(
     request: Request,
     asset_id: str,
     rollback_request: RollbackRequest,
     user: dict = Depends(require_user),
 ):
-    """Return an explicit unsupported response until approval/execution exists."""
+    """Create a PENDING rollback request for approval and later execution."""
     client_ip = request.client.host if request.client else "unknown"
     check_rate_limit(client_ip)
     try:
@@ -1067,16 +1111,177 @@ def request_rollback(
             raise ValueError("Version numbers must be >= 1")
         if rollback_request.from_version == rollback_request.to_version:
             raise ValueError("Versions must be different")
-        if not rollback_request.rollback_reason or len(rollback_request.rollback_reason) < 10:
+        if not rollback_request.rollback_reason or len(rollback_request.rollback_reason.strip()) < 10:
             raise ValueError("Rollback reason must be at least 10 characters")
-    except ValueError as exc:
+        if rollback_request.asset_id and str(rollback_request.asset_id) != str(UUID(asset_id)):
+            raise ValueError("asset_id in the body must match the path")
+    except (ValueError, TypeError) as exc:
         return create_error_response(
             message=str(exc), error_code="INVALID_INPUT", status_code=400,
             request_id=request.headers.get("X-Request-ID", "unknown"),
         )
-    raise HTTPException(
-        status_code=501,
-        detail="Rollback approval and execution are not implemented; no rollback request was created.",
+
+    with get_conn() as conn:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute("SELECT id::text, name FROM dataset WHERE id=%s::uuid", (asset_id,))
+            asset = cur.fetchone()
+            if not asset:
+                raise HTTPException(status_code=404, detail="Asset not found")
+            cur.execute("SELECT MAX(version_number) AS current FROM asset_version WHERE asset_id=%s::uuid", (asset_id,))
+            current = cur.fetchone()["current"]
+            if current is None:
+                raise HTTPException(status_code=404, detail="No version history exists for this asset yet")
+            if rollback_request.from_version != current:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"from_version must be the current version ({current}); refresh history and retry.",
+                )
+            cur.execute(
+                "SELECT 1 FROM asset_version WHERE asset_id=%s::uuid AND version_number=%s",
+                (asset_id, rollback_request.to_version),
+            )
+            if cur.fetchone() is None:
+                raise HTTPException(status_code=404, detail=f"Version {rollback_request.to_version} not found for this asset")
+            cur.execute(
+                """
+                INSERT INTO rollback_record
+                    (asset_id, from_version, to_version, rollback_reason, requested_by, status)
+                VALUES (%s::uuid, %s, %s, %s, %s, 'PENDING')
+                RETURNING id::text
+                """,
+                (
+                    asset_id, rollback_request.from_version, rollback_request.to_version,
+                    rollback_request.rollback_reason.strip(), user.get("email") or user["id"],
+                ),
+            )
+            rollback_id = cur.fetchone()["id"]
+            rollback = _rollback_row(cur, asset_id, UUID(rollback_id))
+            _rollback_event(cur, asset_id, "ROLLBACK_REQUESTED", user, rollback, {"reason": rollback_request.rollback_reason.strip()})
+    return _rollback_response(rollback, "Rollback request created; an owner or admin must approve it before execution.")
+
+
+@router.get("/{asset_id}/rollbacks")
+def list_rollbacks(asset_id: str):
+    """List rollback requests for one asset, newest first."""
+    asset_id = str(validate_uuid(asset_id, "asset_id"))
+    with get_conn() as conn:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(
+                f"""
+                SELECT {_ROLLBACK_COLUMNS}
+                FROM rollback_record r JOIN dataset d ON d.id = r.asset_id
+                WHERE r.asset_id=%s::uuid ORDER BY r.created_at DESC
+                """,
+                (asset_id,),
+            )
+            rows = [dict(row) for row in cur.fetchall()]
+    return {"rollbacks": rows, "count": len(rows)}
+
+
+@router.post("/{asset_id}/rollbacks/{rollback_id}/approve", response_model=RollbackResponse,
+             dependencies=[Depends(require_role("owner", "admin"))])
+def approve_rollback(asset_id: str, rollback_id: UUID, user: dict = Depends(require_user)):
+    """Approve a PENDING rollback; execution is a separate explicit action."""
+    asset_id = str(validate_uuid(asset_id, "asset_id"))
+    with get_conn() as conn:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            rollback = _rollback_row(cur, asset_id, rollback_id, lock=True)
+            if rollback is None:
+                raise HTTPException(status_code=404, detail="Rollback request not found")
+            if rollback["status"] != "PENDING":
+                raise HTTPException(status_code=409, detail=f"Only PENDING rollbacks can be approved (found {rollback['status']}).")
+            cur.execute(
+                "UPDATE rollback_record SET status='APPROVED', approved_by=%s, approved_at=now() WHERE id=%s::uuid",
+                (user.get("email") or user["id"], str(rollback_id)),
+            )
+            rollback = _rollback_row(cur, asset_id, rollback_id)
+            _rollback_event(cur, asset_id, "ROLLBACK_APPROVED", user, rollback)
+    return _rollback_response(rollback, "Rollback approved. Execute it to restore the selected metadata snapshot.")
+
+
+@router.post("/{asset_id}/rollbacks/{rollback_id}/reject", response_model=RollbackResponse,
+             dependencies=[Depends(require_role("owner", "admin"))])
+def reject_rollback(asset_id: str, rollback_id: UUID, user: dict = Depends(require_user)):
+    """Reject a PENDING or APPROVED rollback without changing asset metadata."""
+    asset_id = str(validate_uuid(asset_id, "asset_id"))
+    with get_conn() as conn:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            rollback = _rollback_row(cur, asset_id, rollback_id, lock=True)
+            if rollback is None:
+                raise HTTPException(status_code=404, detail="Rollback request not found")
+            if rollback["status"] not in {"PENDING", "APPROVED"}:
+                raise HTTPException(status_code=409, detail=f"Only PENDING or APPROVED rollbacks can be rejected (found {rollback['status']}).")
+            cur.execute("UPDATE rollback_record SET status='REJECTED' WHERE id=%s::uuid", (str(rollback_id),))
+            rollback = _rollback_row(cur, asset_id, rollback_id)
+            _rollback_event(cur, asset_id, "ROLLBACK_REJECTED", user, rollback)
+    return _rollback_response(rollback, "Rollback rejected; asset metadata was not changed.")
+
+
+@router.post("/{asset_id}/rollbacks/{rollback_id}/execute", response_model=RollbackResponse,
+             dependencies=[Depends(require_role("owner", "admin"))])
+def execute_rollback(asset_id: str, rollback_id: UUID, user: dict = Depends(require_user)):
+    """Restore the selected snapshot's mutable metadata and append a new version."""
+    asset_id = str(validate_uuid(asset_id, "asset_id"))
+    with get_conn() as conn:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(
+                f"""
+                SELECT {_ROLLBACK_COLUMNS}, av.snapshot_data
+                FROM rollback_record r
+                JOIN dataset d ON d.id = r.asset_id
+                JOIN asset_version av ON av.asset_id = r.asset_id AND av.version_number = r.to_version
+                WHERE r.id=%s::uuid AND r.asset_id=%s::uuid
+                FOR UPDATE OF r
+                """,
+                (str(rollback_id), asset_id),
+            )
+            row = cur.fetchone()
+            if row is None:
+                raise HTTPException(status_code=404, detail="Rollback request or target version not found")
+            rollback = dict(row)
+            if rollback["status"] != "APPROVED":
+                raise HTTPException(status_code=409, detail=f"Only an APPROVED rollback can be executed (found {rollback['status']}).")
+
+            snapshot = rollback.get("snapshot_data") or {}
+            allowed = {"description", "tags", "owner_name", "steward_name", "owner_id", "steward_id"}
+            updates = {key: snapshot[key] for key in allowed if key in snapshot}
+            if not updates:
+                raise HTTPException(status_code=422, detail="The target version has no restorable metadata fields.")
+            if "tags" in updates and not (updates["tags"] is None or isinstance(updates["tags"], list)):
+                raise HTTPException(status_code=422, detail="The target snapshot has an invalid tags value.")
+
+            cur.execute(
+                "SELECT description, tags, owner_name, steward_name, owner_id, steward_id FROM dataset WHERE id=%s::uuid",
+                (asset_id,),
+            )
+            before = dict(cur.fetchone())
+            assignments = ", ".join(f"{key}=%s" for key in updates)
+            cur.execute(
+                f"UPDATE dataset SET {assignments}, last_modified_by=%s, last_modified_at=now() WHERE id=%s::uuid",
+                (*updates.values(), user.get("email") or user["id"], asset_id),
+            )
+            for key, value in updates.items():
+                if before.get(key) == value:
+                    continue
+                old = before.get(key)
+                cur.execute(
+                    """INSERT INTO audit_log(asset_id,field_name,old_value,new_value,changed_by,change_type)
+                       VALUES (%s::uuid,%s,%s,%s,%s,'RESTORE')""",
+                    (asset_id, key, None if old is None else str(old), None if value is None else str(value), user.get("email") or user["id"]),
+                )
+            new_version = record_asset_version(
+                cur, asset_id, user.get("email") or user["id"],
+                f"Rollback executed from v{rollback['from_version']} to v{rollback['to_version']}",
+            )
+            cur.execute("UPDATE rollback_record SET status='EXECUTED' WHERE id=%s::uuid", (str(rollback_id),))
+            rollback = _rollback_row(cur, asset_id, rollback_id)
+            _rollback_event(
+                cur, asset_id, "ROLLBACK_EXECUTED", user, rollback,
+                {"restored_from_version": rollback["to_version"], "new_version": new_version},
+            )
+    return _rollback_response(
+        rollback,
+        f"Rollback executed; metadata restored from version {rollback['to_version']} and recorded as version {new_version}.",
     )
 
 

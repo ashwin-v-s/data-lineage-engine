@@ -93,8 +93,8 @@ Status vocabulary used below:
 | Quality results readback | `GET /quality/assertions/{id}/results` | **Verified (API)** | 1 `quality_result` row |
 | **Quality page / KPI** | `?view=quality`, Overview | **Verified live** | `catalog` loads latest results per assertion (BUG-02); deployed and serving 1 PASS result |
 | Freshness SLA | `POST /governance/slas` | **Verified** | `fct_daily_revenue` 48/60/120 min, `e0f15710-…` |
-| Freshness evaluation | `GET /governance/freshness`, `/datasets/{id}/evaluate` | **Partial** | SLA stored; no runtime signal → evaluations `UNKNOWN`; scheduler `manual` |
-| Incident lifecycle | `/governance/incidents` + ack/investigate/resolve/assign/comments | **Verified (empty state)** | 0 incidents; page reads live API |
+| Freshness evaluation | `GET /governance/freshness`, `/datasets/{id}/evaluate` | **Verified (on demand)** | `customers` STALE at 180 min against a 120 min manual SLA; `fct_daily_revenue` stays UNKNOWN without a signal. No scheduler is deployed. |
+| Incident lifecycle | `/governance/incidents` + ack/investigate/resolve/assign/comments | **Verified (demo data)** | 1 open `customers is STALE` incident, HIGH, assigned; DETECTED event; transitions tested against the real API |
 | Manual freshness confirmation | `POST /governance/datasets/{id}/confirm-freshness` | **Verified (route + tests)** | Not exercised in the demo workspace |
 
 ## 7. Operations, notifications, administration
@@ -103,11 +103,12 @@ Status vocabulary used below:
 | --- | --- | --- | --- |
 | Pipeline runs | `catalog.runs` ← `execution_run` → `?view=runs` | **Verified (demo data)** | 4 persisted demo runs (2 SUCCESS, 1 WARNING, 1 FAILED), each with one stored source event; `namespace` now surfaced as environment. Asset counts stay 0 because no per-run evidence exists. |
 | Sync jobs | `sync_job` | **Blocked** | 0 rows; populated only by the PostgreSQL connector |
-| Notifications | `/api/v1/notifications`, `/read`, `/read-all` | **Verified (API), no triggers** | 0 rows; no scheduler emits `FRESHNESS_BREACH` |
+| Notifications | `/api/v1/notifications`, `/read`, `/read-all` | **Verified (demo data)** | 1 unread `FRESHNESS_BREACH` written by the freshness evaluation; read and preference routes persist |
 | Notification preferences | `/notifications/preferences` | **Verified (API)** | UI toggles render in Settings |
 | Workspace members + roles | `/api/v1/members` | **Verified** | Admin page lists roles; owner cannot be removed |
 | Invitations + email | `/members/invites`, SMTP | **Partial** | Route + DB verified; delivery requires SMTP + `KAIROS_PUBLIC_APP_URL` |
-| Workspace audit feed | `GET /api/v1/audit/workspace` | **Verified (API)** | 24 `audit_event` rows globally |
+| Workspace audit feed | `GET /api/v1/audit/workspace` | **Verified (API)** | 24 `audit_event` rows globally; metadata changes append versions |
+| Metadata versions + rollback | `/api/v1/audit/{id}/versions`, `/rollback`, `/rollbacks/{id}/approve|reject|execute` | **Verified end to end** | v1 baseline → v2 edit → request → approve → execute → v3; `customers` restored without changing identity or lineage |
 | API keys | `/api/v1/api-keys` | **Verified (demo)** | Active `ci-readonly-catalog` key (read only); key read catalog 200, members/write 403, revoke 401; revoked name can be rotated without reviving the old secret |
 | Webhooks + deliveries | `/api/v1/webhooks` | **Verified (demo delivery)** | 1 endpoint subscribed to all 7 events; signed `test.ping` delivered HTTP 200 in 26 ms and recorded in history; private/rebound hosts refused (BUG-05) |
 | Profile / preferences | `?view=settings`, `/api/v1/me/welcome-email` | **Verified** | Name from Supabase metadata; avatar/preferences browser-local |

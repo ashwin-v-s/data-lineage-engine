@@ -19,7 +19,7 @@ Test identity: the repository's documented test account
 
 | Suite | Command | Result |
 | --- | --- | --- |
-| Backend (pytest) | `python -m pytest -q` | **733 passed, 83 skipped, 0 failed** (16.9 s) |
+| Backend (pytest) | `python -m pytest -q` | **848 passed, 83 skipped, 0 failed** |
 | Frontend (vitest) | `npx vitest run` | **134 passed / 134** |
 | Frontend build | `npm --prefix frontend run build` | **clean** (46 modules, 1.77 s) |
 | Migration/table presence | `python scripts/db/verify_applied.py` | **PASS** — 47 tables, 0 missing columns, routines present |
@@ -28,6 +28,19 @@ Test identity: the repository's documented test account
 
 Skipped tests are the live/credential-gated ones (`KAIROS_LIVE_*` flags not set
 for this run); their behaviour was exercised manually instead (section 3).
+
+### 1a. Final end-to-end completion (2026-11-24)
+
+| Area | Evidence | Result |
+| --- | --- | --- |
+| Metadata versions | `asset_version` v1 baseline + v2 description edit on `customers` | **PASS** |
+| Rollback workflow | request → PENDING → approve → APPROVED → execute → EXECUTED; description restored; v3 appended | **PASS** |
+| Rollback authorization | Owner/admin role gate; approve/reject/execute each append `audit_event` | **PASS** |
+| Version/rollback UI | Signed-in Chromium, `customers` → Activity: 3 versions and the executed request rendered; zero console errors | **PASS** |
+| Offline version tests | `tests/test_asset_versions.py` (4 tests) inside the 848 | **PASS** |
+| OpenAPI | regenerated, 126 paths, drift 0 | **PASS** |
+| Freshness → incident → notification | stored 180-minute-old manual confirmation; evaluator produced STALE, one HIGH incident and one unread `FRESHNESS_BREACH` | **PASS (on demand)** |
+| UI claims audit | `python scripts/check_ui_claims.py` (16 paths) | **PASS** |
 
 ## 2. Authentication and tenancy
 
@@ -331,7 +344,7 @@ only chart, stewardship, evidence, lineage, app and removal scripts.
 | GitHub App import | Needs App credentials, installation, public callback |
 | OpenLineage ingest | Needs `KAIROS_OPENLINEAGE_WEBHOOK_SECRET` + workspace binding on the deployment |
 | Welcome / invitation email | Needs SMTP credentials and `KAIROS_PUBLIC_APP_URL` on Vercel |
-| Scheduler-driven freshness, incidents, notifications | No scheduler is deployed; signals are `manual` |
+| Scheduler-driven freshness, incidents, notifications | No scheduler is deployed. The on-demand evaluator, incident lifecycle and notification fan-out are verified; only automatic cadence is unavailable. |
 | Hybrid vector search | No embeddings generated for this workspace |
 | Rotation of the password exposed before BUG-07 | Requires the Supabase dashboard; the repository code no longer contains it |
 

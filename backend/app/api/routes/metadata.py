@@ -5,24 +5,23 @@ Handles inline editing of descriptions, tags, and custom properties
 
 import logging
 import re
-from uuid import UUID
 from datetime import datetime
 from typing import Optional
+from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import text
+from fastapi import APIRouter, Depends, HTTPException
 
 from backend.app.api.routes.membership import require_role
-from backend.app.db import get_db_connection
 from backend.app.auth import require_user
+from backend.app.db import get_db_connection
 from backend.app.schemas.metadata import (
-    MetadataUpdateRequest,
-    MetadataUpdateResponse,
-    EntityMetadata,
-    EditableField,
     BulkMetadataUpdate,
     BulkUpdateResponse,
+    EditableField,
+    EntityMetadata,
+    MetadataUpdateResponse,
 )
+from backend.app.services.asset_versions import ensure_baseline_version, record_asset_version
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/metadata", tags=["metadata"], dependencies=[Depends(require_user)])
@@ -89,6 +88,7 @@ def update_description(
             raise HTTPException(status_code=404, detail="Dataset not found")
         
         old_value = result.get("description")
+        ensure_baseline_version(cur, asset_id, current_user)
         
         # Validate description length
         if len(description) > 500:
@@ -115,6 +115,7 @@ def update_description(
             """,
             (asset_id, old_value, description, current_user)
         )
+        record_asset_version(cur, asset_id, current_user, "Description updated")
         
         conn.commit()
         
@@ -181,6 +182,7 @@ def update_tags(
         
         current_tags = result.get("tags") or []
         old_tags = current_tags.copy()
+        ensure_baseline_version(cur, asset_id, current_user)
         
         # Calculate new tags
         if set_tags is not None:
@@ -215,6 +217,7 @@ def update_tags(
             """,
             (asset_id, str(old_tags), str(new_tags), current_user)
         )
+        record_asset_version(cur, asset_id, current_user, "Tags updated")
         
         conn.commit()
         
@@ -278,6 +281,7 @@ def bulk_update_metadata(
         for asset_id in request.asset_ids:
             cur.execute("SELECT tags FROM dataset WHERE id=%s::uuid", (str(asset_id),))
             row = cur.fetchone()
+            ensure_baseline_version(cur, str(asset_id), current_user)
             current_tags = row["tags"] if isinstance(row, dict) else row[0]
             tags = list(current_tags or [])
             if request.add_tags:
@@ -292,6 +296,7 @@ def bulk_update_metadata(
                 cur.execute("INSERT INTO audit_log(asset_id,field_name,new_value,changed_by,change_type) VALUES (%s::uuid,'description',%s,%s,'UPDATE')", (str(asset_id),request.description,current_user))
             if request.add_tags or request.remove_tags:
                 cur.execute("INSERT INTO audit_log(asset_id,field_name,new_value,changed_by,change_type) VALUES (%s::uuid,'tags',%s,%s,'UPDATE')", (str(asset_id),", ".join(tags),current_user))
+            record_asset_version(cur, str(asset_id), current_user, "Bulk metadata update")
         conn.commit()
         updated_assets = list(request.asset_ids)
         return BulkUpdateResponse(

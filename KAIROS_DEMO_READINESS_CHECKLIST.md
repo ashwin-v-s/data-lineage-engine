@@ -35,7 +35,7 @@ infrastructure; **UNVERIFIED** = not executed.
 - [x] **PASS** Run records — 4 persisted demo runs (2 SUCCESS, 1 WARNING, 1 FAILED), 1 stored event each, environment surfaced; signed-in Runs page verified with 4 rows
 - [x] **PASS** API keys — active `ci-readonly-catalog` key; catalog read 200, members/ingest 403, revoke 401; revoked name can be recreated with a new secret (verified live 2026-11-23)
 - [x] **PASS** Webhooks — endpoint subscribed to all 7 events; signed `test.ping` delivered HTTP 200 and recorded in History with `X-Kairos-Signature` (verified live 2026-11-23)
-- [ ] **BLOCKED** Incidents and notifications — no scheduler/signal
+- [x] **PASS (on demand)** Incidents and notifications — `seed_demo_ops_signal.py` wrote a 180-minute-old manual confirmation, the freshness engine evaluated `customers` STALE, and one HIGH incident plus one unread `FRESHNESS_BREACH` were created. No background scheduler is deployed.
 - [x] **PASS** Column-level lineage — SQLGlot projections emitted 19 COLUMN evidence rows and edges in this workspace (BUG-03 fixed)
 - [x] **PASS** Dated/temporal evidence — the dbt manifest's source-declared `generated_at` gives 8 dependencies a KNOWN valid interval; the remaining 34 undated rows are counted, not silently excluded (BUG-04 limited to sources without a timestamp)
 
@@ -63,8 +63,10 @@ infrastructure; **UNVERIFIED** = not executed.
 - [x] **PASS** PII classification — 24 evidence-backed rows covering every active asset; API joins asset + column, all 17 assets show a classification badge, and the PII table renders classification/evidence/provenance
 - [x] **PASS** Time travel — 8 dated dbt dependencies at today, 0 before 2026-11-16, 8 from 2026-11-18; 34 undated records reported separately
 - [x] **PASS** Lineage graph — one row per logical dataset; only genuinely different kinds (table/dashboard/exposure) share a name (BUG-01 fixed)
-- [ ] **PARTIAL** Notifications — empty state only, preferences work
-- [ ] **PARTIAL** Incidents — empty state only
+- [x] **PASS** Notifications — 1 unread `FRESHNESS_BREACH` row, mark-read/read-all and preferences persist (verified live 2026-11-24)
+- [x] **PASS** Incidents — 1 open `customers is STALE` HIGH incident with owner, DETECTED event and tested acknowledge/investigate/resolve transitions
+- [x] **PASS** Metadata versions and rollback — v1 baseline, v2 description edit and v3 executed rollback; approval/execution are separate owner/admin actions; Activity tab renders all three versions and the executed request
+- [x] **PASS** Freshness failure path — `customers` STALE at 180 minutes against a 120-minute SLA, with stored evaluation, incident and notification
 - [ ] **PARTIAL** Sources — form only, no connection
 - [ ] **PARTIAL** Integrations — GitHub shows not configured
 - [ ] **PARTIAL** Hybrid/vector search — route present, no embeddings

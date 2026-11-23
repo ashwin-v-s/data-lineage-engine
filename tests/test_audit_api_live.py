@@ -812,9 +812,9 @@ class TestRollbackWorkflow:
             f"/api/v1/audit/{sample_asset_id}/rollback",
             json=payload
         )
-        assert response.status_code in [200, 201, 404, 400]
+        assert response.status_code in [200, 201, 202, 404, 400]
         
-        if response.status_code in [200, 201]:
+        if response.status_code in [200, 201, 202]:
             data = response.json()
             assert "rollback_id" in data
             assert data["status"] in ["PENDING", "APPROVED", "EXECUTED"]
@@ -831,7 +831,7 @@ class TestRollbackWorkflow:
             json=payload
         )
         
-        if response.status_code in [200, 201]:
+        if response.status_code in [200, 201, 202]:
             data = response.json()
             assert "rollback_id" in data
             assert "asset_id" in data
@@ -852,7 +852,7 @@ class TestRollbackWorkflow:
             json=payload
         )
         
-        if response.status_code in [200, 201]:
+        if response.status_code in [200, 201, 202]:
             data = response.json()
             status = data.get("status")
             valid_statuses = ["PENDING", "APPROVED", "EXECUTED", "REJECTED"]
@@ -897,7 +897,7 @@ class TestRollbackWorkflow:
             json=payload
         )
         # Implementation specific
-        assert response.status_code in [200, 201, 400, 422, 404]
+        assert response.status_code in [200, 201, 202, 400, 422, 404]
 
     def test_rollback_missing_reason(self, client, sample_asset_id):
         """Test rollback without required reason"""
