@@ -291,25 +291,25 @@
       tex.needsUpdate=true;
     };
     const grassTiles=Math.max(8,groundW/9);
-    loadTexture('/assets/textures/grass/leafy_grass_diff_1k.jpg',tex=>{
+    loadTexture('/scene-assets/textures/grass/leafy_grass_diff_1k.jpg',tex=>{
       tileTexture(tex,grassTiles,grassTiles,true);
       ground.material.map=tex;
       ground.material.color.setHex?.(0xd9ecc0);
       ground.material.needsUpdate=true;
     });
-    loadTexture('/assets/textures/grass/leafy_grass_nor_gl_1k.jpg',tex=>{
+    loadTexture('/scene-assets/textures/grass/leafy_grass_nor_gl_1k.jpg',tex=>{
       tileTexture(tex,grassTiles,grassTiles,false);
       ground.material.normalMap=tex;
       ground.material.normalScale?.set(0.8,0.8);
       ground.material.needsUpdate=true;
     });
-    loadTexture('/assets/textures/grass/leafy_grass_rough_1k.jpg',tex=>{
+    loadTexture('/scene-assets/textures/grass/leafy_grass_rough_1k.jpg',tex=>{
       tileTexture(tex,grassTiles,grassTiles,false);
       ground.material.roughnessMap=tex;
       ground.material.roughness=1;
       ground.material.needsUpdate=true;
     });
-    loadTexture('/assets/textures/bark/bark_brown_02_diff_1k.jpg',tex=>{
+    loadTexture('/scene-assets/textures/bark/bark_brown_02_diff_1k.jpg',tex=>{
       tileTexture(tex,2,3,true);
       trunkMat.map=tex;
       trunkMat.color.setHex?.(0xffffff);
@@ -318,7 +318,7 @@
 
     /* Radiance HDR sky: parsed in-page (core three only), then PMREM-filtered so
        every PBR surface reflects the real sky instead of a flat colour. */
-    const HDR_URL='/assets/hdri/mpumalanga_veld_puresky_1k.hdr';
+    const HDR_URL='/scene-assets/hdri/mpumalanga_veld_puresky_1k.hdr';
     let hdrRT=null,hdrTex=null;
     const parseHdr=(buffer)=>{
       const bytes=new Uint8Array(buffer);

@@ -1,4 +1,4 @@
-import { copyFileSync, mkdirSync } from 'node:fs';
+import { cpSync, copyFileSync, existsSync, mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { defineConfig } from 'vite';
 
@@ -45,6 +45,12 @@ export default defineConfig({
         const destination = resolve(output, file);
         mkdirSync(dirname(destination), { recursive: true });
         copyFileSync(resolve(frontendRoot, file), destination);
+      }
+      /* The observatory's HDR/PBR assets are served by the classic scripts, so
+         they ship verbatim rather than through the module graph. */
+      const sceneAssets = resolve(frontendRoot, 'scene-assets');
+      if (existsSync(sceneAssets)) {
+        cpSync(sceneAssets, resolve(output, 'scene-assets'), { recursive: true });
       }
     },
   }],
