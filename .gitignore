@@ -62,3 +62,6 @@ Thumbs.db
 
 .vercel
 .env*
+
+# Skills CLI symlinks into .agents/skills (git on Windows would store copies)
+/.claude/skills/threejs-*/
