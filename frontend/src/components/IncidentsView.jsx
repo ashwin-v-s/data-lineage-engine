@@ -9,6 +9,8 @@ import {
   fetchIncident,
   fetchIncidents,
   formatTimestamp,
+  normalizeIncidentDetail,
+  normalizeIncidentList,
   incidentSeverityChipToken,
   incidentStatusChipToken,
   severityExplanation,
@@ -81,9 +83,13 @@ export default function IncidentsView({ demoPreview = false } = {}) {
     let cancelled = false;
     setListLoading(true);
     if (demoPreview) {
-      setIncidents([]);
-      setCount(0);
-      setListError('Incidents are unavailable in demo preview. No sample incidents are substituted.');
+      const fixtures = window.kairosDemoFixtures || {};
+      const normalised = normalizeIncidentList({ incidents: fixtures.incidents || [] });
+      const visible = statusFilter === 'ALL' ? normalised.incidents : normalised.incidents.filter((item) => item.status === statusFilter);
+      setIncidents(visible);
+      setCount(visible.length);
+      setListError(null);
+      setLive(false);
       setListLoading(false);
       return () => { cancelled = true; };
     }
@@ -111,6 +117,15 @@ export default function IncidentsView({ demoPreview = false } = {}) {
     setDetailError(null);
     setNotice(null);
     setNoticeError(null);
+    if (demoPreview) {
+      const fixtures = window.kairosDemoFixtures || {};
+      const raw = (fixtures.incidentDetails || []).find((item) => String(item.id) === String(id))
+        || (fixtures.incidents || []).find((item) => String(item.id) === String(id));
+      setDetail(raw ? normalizeIncidentDetail(raw) : null);
+      setDetailError(raw ? null : 'This fixture incident has no detail record.');
+      setDetailLoading(false);
+      return;
+    }
     setDetailLoading(true);
     fetchIncident(id).then((result) => {
       if (!mountedRef.current) return;
@@ -118,7 +133,7 @@ export default function IncidentsView({ demoPreview = false } = {}) {
       if (result.ok) setDetail(result.incident);
       else setDetailError(result.error);
     });
-  }, []);
+  }, [demoPreview]);
 
   const handleAction = useCallback((action) => {
     if (!detail || !detail.id) return;
@@ -177,7 +192,7 @@ export default function IncidentsView({ demoPreview = false } = {}) {
         {live ? <DataModeLabel mode={DATA_MODES.LIVE} /> : demoPreview ? <DataModeLabel mode={DATA_MODES.DEMO_FIXTURE} /> : null}
       </div>
       <p className="kv-sub">
-        {demoPreview ? 'Incident records are not included in the demo preview.' : null}
+        {demoPreview ? 'Synthetic incident records from the bundled demo fixture. This view is read-only.' : null}
         {!demoPreview ? <>
         This console reads the live incidents written by the Kairos freshness engine.
         Severity follows the breach that opened the incident: a STALE verdict opens a
@@ -350,7 +365,9 @@ export default function IncidentsView({ demoPreview = false } = {}) {
             </dl>
 
             <div className="kv-actions kv-incidents-actions">
-              {allowed.length > 0 ? (
+              {demoPreview ? (
+                <span className="kv-muted kv-incidents-placeholder">Demo preview is read-only. Switch to Live catalog to acknowledge, investigate or resolve an incident.</span>
+              ) : allowed.length > 0 ? (
                 allowed.map((action) => (
                   <button
                     key={action}
@@ -369,7 +386,7 @@ export default function IncidentsView({ demoPreview = false } = {}) {
               )}
             </div>
 
-            {detail.status !== 'RESOLVED' && <>
+            {!demoPreview && detail.status !== 'RESOLVED' && <>
               <form className="kv-card" onSubmit={handleAssign}>
                 <label>Assign to active workspace member (user UUID)<input value={assignmentUserId} onChange={(event) => setAssignmentUserId(event.target.value)} maxLength={36} required /></label>
                 <button className="kv-btn" disabled={busyAction !== null || !assignmentUserId.trim()} type="submit">Assign incident</button>

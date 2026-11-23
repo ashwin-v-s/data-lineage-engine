@@ -8,6 +8,7 @@ const runtimeFiles = [
   'asset-removal.js',
   'auth.js',
   'auth-stitch.html',
+  'demo-preview-data.js',
   'auth-stitch.css',
   'auth.css',
   'assets.css',

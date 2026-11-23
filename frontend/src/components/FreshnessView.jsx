@@ -13,6 +13,8 @@ import {
   formatTimestamp,
   freshnessChipToken,
   freshnessExplanation,
+  normalizeFreshnessPayload,
+  normalizeSlaList,
   upsertSla,
   validateSlaInput,
 } from '../views/freshness.js';
@@ -44,11 +46,14 @@ function FreshnessView({ demoPreview = false } = {}) {
     if (!quiet) setLoading(true);
     setError('');
     if (demoPreview) {
-      setEvaluations([]);
-      setCounts({ HEALTHY: 0, AT_RISK: 0, LATE: 0, STALE: 0, UNKNOWN: 0, PAUSED: 0 });
-      setSlas([]);
+      const fixtures = window.kairosDemoFixtures || {};
+      const normalised = normalizeFreshnessPayload(fixtures.freshness || {});
+      const normalisedSlas = normalizeSlaList({ slas: fixtures.slas || [] });
+      setEvaluations(normalised.evaluations);
+      setCounts(normalised.counts);
+      setSlas(normalisedSlas.slas);
       setLive(false);
-      setError('Freshness data is unavailable in demo preview. No sample readings are substituted.');
+      setError('');
       setLoading(false);
       setRefreshing(false);
       return;
@@ -141,7 +146,7 @@ function FreshnessView({ demoPreview = false } = {}) {
       <div className="kv-view-head">
         <div>
           <h1 id="freshnessTitle">Freshness</h1>
-          <p className="kv-sub">Latest stored evaluations and workspace freshness thresholds.</p>
+          <p className="kv-sub">{demoPreview ? 'Synthetic freshness readings and SLAs from the bundled demo fixture.' : 'Latest stored evaluations and workspace freshness thresholds.'}</p>
         </div>
         {live ? <DataModeLabel mode={DATA_MODES.LIVE} /> : demoPreview ? <DataModeLabel mode={DATA_MODES.DEMO_FIXTURE} /> : null}
       </div>
@@ -149,10 +154,7 @@ function FreshnessView({ demoPreview = false } = {}) {
       {notice ? <p className="kv-note" role="status">{notice}</p> : null}
       {error ? <p className="kv-note kv-note--error" role="alert">{error}</p> : null}
 
-      {demoPreview ? (
-        <div className="kv-card"><p className="kv-freshness-placeholder">Freshness records are not included in the demo preview. Switch to an authenticated catalog session to load them.</p></div>
-      ) : (
-        <>
+      <>
           <section className="kv-card" aria-label="Latest freshness counts">
             <div className="kv-freshness-counts">
               {['HEALTHY', 'AT_RISK', 'LATE', 'STALE', 'UNKNOWN', 'PAUSED'].map((state) => (
@@ -185,7 +187,7 @@ function FreshnessView({ demoPreview = false } = {}) {
                       <td>{item.evaluationMode || 'Unknown'}</td>
                       <td>{item.evidenceSource === 'MANUAL_ATTESTATION' ? <span>MANUAL ATTESTATION · {item.evidenceRef.note || 'Human attestation'} · not runtime evidence</span> : item.evidenceSource === 'RUNTIME' ? <span>RUNTIME · <code>{item.evidenceId}</code></span> : item.evidenceRef?.kind === 'UNAVAILABLE' ? <span>{item.evidenceRef.reason || 'No qualifying evidence reference'}</span> : item.evidenceSource === 'UNVERIFIED' ? <span>Unverified evidence reference{item.evidenceId ? <> · <code>{item.evidenceId}</code></> : ''}</span> : 'No qualifying evidence reference'}</td>
                       <td>{formatTimestamp(item.evaluatedAt)}</td>
-                      <td><button className="btn small" disabled={refreshing} onClick={() => evaluateNow(item.datasetId)} type="button">Evaluate now</button><details><summary>Manual confirmation</summary><form onSubmit={(event) => submitManualConfirmation(event, item.datasetId)}><label>Observed at<input name="observed_at" required type="datetime-local" /></label><label>Note<textarea name="note" maxLength={1000} minLength={1} required /></label><button className="btn small" disabled={refreshing} type="submit">Save attestation</button></form></details></td>
+                      <td>{demoPreview ? <span className="kv-muted">Read-only fixture</span> : <><button className="btn small" disabled={refreshing} onClick={() => evaluateNow(item.datasetId)} type="button">Evaluate now</button><details><summary>Manual confirmation</summary><form onSubmit={(event) => submitManualConfirmation(event, item.datasetId)}><label>Observed at<input name="observed_at" required type="datetime-local" /></label><label>Note<textarea name="note" maxLength={1000} minLength={1} required /></label><button className="btn small" disabled={refreshing} type="submit">Save attestation</button></form></details></>}</td>
                     </tr>
                   ))}</tbody>
                 </table>
@@ -199,7 +201,7 @@ function FreshnessView({ demoPreview = false } = {}) {
               <div className="kv-table-wrap"><table className="kv-table"><thead><tr><th scope="col">Asset</th><th scope="col">Signal</th><th scope="col">Warn</th><th scope="col">SLA</th><th scope="col">Stale</th><th scope="col">Schedule</th><th scope="col">State</th></tr></thead>
                 <tbody>{slas.map((sla) => <tr key={sla.id}><td>{sla.datasetName || sla.datasetId || 'Unknown asset'}</td><td>{SIGNAL_LABELS[sla.signal] || sla.signal || 'Unknown'}</td><td>{formatAge(sla.warnAfterMinutes)}</td><td>{formatAge(sla.errorAfterMinutes)}</td><td>{formatAge(sla.staleAfterMinutes)}</td><td>{sla.evaluationSchedule || 'manual'} · {sla.schedulerStatus === 'BLOCKED' ? 'BLOCKED — scheduler adapter unavailable' : 'manual only'}</td><td>{sla.paused ? 'PAUSED' : 'Enabled'}</td></tr>)}</tbody></table></div>
             )}
-            <form className="kv-freshness-form" onSubmit={saveSla}>
+            {!demoPreview && <form className="kv-freshness-form" onSubmit={saveSla}>
               <h3>Configure an SLA</h3>
               <label>Asset id or name<input autoComplete="off" onChange={(event) => setForm({ ...form, asset_id: event.target.value })} value={form.asset_id} /></label>
               <label>Signal<select onChange={(event) => setForm({ ...form, signal: event.target.value })} value={form.signal}>{SLA_SIGNALS.map((signal) => <option key={signal} value={signal}>{SIGNAL_LABELS[signal] || signal}</option>)}</select></label>
@@ -210,10 +212,9 @@ function FreshnessView({ demoPreview = false } = {}) {
               <label><input checked={Boolean(form.paused)} onChange={(event) => setForm({ ...form, paused: event.target.checked })} type="checkbox" /> Pause evaluations</label>
               {formErrors.length ? <ul className="kv-note kv-note--error" role="alert">{formErrors.map((item) => <li key={item.field}>{item.message}</li>)}</ul> : null}
               <button className="btn primary" disabled={saving || loading} type="submit">{saving ? 'Saving…' : 'Save SLA'}</button>
-            </form>
+            </form>}
           </section>
-        </>
-      )}
+      </>
     </section>
   );
 }
