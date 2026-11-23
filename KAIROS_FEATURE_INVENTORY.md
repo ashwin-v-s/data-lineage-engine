@@ -108,8 +108,8 @@ Status vocabulary used below:
 | Workspace members + roles | `/api/v1/members` | **Verified** | Admin page lists roles; owner cannot be removed |
 | Invitations + email | `/members/invites`, SMTP | **Partial** | Route + DB verified; delivery requires SMTP + `KAIROS_PUBLIC_APP_URL` |
 | Workspace audit feed | `GET /api/v1/audit/workspace` | **Verified (API)** | 24 `audit_event` rows globally |
-| API keys | `/api/v1/api-keys` | **Verified (API)** | 1 row globally; self/rotate/revoke routes tested |
-| Webhooks + deliveries | `/api/v1/webhooks` | **Verified (API, 0 rows)** | Create/test/deliveries implemented; SSRF allowlist missing (BUG-05) |
+| API keys | `/api/v1/api-keys` | **Verified (demo)** | Active `ci-readonly-catalog` key (read only); key read catalog 200, members/write 403, revoke 401; revoked name can be rotated without reviving the old secret |
+| Webhooks + deliveries | `/api/v1/webhooks` | **Verified (demo delivery)** | 1 endpoint subscribed to all 7 events; signed `test.ping` delivered HTTP 200 in 26 ms and recorded in history; private/rebound hosts refused (BUG-05) |
 | Profile / preferences | `?view=settings`, `/api/v1/me/welcome-email` | **Verified** | Name from Supabase metadata; avatar/preferences browser-local |
 | REA insight endpoints | `/api/v1/rea/*` | **Partial** | Static recommendation/pattern catalog, not workspace data |
 

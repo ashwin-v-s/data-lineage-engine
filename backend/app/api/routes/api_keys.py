@@ -101,18 +101,52 @@ def create_api_key(body: ApiKeyCreate, user: dict = Depends(require_user)):
             with conn.cursor() as cur:
                 if _table_missing(cur, "workspace_api_key"):
                     raise HTTPException(status_code=503, detail=_UNPROVISIONED_DETAIL)
+                # Revoking a key keeps its audit row, so the name is normally
+                # still present.  Reusing the name must rotate that row instead
+                # of failing as a duplicate: the UI promises a lost key can be
+                # replaced, and the old secret must stay dead.
                 cur.execute(
                     """
-                    INSERT INTO workspace_api_key
-                        (workspace_id, name, token_prefix, secret_hash, scopes, created_by)
-                    VALUES (
-                        current_setting('kairos.workspace_id', true)::uuid,
-                        %s, %s, %s, ARRAY['read']::text[], %s::uuid
-                    )
-                    RETURNING id::text, name, token_prefix, scopes, created_at, last_used_at, revoked_at
+                    SELECT id::text, revoked_at
+                    FROM workspace_api_key
+                    WHERE workspace_id = current_setting('kairos.workspace_id', true)::uuid
+                      AND name = %s
+                    FOR UPDATE
                     """,
-                    (body.name.strip(), prefix, secret_hash, str(actor_id)),
+                    (body.name.strip(),),
                 )
+                existing = cur.fetchone()
+                if existing and existing[1] is None:
+                    raise HTTPException(status_code=409, detail="A key with that name already exists")
+                if existing:
+                    cur.execute(
+                        """
+                        UPDATE workspace_api_key
+                           SET token_prefix = %s,
+                               secret_hash = %s,
+                               scopes = ARRAY['read']::text[],
+                               created_by = %s::uuid,
+                               created_at = now(),
+                               last_used_at = NULL,
+                               revoked_at = NULL
+                         WHERE id = %s::uuid
+                        RETURNING id::text, name, token_prefix, scopes, created_at, last_used_at, revoked_at
+                        """,
+                        (prefix, secret_hash, str(actor_id), existing[0]),
+                    )
+                else:
+                    cur.execute(
+                        """
+                        INSERT INTO workspace_api_key
+                            (workspace_id, name, token_prefix, secret_hash, scopes, created_by)
+                        VALUES (
+                            current_setting('kairos.workspace_id', true)::uuid,
+                            %s, %s, %s, ARRAY['read']::text[], %s::uuid
+                        )
+                        RETURNING id::text, name, token_prefix, scopes, created_at, last_used_at, revoked_at
+                        """,
+                        (body.name.strip(), prefix, secret_hash, str(actor_id)),
+                    )
                 row = cur.fetchone()
     except PostgresError as exc:
         if getattr(exc, "pgcode", None) == "23505":

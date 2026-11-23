@@ -33,6 +33,8 @@ infrastructure; **UNVERIFIED** = not executed.
 - [x] **VERIFIED** Catalog readback after identity reconciliation: 17 active assets / 42 edges (23 dataset + 19 column) / 42 evidence rows / 1 quality check
 - [x] **PASS** PII classification — column fallback + classification ownership fixed and verified live (PR #15)
 - [x] **PASS** Run records — 4 persisted demo runs (2 SUCCESS, 1 WARNING, 1 FAILED), 1 stored event each, environment surfaced; signed-in Runs page verified with 4 rows
+- [x] **PASS** API keys — active `ci-readonly-catalog` key; catalog read 200, members/ingest 403, revoke 401; revoked name can be recreated with a new secret (verified live 2026-11-23)
+- [x] **PASS** Webhooks — endpoint subscribed to all 7 events; signed `test.ping` delivered HTTP 200 and recorded in History with `X-Kairos-Signature` (verified live 2026-11-23)
 - [ ] **BLOCKED** Incidents and notifications — no scheduler/signal
 - [x] **PASS** Column-level lineage — SQLGlot projections emitted 19 COLUMN evidence rows and edges in this workspace (BUG-03 fixed)
 - [x] **PASS** Dated/temporal evidence — the dbt manifest's source-declared `generated_at` gives 8 dependencies a KNOWN valid interval; the remaining 34 undated rows are counted, not silently excluded (BUG-04 limited to sources without a timestamp)

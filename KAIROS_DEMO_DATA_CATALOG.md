@@ -175,6 +175,23 @@ python scripts/db/seed_demo_runs.py \
   --workspace d91f7d80-dc3e-401e-9df4-e7670e4d3ba1
 ```
 
+### 5b. Integration credentials
+
+Created from the signed-in **Workspace administration** page on 2026-11-23:
+
+| Record | Value |
+| --- | --- |
+| API key | `ci-readonly-catalog`, prefix `kairos_sk_2bI-S26ksl`, scope `read`, last used 2026-11-23T22:09Z |
+| API key secret | `.demo-sources/ci-readonly-catalog.key` (git-ignored, mode 600; never documented) |
+| Webhook | `https://httpbin.org/post`, description "Demo echo receiver - replace with your HTTPS endpoint", all 7 events, active |
+| Webhook signing secret | `.demo-sources/webhook-signing-secret.txt` (git-ignored, mode 600) |
+| Delivery | `test.ping`, HTTP 200, 26 ms, `X-Kairos-Signature` echoed by the receiver |
+
+The API key was verified against production: catalog read **200** with 17
+assets, `/api-keys/self` **200**, `/members` **403**, ingest preview **403**.
+The webhook delivery is stored in `workspace_webhook_delivery` and surfaced in
+the page's History panel.
+
 ## 6. Historical / temporal data
 
 The dbt manifest declares `metadata.generated_at = 2026-11-17T21:00:00Z`.

@@ -422,12 +422,15 @@ read-only by design."
 
 ## 18. Integrations & API
 
-**A.** GitHub App connector status, API keys, webhooks.
+**A.** GitHub App connector status, public repository browsing, private-file
+preview. Workspace API keys and webhooks live on **Workspace administration**
+(§19), not on this page.
 
 **B/C.** Sidebar → **System → Integrations & API**.
 
-**D (verified).** Page renders; API keys route exists (1 key globally);
-webhooks route exists (0 rows). GitHub connector reports "not configured".
+**D (verified).** Page renders; GitHub connector reports "not configured"
+without an App installation. API keys and webhooks are demonstrated under
+**System → Workspace administration**.
 
 **E.** "Private repository import is a server-side OAuth app, not a browser
 token; keys are scoped per workspace."
@@ -436,7 +439,7 @@ token; keys are scoped per workspace."
 
 ## 19. Workspace administration
 
-**A.** Members, roles, invitations, workspace audit.
+**A.** Members, roles, invitations, workspace audit, API keys and webhooks.
 
 **B/C.** Sidebar → **System → Workspace administration**.
 
@@ -448,6 +451,78 @@ are bound to the invitee's email."
 
 **G.** Invitation email requires SMTP; without it the link can still be copied
 from the API response.
+
+### API keys (verified live)
+
+The demo workspace has one active key, **`ci-readonly-catalog`**, prefix
+`kairos_sk_2bI-S26ksl`, scope **read only**, created 2026-11-23 and last used
+when the catalog was read. Its secret is stored locally at
+`.demo-sources/ci-readonly-catalog.key` (git-ignored) and is deliberately not
+printed in any document.
+
+1. Point at the row: name, masked prefix, `read only` scope, last-used time.
+2. Create a second key, e.g. `demo-ci-key`; the secret is revealed once with a
+   **Copy secret** button. Reload the page: the secret is gone, only the prefix
+   remains.
+3. Read the catalog with the key:
+
+```bash
+BASE=https://data-lineage-engine-5i2x.vercel.app
+KEY=$(cat .demo-sources/ci-readonly-catalog.key)
+curl -s "$BASE/api/v1/catalog?limit=100" \
+  -H "Authorization: Bearer $KEY" | jq '.counts'
+# {"assets":17,"edges":42,"evidence":42,"runs":4,...}
+```
+
+4. Prove read-only scope: the same key gets `403` from
+   `POST /api/v1/ingest/preview` and `GET /api/v1/members`.
+5. Revoke the key; the next catalog request returns `401`. Recreating the same
+   name rotates the revoked row, so the old secret stays dead and the name can
+   be reused (fixed 2026-11-23).
+
+**E.** "A key is a workspace-scoped read credential, not a user session. It can
+read the catalog, assets, lineage and search, and cannot mutate anything. The
+server stores only its SHA-256 hash."
+
+### Webhooks (verified live)
+
+The demo has one active endpoint, `https://httpbin.org/post`, labelled **Demo
+echo receiver - replace with your HTTPS endpoint**, subscribed to all seven
+events. **Send test** delivered a real signed `test.ping`: HTTP **200**, 26 ms,
+recorded in History with the `X-Kairos-Signature` header echoed back. Its
+signing secret is at `.demo-sources/webhook-signing-secret.txt` (git-ignored).
+
+1. Point at the endpoint row: seven event pills, **DELIVERED · HTTP 200**.
+2. Click **History** to show the `test.ping` attempt, HTTP 200, duration and the
+   receiver's echoed headers.
+3. Click **Send test** again; the delivery history adds a new signed attempt.
+4. For a real receiver, register your own HTTPS URL, select events, and copy the
+   one-time `whsec_…` signing secret. `httpbin.org` is only a public echo used
+   to prove the delivery path; it does not verify signatures.
+
+Receiver verification: compute `sha256=<hex>` over the **raw request body** with
+HMAC-SHA256 using the endpoint secret and compare it to
+`X-Kairos-Signature`. Also read `X-Kairos-Event` and `X-Kairos-Webhook-Id`.
+
+```python
+import hashlib, hmac
+expected = "sha256=" + hmac.new(secret.encode(), raw_body, hashlib.sha256).hexdigest()
+assert hmac.compare_digest(expected, request.headers["X-Kairos-Signature"])
+```
+
+Payload shape:
+
+```json
+{"event":"test.ping","workspace_id":"d91f7d80-…","webhook_id":"d75d546d-…","sent_at":"2026-11-23T22:07:20Z","data":{"message":"Kairos webhook delivery test"}}
+```
+
+**E.** "The test button uses the same signed POST and audited delivery row as a
+real event; failures are recorded, not swallowed. The endpoint is subscribed to
+all seven event names; `test.ping` is the event the demo sends."
+
+**G.** Only HTTPS public hosts are accepted; loopback, private, link-local and
+DNS-rebound destinations are refused. A failed delivery remains visible in
+History with its error.
 
 ---
 

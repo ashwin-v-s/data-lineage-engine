@@ -158,6 +158,7 @@ def test_create_api_key_returns_secret_once_and_stores_only_hash(client, monkeyp
     conn = _Conn(
         _regclass("workspace_api_key"),
         _role("admin"),
+        ("SELECT id::text, revoked_at", lambda stmts, params: []),
         ("INSERT INTO workspace_api_key", insert),
     )
     _use_all(monkeypatch, conn, ak, m)
@@ -173,18 +174,41 @@ def test_create_api_key_returns_secret_once_and_stores_only_hash(client, monkeyp
     assert body["token"] not in [str(value) for value in params]
 
 
-def test_duplicate_key_name_conflicts(client, monkeypatch):
-    class _Unique(Exception):
-        pgcode = "23505"
-
-    def insert(stmts, params):
-        raise _Unique("duplicate")
-
-    monkeypatch.setattr(ak, "PostgresError", _Unique)
-    conn = _Conn(_regclass("workspace_api_key"), _role("owner"), ("INSERT INTO workspace_api_key", insert))
+def test_duplicate_active_key_name_conflicts(client, monkeypatch):
+    active = ("key-1", None)
+    conn = _Conn(
+        _regclass("workspace_api_key"),
+        _role("owner"),
+        ("SELECT id::text, revoked_at", lambda stmts, params: [active]),
+    )
     _use_all(monkeypatch, conn, ak, m)
     response = client.post("/api/v1/api-keys", json={"name": "ci-key"})
     assert response.status_code == 409
+    assert not any("INSERT INTO workspace_api_key" in sql for sql, _ in conn.cursor_obj.stmts)
+
+
+def test_revoked_key_name_can_be_replaced_without_reviving_old_secret(client, monkeypatch):
+    revoked = ("key-1", datetime.now(timezone.utc))
+
+    def update(stmts, params):
+        return [("key-1", "ci-key", "kairos_sk_newprefix", ["read"],
+                 datetime.now(timezone.utc), None, None)]
+
+    conn = _Conn(
+        _regclass("workspace_api_key"),
+        _role("owner"),
+        ("SELECT id::text, revoked_at", lambda stmts, params: [revoked]),
+        ("UPDATE workspace_api_key", update),
+    )
+    _use_all(monkeypatch, conn, ak, m)
+    response = client.post("/api/v1/api-keys", json={"name": "ci-key"})
+    assert response.status_code == 201
+    body = response.json()
+    assert body["token"].startswith("kairos_sk_")
+    assert body["key"]["revoked_at"] is None
+    sql, params = next((s, p) for s, p in conn.cursor_obj.stmts if "UPDATE workspace_api_key" in s)
+    assert params[1] == hashlib.sha256(body["token"].encode()).hexdigest()
+    assert params[3] == "key-1"
 
 
 def test_list_api_keys_never_returns_a_secret(client, monkeypatch):
