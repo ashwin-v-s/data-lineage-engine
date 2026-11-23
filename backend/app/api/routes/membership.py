@@ -182,10 +182,19 @@ def create_invite(body: InviteCreate, user: dict = Depends(require_user)):
     token = secrets.token_urlsafe(32)
     expires_at = datetime.now(timezone.utc) + timedelta(days=7)
     inviter_id = user.get("id") or user.get("sub")
+    from backend.app import db as _db
+    workspace_id = _db._workspace_id.get()
     with get_conn() as conn:
         with conn.cursor() as cur:
             if _table_missing(cur, "workspace_invite"):
                 raise HTTPException(status_code=503, detail=_UNPROVISIONED_DETAIL)
+            # An invitation must not grant more than the inviter could grant to
+            # an existing member: update_member_role reserves admin for owners.
+            if body.role == "admin" and _member_role(conn, workspace_id, inviter_id) != "owner":
+                raise HTTPException(
+                    status_code=403,
+                    detail="Only the workspace owner can grant or change admin roles",
+                )
             cur.execute(
                 """
                 INSERT INTO workspace_invite (email, role, invited_by, token, expires_at)

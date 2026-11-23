@@ -204,6 +204,39 @@ def test_invite_cannot_grant_ownership(client, monkeypatch):
     assert response.status_code == 422
 
 
+def test_admin_cannot_invite_an_admin(client, monkeypatch):
+    """Only an owner may create another admin, matching update_member_role."""
+    conn = _Conn(
+        _regclass("workspace_member"),
+        _role("admin"),
+        _regclass("workspace_invite"),
+        ("INSERT INTO workspace_invite", lambda stmts, params: pytest.fail("an admin invite must not be stored")),
+    )
+    _use(monkeypatch, conn)
+    response = client.post("/api/v1/members/invites", json={"email": "x@y.com", "role": "admin"})
+    assert response.status_code == 403
+    assert "owner" in response.json()["detail"].lower()
+
+
+def test_owner_can_invite_an_admin(client, monkeypatch):
+    monkeypatch.setattr("backend.app.api.routes.membership.EmailSettings.from_env", lambda: None)
+
+    def insert(stmts, params):
+        assert params[1] == "admin"
+        return [("invite-2",)]
+
+    conn = _Conn(
+        _regclass("workspace_member"),
+        _role("owner"),
+        _regclass("workspace_invite"),
+        ("INSERT INTO workspace_invite", insert),
+    )
+    _use(monkeypatch, conn)
+    response = client.post("/api/v1/members/invites", json={"email": "x@y.com", "role": "admin"})
+    assert response.status_code == 201
+    assert response.json()["id"] == "invite-2"
+
+
 # ── Invite lifecycle ─────────────────────────────────────────────────────────
 
 def _open_invite(expires_in: timedelta):

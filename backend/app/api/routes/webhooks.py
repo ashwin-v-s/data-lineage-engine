@@ -11,9 +11,11 @@ use, so a successful test is evidence the endpoint works.
 """
 from __future__ import annotations
 
+import ipaddress
 import secrets
 import uuid
 from typing import Literal
+from urllib.parse import urlsplit
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from psycopg2 import Error as PostgresError
@@ -24,7 +26,11 @@ from backend.app.api.routes.membership import require_role
 from backend.app.auth import require_user
 from backend.app.db import get_conn
 from backend.app.services.token_crypto import TokenCryptoError, encrypt_token, is_configured
-from backend.app.services.webhook_delivery import SUPPORTED_EVENTS, deliver
+from backend.app.services.webhook_delivery import (
+    SUPPORTED_EVENTS,
+    deliver,
+    is_internal_address,
+)
 
 router = APIRouter(prefix="/webhooks", tags=["webhooks"], dependencies=[Depends(require_user)])
 
@@ -57,6 +63,20 @@ class WebhookCreate(BaseModel):
         url = value.strip()
         if not url.startswith("https://"):
             raise ValueError("Webhook URLs must use https")
+        host = (urlsplit(url).hostname or "").strip().lower()
+        if not host:
+            raise ValueError("Webhook URLs must include a host")
+        # Reject literal internal addresses and obviously local names up front.
+        # Named hosts are resolved and re-checked at delivery time, where a DNS
+        # record cannot be repointed at an internal address.
+        if host == "localhost" or host.endswith((".localhost", ".local", ".internal")):
+            raise ValueError("Webhook URLs must point at a public host")
+        try:
+            address = ipaddress.ip_address(host.strip("[]"))
+        except ValueError:
+            return url
+        if is_internal_address(address):
+            raise ValueError("Webhook URLs must point at a public host")
         return url
 
     @field_validator("events")

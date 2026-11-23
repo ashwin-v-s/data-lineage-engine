@@ -13,6 +13,7 @@ from sqlalchemy import text
 
 from backend.app.db import get_db_connection
 from backend.app.auth import require_user
+from backend.app.api.routes.membership import require_role
 from backend.app.schemas.owner import (
     AssignOwnerRequest,
     AssignOwnerResponse,
@@ -26,6 +27,12 @@ from backend.app.schemas.owner import (
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/owner", tags=["ownership"], dependencies=[Depends(require_user)])
+
+# Assigning an owner or steward writes dataset metadata, so it takes the same
+# editor floor as every other metadata write; approving a pending request is a
+# governance approval and stays with owners and admins.
+owner_write_role = require_role("owner", "admin", "editor")
+owner_approve_role = require_role("owner", "admin")
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -120,7 +127,7 @@ def search_team_members(
 # Owner Assignment
 # ═══════════════════════════════════════════════════════════════════
 
-@router.post("/assign/{asset_id}", response_model=AssignOwnerResponse)
+@router.post("/assign/{asset_id}", response_model=AssignOwnerResponse, dependencies=[Depends(owner_write_role)])
 def assign_owner(
     asset_id: str,
     request: AssignOwnerRequest,
@@ -411,7 +418,7 @@ def get_pending_requests():
         raise HTTPException(status_code=500, detail="Failed to fetch requests")
 
 
-@router.post("/requests/{request_id}/approve")
+@router.post("/requests/{request_id}/approve", dependencies=[Depends(owner_approve_role)])
 def approve_owner_request(
     request_id: str,
     approval: ApproveOwnerRequest,
@@ -436,6 +443,9 @@ def approve_owner_request(
             raise HTTPException(status_code=404, detail="Request not found")
         if req["status"] != "PENDING" or not req["is_active"]:
             raise HTTPException(status_code=409, detail="Request is no longer pending or has expired")
+        if req["requested_by"] and str(req["requested_by"]) == str(current_user):
+            # An approval workflow only means something when someone else checks it.
+            raise HTTPException(status_code=403, detail="A request cannot be approved by the person who raised it")
         
         # Update request
         cur.execute("""

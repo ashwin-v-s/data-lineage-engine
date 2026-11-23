@@ -10,9 +10,12 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import ipaddress
 import json
+import socket
 import time
 from typing import Any
+from urllib.parse import urlsplit
 
 import httpx
 
@@ -59,6 +62,59 @@ def serialise(payload: dict[str, Any]) -> bytes:
     return json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
 
 
+class BlockedDestination(httpx.HTTPError):
+    """The webhook URL points at a host we refuse to make requests to."""
+
+
+def is_internal_address(address: ipaddress.IPv4Address | ipaddress.IPv6Address) -> bool:
+    """True for addresses that are not routable public destinations.
+
+    Covers loopback, RFC1918/ULA private space, link-local (including the
+    169.254.169.254 metadata service), multicast, reserved and unspecified.
+    """
+    return (
+        address.is_private
+        or address.is_loopback
+        or address.is_link_local
+        or address.is_multicast
+        or address.is_reserved
+        or address.is_unspecified
+    )
+
+
+def assert_public_destination(url: str) -> None:
+    """Refuse to deliver to a loopback, private or link-local destination.
+
+    The host is resolved here — at delivery time, not only at registration — so
+    a DNS record cannot be repointed at an internal address after the webhook
+    was created.  Redirects are already disabled, so this is the only hop.
+    """
+    parsed = urlsplit(url)
+    host = parsed.hostname
+    if parsed.scheme != "https" or not host:
+        raise BlockedDestination("Refusing to deliver: webhook URLs must be https with a host")
+    try:
+        port = parsed.port or 443
+    except ValueError as exc:  # malformed :port
+        raise BlockedDestination("Refusing to deliver: webhook URL has an invalid port") from exc
+    try:
+        infos = socket.getaddrinfo(host, port, proto=socket.IPPROTO_TCP)
+    except OSError as exc:
+        raise BlockedDestination(f"Refusing to deliver: host {host!r} did not resolve") from exc
+    addresses = {info[4][0].split("%", 1)[0] for info in infos if info[4]}
+    if not addresses:
+        raise BlockedDestination(f"Refusing to deliver: host {host!r} did not resolve")
+    for raw in addresses:
+        try:
+            address = ipaddress.ip_address(raw)
+        except ValueError:
+            continue
+        if is_internal_address(address):
+            raise BlockedDestination(
+                f"Refusing to deliver: host {host!r} resolves to a private or loopback address"
+            )
+
+
 def _signing_secret(webhook: dict[str, Any]) -> str | None:
     ciphertext = webhook.get("signing_secret_ciphertext")
     if not ciphertext:
@@ -73,6 +129,7 @@ def _signing_secret(webhook: dict[str, Any]) -> str | None:
 
 def _post(url: str, body: bytes, headers: dict[str, str]) -> httpx.Response:
     """Single seam for tests: one POST with a bounded timeout, no retries."""
+    assert_public_destination(url)
     with httpx.Client(timeout=DELIVERY_TIMEOUT_SECONDS, follow_redirects=False) as client:
         return client.post(url, content=body, headers=headers)
 

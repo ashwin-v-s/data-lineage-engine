@@ -319,6 +319,15 @@ def test_webhook_rejects_unknown_event(client, monkeypatch):
     assert response.status_code in (400, 422)
 
 
+def test_webhook_rejects_private_literal_host(client, monkeypatch):
+    conn = _Conn(_regclass("workspace_webhook"), _role("owner"))
+    _use_all(monkeypatch, conn, w, m)
+    for url in ("https://127.0.0.1/hook", "https://169.254.169.254/latest/meta-data", "https://localhost/hook"):
+        response = client.post("/api/v1/webhooks", json={"url": url, "events": ["test.ping"]})
+        assert response.status_code in (400, 422), url
+        assert not any("INSERT INTO workspace_webhook" in sql for sql, _ in conn.cursor_obj.stmts)
+
+
 def test_webhook_requires_encryption_key(client, monkeypatch):
     monkeypatch.setattr(w, "is_configured", lambda: False)
     conn = _Conn(_regclass("workspace_webhook"), _role("owner"))
@@ -349,6 +358,61 @@ def test_create_webhook_stores_ciphertext_and_returns_secret_once(client, monkey
     body = response.json()
     assert body["signing_secret"].startswith("whsec_")
     assert "ENVELOPE" not in str(body)
+
+
+def test_delivery_refuses_private_destination(monkeypatch):
+    import socket
+
+    monkeypatch.setattr(
+        wd.socket,
+        "getaddrinfo",
+        lambda *a, **k: [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("10.0.0.5", 443))],
+    )
+
+    def no_request(*args, **kwargs):
+        raise AssertionError("delivery must not open a client for an internal destination")
+
+    monkeypatch.setattr(wd.httpx, "Client", no_request)
+    outcome = wd.deliver(
+        {"id": HOOK, "url": "https://internal.example/hook", "workspace_id": WORKSPACE},
+        "test.ping",
+    )
+    assert outcome["ok"] is False
+    assert outcome["response_status"] is None
+    assert "private or loopback" in (outcome["error"] or "")
+
+
+def test_delivery_allows_public_destination(monkeypatch):
+    import socket
+
+    monkeypatch.setattr(
+        wd.socket,
+        "getaddrinfo",
+        lambda *a, **k: [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("93.184.216.34", 443))],
+    )
+    seen: dict[str, str] = {}
+
+    class _Client:
+        def __init__(self, **kwargs):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc_info):
+            return False
+
+        def post(self, url, content=None, headers=None):
+            seen["url"] = url
+            return type("R", (), {"status_code": 204, "text": ""})()
+
+    monkeypatch.setattr(wd.httpx, "Client", _Client)
+    outcome = wd.deliver(
+        {"id": HOOK, "url": "https://example.com/hook", "workspace_id": WORKSPACE},
+        "test.ping",
+    )
+    assert outcome["ok"] is True
+    assert seen["url"] == "https://example.com/hook"
 
 
 def test_test_delivery_records_success(client, monkeypatch):
