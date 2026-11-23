@@ -124,7 +124,7 @@ committed file.
 | `GET /api/v1/assets/{fct_daily_revenue MODEL}/lineage?depth=4` | 8 nodes, 8 edges |
 | `GET /api/v1/assets/{customers SOURCE}/downstream-impact?depth=4` | `total_affected: 4` across depth levels |
 | `GET /api/v1/lineage/edges/5a9abd50-…/evidence` | evidence rows returned |
-| `GET /api/v1/evidence-at-time?valid_as_of=now&recorded_as_of=now` | `included: 0, undated_valid_time: 23` (static evidence has no effective time) |
+| `GET /api/v1/evidence-at-time?valid_as_of=now&recorded_as_of=now` | `included: 8, undated_valid_time: 34` — the dbt dependencies carry the manifest's `generated_at`; SQL/CSV/file evidence stays undated |
 | `GET /api/v1/column-lineage?valid_as_of=now` | `total: 19` after the SQL projection backfill (was 0) |
 
 ## 5. Governance records created in this workspace
@@ -155,15 +155,24 @@ Readbacks: `/governance/terms` 4 rows, `/governance/domains` 3 rows,
 
 ## 6. Historical / temporal data
 
-`edge_temporal_version` holds **131** rows globally, produced by the platform's
-temporal projection of edges; 23 undated evidence rows belong to this
-workspace's static imports. Because static imports carry no `event_time` or
-`effective_time`, the bitemporal query for "now" returns those rows as
-*undated* rather than included. To demonstrate time travel honestly you need a
-runtime source (OpenLineage or the PostgreSQL connector) that stamps times, or
-a backfill endpoint, which does not exist. Use the Time travel screen to show
-the *mechanism* and state clearly that the demo workspace's static evidence is
-undated.
+The dbt manifest declares `metadata.generated_at = 2026-11-17T21:00:00Z`.
+The adapter forwards that source timestamp, and
+`scripts/db/backfill_demo_temporal.py` applied it to the eight already-imported
+dbt dependencies, so they now have `effective_time_status='KNOWN'` and a valid
+interval starting at the manifest generation time. They were recorded at import
+time (`2026-11-21T11:32:59Z`).
+
+The bitemporal query therefore returns **8 dated rows** at "now" and reports
+the other **34** SQL/CSV/file evidence rows as undated rather than inventing a
+time for them. Demo states:
+
+- today → 8 rows;
+- valid time `2026-11-16` → 0 rows (manifest did not exist);
+- valid time `2026-11-18` → 8 rows;
+- recorded time before `2026-11-21T11:32Z` → 0 rows (not learned yet).
+
+The backfill is idempotent; a second run updates 0 rows. Future dbt imports get
+the same timestamp directly from the adapter.
 
 ## 7. Reproducing this dataset
 

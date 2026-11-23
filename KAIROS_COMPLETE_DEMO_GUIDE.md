@@ -215,18 +215,25 @@ declared dependencies; UNKNOWN is shown as unknown."
 
 **B/C.** Sidebar → **Lineage → Time travel**. Set both dates to today, run.
 
-**D (verified, but empty).** The query executes; `evidence-at-time` returns
-`included: 0, undated_valid_time: 23`, because static imports have no
-effective/event time.
+**D (verified, populated).** With both timestamps at today, the query returns
+`included: 8, undated_valid_time: 34`. The eight rows are the dbt dependencies,
+whose valid time is the manifest's own `metadata.generated_at`
+(`2026-11-17T21:00:00Z`); they were recorded at the import time
+(`2026-11-21T11:32:59Z`). The table shows three hops, e.g.
+`analytics.fct_daily_revenue → exposure.daily_revenue_kpi`.
 
 **E.** "The mechanism separates when something was true from when we learned it.
-Our imported static evidence is undated, so it is reported as undated instead of
-being faked into a date."
+The dbt manifest declared its generation time, so those dependencies have a real
+valid interval. SQL, CSV and file evidence carry no source time and are reported
+as 34 undated records instead of being faked into a date."
 
 **F.** `GET /api/v1/evidence-at-time?valid_as_of=…&recorded_as_of=…`.
 
-**G.** Do not demonstrate a non-empty time-travel result; it does not exist yet
-(BUG-04).
+**G (the time-travel moment).** Set both dates to today → eight rows. Change
+valid time to **2026-11-16** → zero rows, because the manifest did not exist yet.
+Change it to **2026-11-18** → eight rows again. Change recorded time to before
+**2026-11-21T11:32Z** → zero rows, because Kairos had not learned it yet. Say:
+"Same business date, different recorded date: this is bitemporal, not a filter."
 
 ---
 

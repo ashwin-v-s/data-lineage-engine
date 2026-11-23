@@ -10,7 +10,7 @@ infrastructure; **UNVERIFIED** = not executed.
 - [x] **VERIFIED** Frontend bundle is the current build (`index-BI-DWeko.js`, `index--HCZZvnV.css`)
 - [x] **VERIFIED** Database reachable (PostgreSQL 17.6)
 - [x] **VERIFIED** 44 tracked tables/columns/routines present (`verify_applied.py`)
-- [x] **VERIFIED** Backend suite 842 passed / 83 skipped
+- [x] **VERIFIED** Backend suite 843 passed / 83 skipped
 - [x] **VERIFIED** Frontend suite 156 passed
 - [x] **VERIFIED** Production build clean
 - [ ] **BLOCKED** SMTP credentials for invitation/welcome email
@@ -35,7 +35,7 @@ infrastructure; **UNVERIFIED** = not executed.
 - [ ] **PARTIAL** Run records — 0 in the demo workspace, 2 globally
 - [ ] **BLOCKED** Incidents and notifications — no scheduler/signal
 - [x] **PASS** Column-level lineage — SQLGlot projections emitted 19 COLUMN evidence rows and edges in this workspace (BUG-03 fixed)
-- [ ] **PARTIAL** Dated/temporal evidence — undated rows are counted, not silently excluded (BUG-04)
+- [x] **PASS** Dated/temporal evidence — the dbt manifest's source-declared `generated_at` gives 8 dependencies a KNOWN valid interval; the remaining 34 undated rows are counted, not silently excluded (BUG-04 limited to sources without a timestamp)
 
 ## Features — presentable now
 
@@ -59,7 +59,7 @@ infrastructure; **UNVERIFIED** = not executed.
 
 - [x] **PASS** Data quality panel — 1 recorded check, 1 PASS rendered live (BUG-02 fixed)
 - [x] **PASS** PII classification — one classification resolves to the merged `customers` asset and its column
-- [ ] **PARTIAL** Time travel — mechanism only, empty dated set
+- [x] **PASS** Time travel — 8 dated dbt dependencies at today, 0 before 2026-11-16, 8 from 2026-11-18; 34 undated records reported separately
 - [x] **PASS** Lineage graph — one row per logical dataset; only genuinely different kinds (table/dashboard/exposure) share a name (BUG-01 fixed)
 - [ ] **PARTIAL** Notifications — empty state only, preferences work
 - [ ] **PARTIAL** Incidents — empty state only
@@ -97,7 +97,7 @@ infrastructure; **UNVERIFIED** = not executed.
 | Application runs against real auth + DB | ✅ |
 | Demonstration data prepared and traceable | ✅ |
 | Core workflow (ingest → catalog → lineage → evidence → governance) executed | ✅ |
-| Quality, PII and column-lineage demos | ✅ working (BUG-01/02/03 fixed); temporal demo is partial (BUG-04, by design) |
+| Quality, PII, column-lineage and time-travel demos | ✅ working (BUG-01/02/03 fixed; dbt gives 8 dated dependencies, other undated evidence is counted) |
 | External integrations | ⛔ blocked on credentials |
 | Documentation (6 deliverables) | ✅ |
 

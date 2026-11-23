@@ -12,11 +12,11 @@ from typing import Any
 
 from ingestion.metadata_graph import (
     MAX_FILE_BYTES,
-    _DuplicateJSONKey,
     Diagnostic,
     MetadataGraphResult,
     _canonical_json,
     _count_and_check_json,
+    _DuplicateJSONKey,
     _reject_duplicate_keys,
     parse_metadata_graph,
 )
@@ -295,5 +295,11 @@ def parse_dbt_manifest(
     result.payload["provenance"]["content_sha256"] = hashlib.sha256(raw).hexdigest()
     if schema_version:
         result.payload["provenance"]["dbt_schema_version"] = schema_version
+    # The manifest declares when it was generated.  That is source-provided
+    # valid time for the dependencies in it, so the commit path can record a
+    # KNOWN effective interval instead of silently labelling them undated.
+    generated_at = metadata.get("generated_at")
+    if isinstance(generated_at, str) and generated_at.strip():
+        result.payload["provenance"]["dbt_generated_at"] = generated_at.strip()
     combined_warnings = tuple(_early_version_warnings) + tuple(warnings) + result.warnings
     return MetadataGraphResult(result.payload, (), combined_warnings)

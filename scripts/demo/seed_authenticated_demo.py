@@ -19,6 +19,7 @@ import json
 import os
 import sys
 import uuid
+from datetime import datetime, timezone
 
 import psycopg2
 from dotenv import load_dotenv
@@ -26,6 +27,20 @@ from psycopg2.extras import Json, RealDictCursor
 
 from backend.app.identity.canonical_ids import canonical_import_identity
 from ingestion.static_files import parse_static_file
+
+
+def _declared_valid_from(payload: dict) -> tuple[datetime | None, str]:
+    """Use the dbt manifest's own generated_at as valid time when present."""
+    raw = (payload.get("provenance") or {}).get("dbt_generated_at")
+    if not isinstance(raw, str) or not raw.strip():
+        return None, "UNKNOWN"
+    try:
+        value = datetime.fromisoformat(raw.strip().replace("Z", "+00:00"))
+    except ValueError:
+        return None, "UNKNOWN"
+    if value.tzinfo is None:
+        value = value.replace(tzinfo=timezone.utc)
+    return value, "KNOWN"
 
 
 def seed_workspace(conn, workspace_id: str, user_id: str) -> dict:
@@ -85,6 +100,7 @@ def seed_workspace(conn, workspace_id: str, user_id: str) -> dict:
         )
 
         # 4. Upsert assets and columns
+        declared_valid_from, effective_time_status = _declared_valid_from(payload)
         dataset_ids: dict[str, str] = {}
         for asset in payload["assets"]:
             namespace = str(asset.get("namespace") or "general")
@@ -169,9 +185,10 @@ def seed_workspace(conn, workspace_id: str, user_id: str) -> dict:
                 INSERT INTO edge_temporal_version
                     (edge_id, valid_from, effective_time_status, transaction_from,
                      evidence_id, source_system)
-                VALUES (%s::uuid, now(), 'UNKNOWN', now(), %s::uuid, %s)
+                VALUES (%s::uuid, COALESCE(%s::timestamptz, now()), %s, now(), %s::uuid, %s)
                 """,
-                (edge_id, norm_ev_id, source_kind),
+                (edge_id, declared_valid_from, effective_time_status,
+                 norm_ev_id, source_kind),
             )
             edges_inserted += 1
 

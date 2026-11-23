@@ -55,8 +55,6 @@ from types import ModuleType
 from typing import Any
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 # ── psycopg2 stub — must be injected BEFORE any backend import ───────────────
 if "psycopg2" not in sys.modules:
     _stub = ModuleType("psycopg2")
@@ -74,8 +72,9 @@ if "psycopg2" not in sys.modules:
 
 from fastapi.testclient import TestClient  # noqa: E402
 
+from backend.app.api.routes.ingest import _declared_valid_from  # noqa: E402
 from backend.app.auth import require_user  # noqa: E402
-from backend.app.main import app           # noqa: E402
+from backend.app.main import app  # noqa: E402
 
 # ── Demo fixture content ─────────────────────────────────────────────────────
 _FIXTURES = Path(__file__).resolve().parents[1] / "docs" / "demo-fixtures"
@@ -399,6 +398,17 @@ class TestDbtManifestPreview:
 
         body = resp.json()
         assert body["preview"]["provenance"]["adapter"] == "kairos.dbt_manifest"
+
+    def test_d1b_manifest_generated_at_is_declared_valid_time(self):
+        manifest = json.loads(json.dumps(DBT_FIXTURE))
+        manifest["metadata"]["generated_at"] = "2026-11-17T21:00:00.000000Z"
+        with patch("backend.app.api.routes.ingest.get_conn", side_effect=_preview_conn):
+            resp = _preview("dbt_manifest", manifest, "manifest.json")
+
+        provenance = resp.json()["preview"]["provenance"]
+        assert provenance["dbt_generated_at"] == "2026-11-17T21:00:00.000000Z"
+        assert _declared_valid_from({"provenance": provenance}).isoformat() == \
+            "2026-11-17T21:00:00+00:00"
 
     def test_d2_preview_opens_exactly_one_db_connection(self):
         """Preview is read-only: one connection only (migration check)."""

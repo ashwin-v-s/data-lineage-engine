@@ -66,8 +66,8 @@ Status vocabulary used below:
 | Four-state reasoning (OBSERVED/POSSIBLE/REFUTED/UNKNOWN) | `evidence-semantics.js`, evidence view | **Verified** | 6,487 chars; states composed from stored evidence |
 | Downstream impact | `GET /api/v1/assets/{id}/downstream-impact` | **Verified** | `customers` → `total_affected: 4` across depth levels |
 | Column-level lineage | `GET /api/v1/column-lineage` | **Verified** | 19 mappings in the demo workspace (SQLGlot projections backfilled with `scripts/db/backfill_column_lineage.py`) |
-| Bitemporal / as-of lineage | `?view=history`, `?as_of=`/`recorded_as_of=` | **Partial** | `evidence-at-time` returns `included: 0, undated_valid_time: 23` — all rows are `effective_time_status='UNKNOWN'`, reported honestly (BUG-04) |
-| Time-travel comparison UI | `?view=history` | **Partial** | Renders, but compares an empty dated set |
+| Bitemporal / as-of lineage | `?view=history`, `?as_of=`/`recorded_as_of=` | **Verified** | `evidence-at-time` returns `included: 8, undated_valid_time: 34` — dbt dependencies use the manifest's `generated_at`; remaining evidence is reported honestly as undated |
+| Time-travel comparison UI | `?view=history` | **Verified** | Eight rows at today, zero before 2026-11-16, eight from 2026-11-18; recorded time before the import returns zero |
 | 3D observatory | `?view=observatory` | **Verified** | Loads with persisted graph; three.js + observatory.js are fetched only on first open (BUG-08) |
 
 ## 5. Governance

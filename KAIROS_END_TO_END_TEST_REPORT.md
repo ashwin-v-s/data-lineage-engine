@@ -250,21 +250,19 @@ COLUMN evidence and its temporal version. `scripts/db/backfill_column_lineage.py
 replayed the stored SQL of the demo import, producing **19 mappings**; the
 workspace-scoped query used by `GET /api/v1/column-lineage` returns all 19.
 
-### BUG-04 — Static evidence is undated, so time travel returns nothing (Medium) — **BY DESIGN, NOT SILENT**
+### BUG-04 — Static evidence is undated, so time travel returns nothing (Medium) — **FIXED FOR DBT, HONEST FOR THE REST**
 
-All 23 `edge_temporal_version` rows in the demo workspace carry
-`effective_time_status = 'UNKNOWN'`, so `evidence-at-time` reports
-`included: 0, undated_valid_time: 23` — it counts the undated rows instead of
-pretending they were valid at the requested instant. Stamping an import time as
-a business effective time would make the timeline look populated but wrong;
-the fix is an ingest contract that records `event_time`/`effective_time` when a
-source provides them. Edge travel itself works: every covered edge has a
-`valid_from`.
+The dbt manifest already declares `metadata.generated_at`. The adapter now
+forwards it as `dbt_generated_at`, the commit path records a KNOWN valid
+interval from it, and `scripts/db/backfill_demo_temporal.py` applied it to the
+eight existing demo dependencies. `evidence-at-time` at today now returns
+`included: 8, undated_valid_time: 34`; valid time 2026-11-16 returns zero and
+2026-11-18 returns eight.
 
-`evidence.event_time` / `effective_time` are NULL for imports; the demo
-workspace shows `included: 0, undated_valid_time: 23`. The bitemporal endpoint
-is correct; the data has no timestamps. Use a runtime source or add an explicit
-`effective_time` to the import contract.
+SQL, CSV and file imports carry no source-declared time, so they remain
+`UNKNOWN` and are counted rather than stamped with a fabricated import time.
+The bitemporal endpoint is correct in both cases. Future dbt imports get the
+timestamp directly, without a backfill.
 
 ### BUG-05 — Webhook URLs accept any HTTPS host (Low, security) — **FIXED (fd1ec98)**
 

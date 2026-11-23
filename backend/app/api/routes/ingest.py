@@ -42,6 +42,7 @@ import logging
 import os
 import secrets
 import uuid
+from datetime import datetime, timezone
 from typing import Any, AsyncGenerator, Literal, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
@@ -342,6 +343,26 @@ def _parse(request: ImportInput):
     return result.payload, [warning.as_dict() for warning in result.warnings]
 
 
+def _declared_valid_from(payload: dict[str, Any]) -> datetime | None:
+    """Return source-declared valid time from the adapter provenance.
+
+    dbt manifests declare ``metadata.generated_at``.  It is the moment the
+    dependency graph was generated, so it is a real source-provided valid time,
+    not an inference from the ingestion clock.
+    """
+    provenance = payload.get("provenance")
+    if not isinstance(provenance, dict):
+        return None
+    raw = provenance.get("dbt_generated_at")
+    if not isinstance(raw, str) or not raw.strip():
+        return None
+    try:
+        value = datetime.fromisoformat(raw.strip().replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return value if value.tzinfo is not None else value.replace(tzinfo=timezone.utc)
+
+
 def _summary(payload: dict[str, Any], warnings: list[dict[str, str]]) -> dict[str, Any]:
     return {
         "contract_version": payload["contract_version"],
@@ -440,6 +461,8 @@ def _commit_import(
     content_hash = payload["provenance"]["content_sha256"]
     source_ref = trusted_source_ref or payload["source"].get("ref") or payload["provenance"].get("original_filename") or ""
     summary = _summary(payload, warnings)
+    declared_valid_from = _declared_valid_from(payload)
+    effective_time_status = "KNOWN" if declared_valid_from else "UNKNOWN"
 
     with get_conn() as conn:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
@@ -541,9 +564,10 @@ def _commit_import(
                     INSERT INTO edge_temporal_version
                         (edge_id, valid_from, effective_time_status, transaction_from,
                          evidence_id, source_system)
-                    VALUES (%s::uuid, now(), 'UNKNOWN', now(), %s::uuid, %s)
+                    VALUES (%s::uuid, COALESCE(%s::timestamptz, now()), %s, now(), %s::uuid, %s)
                     """,
-                    (edge_id, normalized_evidence_id, source_kind),
+                    (edge_id, declared_valid_from, effective_time_status,
+                     normalized_evidence_id, source_kind),
                 )
 
                 # A static projection carries a column pair; persist it as a
@@ -609,9 +633,10 @@ def _commit_import(
                     INSERT INTO edge_temporal_version
                         (edge_id, valid_from, effective_time_status, transaction_from,
                          evidence_id, source_system)
-                    VALUES (%s::uuid, now(), 'UNKNOWN', now(), %s::uuid, %s)
+                    VALUES (%s::uuid, COALESCE(%s::timestamptz, now()), %s, now(), %s::uuid, %s)
                     """,
-                    (column_edge_id, column_evidence_row, source_kind),
+                    (column_edge_id, declared_valid_from, effective_time_status,
+                     column_evidence_row, source_kind),
                 )
 
             summary["persisted_assets"] = len(dataset_ids)
