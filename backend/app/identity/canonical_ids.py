@@ -61,7 +61,8 @@ def canonical_import_identity(asset: dict) -> tuple[str, str, str]:
     instead of storing the import artifact's name (the old behaviour, which made
     the same table look like a different dataset on every import).  The schema
     comes from the source declaration when it has one (dbt resources carry
-    ``metadata.schema``) and otherwise from the last namespace path segment.
+    ``metadata.schema``), from the third dbt path segment for ``dbt/...``
+    namespaces, and otherwise from the namespace itself (``warehouse.raw``).
     """
     metadata = asset.get("metadata")
     metadata = metadata if isinstance(metadata, dict) else {}
