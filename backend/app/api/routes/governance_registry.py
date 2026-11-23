@@ -197,6 +197,7 @@ def list_classifications(dataset_id: uuid.UUID | None = None, user: dict = Depen
                        pc.evidence_state, pc.provenance, pc.classified_by::text,
                        pc.reviewed_by::text, pc.reviewed_at, pc.created_at,
                        d.name AS dataset_name,
+                       d.owner_name AS asset_owner,
                        concat_ws('.', NULLIF(d.database_name, ''), NULLIF(d.schema_name, ''), d.name) AS qualified_asset_name,
                        cr.column_name
                 FROM pii_classification pc
