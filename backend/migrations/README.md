@@ -30,6 +30,10 @@ shared **Supabase Postgres** project.
 | 0013_membership_lifecycle | Repair owner membership for existing and newly provisioned workspaces; secure workspace listing and invitation acceptance functions | Applied — live functions and owner backfill verified 2026-11-07 |
 | 0014_welcome_email_delivery | Workspace-scoped login welcome email idempotency and delivery status | Applied — table/RLS verified 2026-11-07 |
 | 0015_dataset_soft_removal | Hide selected assets from active catalog reads while retaining evidence and lineage | Pending — implementation in progress |
+| 0016_api_keys_webhooks | API keys, webhooks and delivery history | Applied to shared Supabase |
+| 0017_stewardship_requests | Workspace access requests and glossary proposals | Applied to shared Supabase (2026-11-19) |
+| 0018_dataset_identity_reconciliation | One row per logical dataset, canonical identity, merge function | Applied to shared Supabase (2026-11-23) |
+| 0019_trust_collaboration | Asset certification, discussions and engagement counters | Applied to shared Supabase (2026-11-26) — `verify_applied.py` and `verify_rls.py` PASS |
 
 
 
@@ -282,7 +286,37 @@ Makes one catalog row represent one logical dataset (BUG-01):
 psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f backend/migrations/0018_dataset_identity_reconciliation.sql
 ```
 
-After applying, existing SQL imports can be given column-level evidence without
+### 0019_trust_collaboration.sql
+
+**Status:** applied to shared Supabase (2026-11-26). `verify_applied.py` and
+`verify_rls.py --table asset_certification asset_discussion asset_engagement`
+both PASS.
+**Naming:** `{number}_{feature}.sql`
+
+Adds the trust and collaboration surfaces every established catalog exposes:
+
+- `asset_certification` — one steward endorsement per asset, optional expiry,
+  certifier identity. Expiry is evaluated at read time.
+- `asset_discussion` — threaded asset comments. Only a root can be resolved;
+  a reply cannot be resolved independently.
+- `asset_engagement` — workspace-level open counter for popularity. Stores no
+  user id; per-user viewing history remains in `asset_view`.
+
+**Requires:**
+- `kairos_app` role from migration 0008
+- nothing else; no encryption key and no external service
+
+**To apply:**
+```sql
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f backend/migrations/0019_trust_collaboration.sql
+```
+
+After applying, verify the new tables with
+`python scripts/db/verify_rls.py --table asset_certification asset_discussion asset_engagement`.
+
+---
+
+After applying 0018, existing SQL imports can be given column-level evidence without
 re-uploading the file:
 
 ```bash

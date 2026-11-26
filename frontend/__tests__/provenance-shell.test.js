@@ -77,7 +77,7 @@ describe('dashboard shell contract', () => {
     for (const view of ['notifications', 'settings', 'freshness', 'incidents', 'sources', 'integrations']) {
       expect(shell).toContain(`data-view="${view}"`);
     }
-    expect(appCode).toContain("['sources','freshness','notifications','glossary','domains','admin']");
+    expect(appCode).toContain("['sources','freshness','notifications','glossary','domains','admin','trust']");
   });
 
   it('keeps workspace administration reachable even without a sidebar entry', () => {

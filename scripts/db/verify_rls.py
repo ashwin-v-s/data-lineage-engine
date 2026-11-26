@@ -108,6 +108,10 @@ WORKSPACE_SCOPED_TABLES = (
     "workspace_webhook_delivery",
     # 0017_stewardship_requests.sql
     "stewardship_request",
+    # 0019_trust_collaboration.sql
+    "asset_certification",
+    "asset_discussion",
+    "asset_engagement",
 )
 
 # Exit codes.

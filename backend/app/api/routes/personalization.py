@@ -177,6 +177,23 @@ def record_asset_view(asset_id: str, user: dict = Depends(require_user)):
                 """,
                 (user["id"], dataset_id),
             )
+            # Workspace popularity is an aggregate counter with no user id.
+            # It is optional storage: recording a view must keep working on a
+            # project where migration 0019 has not been applied yet.
+            cur.execute("SELECT to_regclass('public.asset_engagement') AS relation")
+            engagement = cur.fetchone()
+            configured = engagement["relation"] if isinstance(engagement, dict) else (engagement[0] if engagement else None)
+            if configured is not None:
+                cur.execute(
+                    """
+                    INSERT INTO asset_engagement (dataset_id, view_count, last_viewed_at)
+                    VALUES (%s::uuid, 1, now())
+                    ON CONFLICT (workspace_id, dataset_id)
+                    DO UPDATE SET view_count = asset_engagement.view_count + 1,
+                                  last_viewed_at = now()
+                    """,
+                    (dataset_id,),
+                )
     return MutationResult(ok=True, asset_id=dataset_id)
 
 

@@ -11,6 +11,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from backend.app.api.routes.membership import require_role
 from backend.app.auth import require_user
 from backend.app.db import get_conn
+from backend.app.services.pii_propagation import derive_inherited_columns
 
 router = APIRouter(prefix="/governance", tags=["governance-registry"], dependencies=[Depends(require_user)])
 WRITE = [Depends(require_role("owner", "admin", "editor"))]
@@ -105,6 +106,13 @@ class ContractLinkInput(BaseModel):
     clause_key: str = Field(min_length=1, max_length=120)
 
 
+class PropagationInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    dataset_id: uuid.UUID | None = None
+    depth: int = Field(default=3, ge=1, le=5)
+    dry_run: bool = False
+
+
 @router.get("/terms")
 def list_terms(user: dict = Depends(require_user)):
     with get_conn() as conn:
@@ -184,6 +192,161 @@ def create_classification(body: ClassificationInput, user: dict = Depends(requir
                 cur.execute("INSERT INTO pii_classification(dataset_id,column_id,classification,evidence_state,provenance,classified_by) VALUES (%s::uuid,%s::uuid,%s,%s,%s,%s::uuid) RETURNING id::text,dataset_id::text,column_id::text,classification,evidence_state,provenance,created_at", (effective_dataset_id,str(body.column_id) if body.column_id else None,body.classification,body.evidence_state,Json(body.provenance),user["id"]))
             result = dict(cur.fetchone())
     return result
+
+
+@router.post("/classifications/propagate", dependencies=WRITE)
+def propagate_classifications(body: PropagationInput, user: dict = Depends(require_user)):
+    """Derive PII_INHERITED rows from stored column lineage, never from names.
+
+    Only PII_SOURCE and previously inherited columns seed propagation. A column
+    that already carries any classification is left untouched, so a steward
+    decision always wins. Each created row records the exact lineage edge ids
+    that justify it and is marked POSSIBLE rather than OBSERVED.
+    """
+    with get_conn() as conn:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            _tables(cur, "pii_classification", "column_record", "lineage_edge", "edge_temporal_version", "evidence")
+            scoped = str(body.dataset_id) if body.dataset_id else None
+            cur.execute(
+                """
+                SELECT DISTINCT ON (pc.column_id)
+                       pc.column_id::text AS column_id,
+                       pc.dataset_id::text AS dataset_id,
+                       pc.classification,
+                       cr.column_name AS seed_column_name
+                FROM   pii_classification pc
+                JOIN   column_record cr ON cr.id = pc.column_id
+                WHERE  pc.column_id IS NOT NULL
+                  AND  pc.classification IN ('PII_SOURCE', 'PII_INHERITED')
+                  AND  (%s::uuid IS NULL OR pc.dataset_id = %s::uuid)
+                ORDER  BY pc.column_id, pc.created_at DESC
+                """,
+                (scoped, scoped),
+            )
+            seeds = {
+                row["column_id"]: {
+                    "classification": row["classification"],
+                    "seed_column_name": row["seed_column_name"],
+                    "dataset_id": row["dataset_id"],
+                }
+                for row in cur.fetchall()
+            }
+            cur.execute(
+                """
+                SELECT DISTINCT le.id::text AS edge_id,
+                       e.source_column_id::text AS source_column_id,
+                       e.target_column_id::text AS target_column_id
+                FROM   lineage_edge le
+                JOIN   edge_temporal_version etv ON etv.edge_id = le.id
+                JOIN   evidence e ON e.id = etv.evidence_id
+                WHERE  le.granularity = 'COLUMN'
+                  AND  le.source_id IS NOT NULL
+                  AND  le.target_id IS NOT NULL
+                  AND  etv.valid_to IS NULL
+                  AND  etv.transaction_to IS NULL
+                  AND  e.source_column_id IS NOT NULL
+                  AND  e.target_column_id IS NOT NULL
+                """
+            )
+            edges = [dict(row) for row in cur.fetchall()]
+            cur.execute("SELECT DISTINCT column_id::text AS column_id FROM pii_classification WHERE column_id IS NOT NULL")
+            classified = [row["column_id"] for row in cur.fetchall()]
+
+            proposals = derive_inherited_columns(seeds, edges, classified, depth=body.depth)
+            if not proposals:
+                return {
+                    "ok": True,
+                    "created": 0,
+                    "skipped_existing": 0,
+                    "seeds": len(seeds),
+                    "edges": len(edges),
+                    "depth": body.depth,
+                    "dry_run": body.dry_run,
+                    "inherited": [],
+                    "message": (
+                        "No unclassified downstream column is reachable from a PII_SOURCE or inherited column."
+                        if seeds else "No PII_SOURCE or inherited column classification exists to propagate."
+                    ),
+                }
+
+            target_ids = [proposal["column_id"] for proposal in proposals]
+            cur.execute(
+                """
+                SELECT cr.id::text AS column_id, cr.dataset_id::text AS dataset_id,
+                       cr.column_name, d.name AS dataset_name
+                FROM   column_record cr
+                JOIN   dataset d ON d.id = cr.dataset_id
+                WHERE  cr.id = ANY(%s::uuid[])
+                """,
+                (target_ids,),
+            )
+            targets = {row["column_id"]: dict(row) for row in cur.fetchall()}
+
+    inherited = []
+    for proposal in proposals:
+        target = targets.get(proposal["column_id"])
+        if not target:
+            # The column disappeared between the walk and the read; do not write
+            # a classification that cannot name its target.
+            continue
+        seed = seeds[proposal["seed_column_id"]]
+        inherited.append(
+            {
+                **target,
+                "source_column_id": proposal["seed_column_id"],
+                "source_column": seed.get("seed_column_name"),
+                "source_classification": proposal["seed_classification"],
+                "edge_ids": proposal["edge_ids"],
+                "depth": proposal["depth"],
+            }
+        )
+
+    if body.dry_run:
+        return {
+            "ok": True,
+            "created": 0,
+            "skipped_existing": 0,
+            "seeds": len(seeds),
+            "edges": len(edges),
+            "depth": body.depth,
+            "dry_run": True,
+            "inherited": inherited,
+        }
+
+    created = 0
+    with get_conn() as conn:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            _tables(cur, "pii_classification", "column_record")
+            for item in inherited:
+                note = (
+                    f"Inherited from {item['source_column']} ({item['source_classification']}) "
+                    f"via {len(item['edge_ids'])} stored column-lineage edge(s)."
+                )
+                cur.execute(
+                    """
+                    INSERT INTO pii_classification(dataset_id, column_id, classification, evidence_state, provenance, classified_by)
+                    VALUES (%s::uuid, %s::uuid, 'PII_INHERITED', 'POSSIBLE', %s, %s::uuid)
+                    RETURNING id::text
+                    """,
+                    (
+                        item["dataset_id"],
+                        item["column_id"],
+                        Json({"origin": "inherited_lineage", "lineage_edge_ids": item["edge_ids"], "note": note}),
+                        user["id"],
+                    ),
+                )
+                created += 1
+    return {
+        "ok": True,
+        "created": created,
+        "skipped_existing": 0,
+        "seeds": len(seeds),
+        "edges": len(edges),
+        "depth": body.depth,
+        "dry_run": False,
+        "inherited": inherited,
+        "message": "Inherited classifications are POSSIBLE evidence derived from stored column lineage; review them in the PII register.",
+    }
 
 
 @router.get("/classifications")

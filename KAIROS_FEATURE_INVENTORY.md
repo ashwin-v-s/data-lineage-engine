@@ -1,4 +1,4 @@
-# KAIROS — Feature Inventory (verified 2026-11-21)
+# KAIROS — Feature Inventory (verified 2026-11-21, updated 2026-11-26)
 
 Scope: the repository at `E:\EDI-Metadata_Lineage`, the deployed app
 `https://data-lineage-engine-5i2x.vercel.app`, the shared Supabase Postgres
@@ -82,6 +82,8 @@ Status vocabulary used below:
 | Contracts + assertion linking | `/governance/products/{id}/contracts`, `/contracts/{id}/assertions` | **Verified (API, 2 rows exist globally)** | Not yet created in the demo workspace |
 | Column chooser for PII | `GET /governance/datasets/{id}/columns` | **Verified** | Merged `customers` owns its 6 columns |
 | Stewardship requests | `/api/v1/stewardship/requests` → `?view=stewardship` | **Verified (empty state)** | 0 rows; page renders create/approve forms |
+| Asset certification | `PUT/DELETE /trust/assets/{id}/certification` → `?view=trust` | **Verified (live API)** | Read-time `CERTIFIED`/`EXPIRING`/`EXPIRED`; live certify, list and revoke against shared Supabase. Browser rendering not yet checked |
+| Asset discussions | `/trust/assets/{id}/discussion`, `/trust/discussion/{id}/resolve` → `?view=trust` | **Verified (live API)** | Threaded comments; live 201 create, 200 list and 200 resolve, including the reply-validation rules |
 | Ownership | `/api/v1/owner/*` | **Verified (demo data)** | All 17 demo assets have `owner_name` + `steward_name`; catalog returns them instead of `null`; 3 named owners in the Assets filter |
 
 ## 6. Quality, freshness, incidents
@@ -92,6 +94,7 @@ Status vocabulary used below:
 | Metadata-only evaluation | `POST /quality/assertions/{id}/evaluate` | **Verified** | Result `54a0cd91-…` `PASS`, checked 1, failed 0 |
 | Quality results readback | `GET /quality/assertions/{id}/results` | **Verified (API)** | 1 `quality_result` row |
 | **Quality page / KPI** | `?view=quality`, Overview | **Verified live** | `catalog` loads latest results per assertion (BUG-02); deployed and serving 1 PASS result |
+| Quality scorecard + trend | `GET /quality/scorecard` → `?view=trust` | **Verified (live API)** | Latest result per assertion, pass rate excluding SKIPPED/ERROR, daily trend, uncovered assets; 200 against the shared database |
 | Freshness SLA | `POST /governance/slas` | **Verified** | `fct_daily_revenue` 48/60/120 min, `e0f15710-…` |
 | Freshness evaluation | `GET /governance/freshness`, `/datasets/{id}/evaluate`, scheduled runner | **Verified (manual + scheduled)** | `customers` STALE at 180 min against a 120 min manual SLA; Supabase `pg_cron` now evaluates due SLAs every 15 minutes and records `SCHEDULED` evaluations. See `docs/FRESHNESS_SCHEDULER.md`. |
 | Incident lifecycle | `/governance/incidents` + ack/investigate/resolve/assign/comments | **Verified (demo data)** | 1 open `customers is STALE` incident, HIGH, assigned; DETECTED event; transitions tested against the real API |
@@ -112,6 +115,8 @@ Status vocabulary used below:
 | API keys | `/api/v1/api-keys` | **Verified (demo)** | Active `ci-readonly-catalog` key (read only); key read catalog 200, members/write 403, revoke 401; revoked name can be rotated without reviving the old secret |
 | Webhooks + deliveries | `/api/v1/webhooks` | **Verified (demo delivery)** | 1 endpoint subscribed to all 7 events; signed `test.ping` delivered HTTP 200 in 26 ms and recorded in history; private/rebound hosts refused (BUG-05) |
 | Profile / preferences | `?view=settings`, `/api/v1/me/welcome-email` | **Verified** | Name from Supabase metadata; avatar/preferences browser-local |
+| Usage / popularity | `asset_engagement` ← explicit asset opens → `?view=trust` | **Verified (live API)** | Workspace-level open counter with no user identity; live `None → 1` increment, then the test counter was restored. It measures recorded opens, not warehouse query frequency |
+| Trust center | `?view=trust` (`TrustView.jsx`) | **Partial** | Overview, certification register and discussion pane built against the live-verified APIs; the deployed site does not include this build yet, so browser rendering is unchecked |
 | REA insight endpoints | `/api/v1/rea/*` | **Partial** | Static recommendation/pattern catalog, not workspace data |
 
 ## 8. Deliberate placeholders (honest, not bugs)
@@ -120,7 +125,8 @@ Status vocabulary used below:
 | --- | --- | --- |
 | Data products health | "Product health is shown only when source evaluation rows exist." | No quality/incident evidence per product yet |
 | Custom SQL assertions | Disabled with explanation | No isolated read-only runner |
-| PII_INHERITED / PII_POTENTIAL | Disabled with reason | Requires lineage/SQL evidence propagation |
+| PII_POTENTIAL | Disabled with reason | Requires a persisted SQLGlot evidence reference |
+| PII_INHERITED manual selection | Replaced by derivation | `POST /governance/classifications/propagate` derives inherited rows from stored column lineage as POSSIBLE evidence; live dry-run and write verified, second run idempotent |
 | Demo preview switch | Disabled | No fixture dataset is bundled |
 | Notifications realtime | Copy says refresh reads persisted notifications | No websocket/realtime channel |
 
@@ -135,10 +141,14 @@ Status vocabulary used below:
 `/search/hybrid`), `ingest` (`/preview`, `/commit`, `/runs`,
 `/runs/{id}`, `/openlineage`), `ingestion` (`/preview`, `/commit`),
 `governance` (`/terms`, `/terms/{id}/assets`, `/terms/{id}/approve`,
-`/classifications`, `/datasets/{id}/columns`, `/domains`, `/products`,
-`/products/{id}/contracts`, `/contracts/{id}/assertions`, `/slas`,
-`/freshness`, `/datasets/{id}/evaluate`, `/datasets/{id}/confirm-freshness`,
-`/incidents` + lifecycle), `quality` (`/assertions`, `/evaluate`, `/results`),
+`/classifications`, `/classifications/propagate`, `/datasets/{id}/columns`,
+`/domains`, `/products`, `/products/{id}/contracts`,
+`/contracts/{id}/assertions`, `/slas`, `/freshness`,
+`/datasets/{id}/evaluate`, `/datasets/{id}/confirm-freshness`,
+`/incidents` + lifecycle), `quality` (`/assertions`, `/evaluate`, `/results`,
+`/scorecard`), `trust` (`/overview`, `/certifications`,
+`/assets/{id}/certification`, `/assets/{id}/discussion`,
+`/discussion/{id}/resolve`),
 `metadata` (`/{id}/description`, `/{id}/tags`, `/bulk-update`, `/{id}/editable`,
 `/validate`), `owner` (`/team-members`, `/assign/{id}`, `/{id}/history`,
 `/stats/overview`, `/request`, `/requests/pending`, `/requests/{id}/approve`),
@@ -149,3 +159,27 @@ Status vocabulary used below:
 (`/me/recently-viewed`, `/me/starred-assets`, `/assets/{id}/star`),
 `workspaces` (`/me/workspace`, `/me/workspaces`, `/me/welcome-email`,
 `/workspaces/{id}`), `integrations` (GitHub App), `rea`, `health`, `dependency`.
+
+---
+
+## 9. Competitive parity (2026-11-26)
+
+A full comparison against DataHub, OpenMetadata, Atlan, Alation, Collibra,
+Monte Carlo, Elementary, Select Star, Secoda, DataGalaxy, OvalEdge, Marquez and
+Amundsen is in `docs/COMPETITOR_ANALYSIS_2026-11.md`. Shipped in this pass:
+certification, discussions, usage popularity, quality scorecard, and PII
+inheritance from stored column lineage.
+
+Still required (documented in the analysis, not implemented):
+
+| Priority | Capability | Blocker |
+| --- | --- | --- |
+| P0 | Connector breadth (Snowflake, BigQuery, Databricks, BI tools, orchestrators) | 4 import formats + 1 PostgreSQL source today |
+| P0 | Executed data quality (volume, column value, custom SQL, anomalies) | No reviewed read-only query runner / `data:preview` grant |
+| P0 | Semantic search | No `OPENAI_API_KEY`; 0 embeddings |
+| P0 | MCP server / agent access | Not built |
+| P1 | Warehouse query-log usage analytics | Only UI opens are recorded |
+| P1 | Data contract enforcement | Contracts are stored, never evaluated |
+| P1 | Slack / Teams notifications | Email + in-app only |
+| P1 | Activity feed, announcements, saved searches, collections | Not built |
+| P1 | Description/tag propagation along lineage | PII propagates; other metadata does not |

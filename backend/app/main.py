@@ -33,6 +33,7 @@ from backend.app.api.routes.rea import router as rea_router
 from backend.app.api.routes.search import router as search_router
 from backend.app.api.routes.sources import router as sources_router
 from backend.app.api.routes.stewardship import router as stewardship_router
+from backend.app.api.routes.trust import router as trust_router
 from backend.app.api.routes.vector_search import router as vector_search_router
 from backend.app.api.routes.webhooks import router as webhooks_router
 from backend.app.api.routes.workspaces import router as workspaces_router
@@ -178,6 +179,7 @@ app.include_router(workspaces_router, prefix="/api/v1")
 app.include_router(api_keys_router,   prefix="/api/v1")
 app.include_router(webhooks_router,   prefix="/api/v1")
 app.include_router(stewardship_router, prefix="/api/v1")
+app.include_router(trust_router, prefix="/api/v1")
 app.include_router(vector_search_router, prefix="/api/v1")
 
 

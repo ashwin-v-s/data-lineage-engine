@@ -8,6 +8,7 @@ import FreshnessView from './components/FreshnessView.jsx';
 import GovernanceView from './components/GovernanceView.jsx';
 import IncidentsView from './components/IncidentsView.jsx';
 import MobileShell from './components/MobileShell.jsx';
+import TrustView from './components/TrustView.jsx';
 import {
   CONNECTING_DESCRIPTION,
   DATA_MODES,
@@ -243,6 +244,7 @@ function Sidebar() {
             <button className="nav-item nav-child" data-view="domains">Domains</button>
             <button className="nav-item nav-child" data-view="notifications">Notifications</button>
             <button className="nav-item nav-child" data-view="stewardship">Stewardship <span className="nav-tag">NEW</span></button>
+            <button className="nav-item nav-child" data-view="trust">Trust center <span className="nav-tag">NEW</span></button>
           </div>
         </div>
         <div className="nav-group" data-nav-group="settings">
@@ -305,6 +307,8 @@ function DashboardContent() {
         ? <IncidentsView demoPreview={dataMode === DATA_MODES.DEMO_FIXTURE} />
         : liveView === 'freshness'
           ? <FreshnessView demoPreview={dataMode === DATA_MODES.DEMO_FIXTURE} />
+        : liveView === 'trust'
+          ? <TrustView demoPreview={dataMode === DATA_MODES.DEMO_FIXTURE} />
           : <div dangerouslySetInnerHTML={{ __html: markup }} />}
     </main>
   );

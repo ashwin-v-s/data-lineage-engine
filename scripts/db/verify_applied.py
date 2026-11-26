@@ -113,6 +113,17 @@ MIGRATION_TABLES: dict[str, list[str]] = {
         "notification_preference",
     ],
     "0014_welcome_email_delivery": ["kairos_welcome_email_delivery"],
+    "0016_api_keys_webhooks": [
+        "workspace_api_key",
+        "workspace_webhook",
+        "workspace_webhook_delivery",
+    ],
+    "0017_stewardship_requests": ["stewardship_request"],
+    "0019_trust_collaboration": [
+        "asset_certification",
+        "asset_discussion",
+        "asset_engagement",
+    ],
 }
 
 MIGRATION_COLUMNS: dict[str, list[tuple[str, str]]] = {

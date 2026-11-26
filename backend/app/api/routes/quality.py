@@ -24,6 +24,7 @@ from backend.app.services.notification_delivery import (
     create_in_app_notification,
     dispatch_notification_emails,
 )
+from backend.app.services.quality_scorecard import build_scorecard
 
 router = APIRouter(prefix="/quality", tags=["quality"], dependencies=[Depends(require_user)])
 
@@ -121,6 +122,15 @@ def _result_for_assertion(cur, assertion: dict) -> dict:
     if status != "SKIPPED":
         status = "FAIL" if failed else "PASS"
     return {"status": status, "checked_count": checked, "failed_count": failed, "evidence": evidence}
+
+
+@router.get("/scorecard")
+def quality_scorecard(days: int = Query(default=30, ge=1, le=365), user: dict = Depends(require_user)):
+    """Workspace quality snapshot and daily trend from persisted results."""
+    with get_conn() as conn:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            _require_tables(cur, "quality_assertion", "quality_result")
+            return build_scorecard(cur, days=days)
 
 
 @router.get("/assertions")
