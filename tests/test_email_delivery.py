@@ -58,6 +58,28 @@ def test_invitation_email_contains_acceptance_url_and_expiry(monkeypatch):
     assert "2026-11-14T00:00:00Z" not in html
 
 
+def test_notification_email_contains_event_action_link_and_branded_html():
+    url = mail.send_notification_email(
+        "owner@example.com",
+        event_type="FRESHNESS_BREACH",
+        title="orders is <STALE>",
+        action_path="/governance/freshness?asset=123",
+    )
+
+    assert url == "https://kairos.example.test/governance/freshness?asset=123"
+    message = _SMTP.messages[0]
+    assert message["To"] == "owner@example.com"
+    assert message["Subject"] == "Kairos: orders is <STALE>"
+    plain = message.get_body(preferencelist=("plain",)).get_content()
+    assert "A Freshness Breach notification" in plain
+    assert "orders is <STALE>" in plain
+    assert url in plain
+    html = message.get_body(preferencelist=("html",)).get_content()
+    assert "orders is &lt;STALE&gt;" in html
+    assert "Open notification" in html
+    assert url in html
+
+
 def test_welcome_email_greets_signed_in_user():
     mail.send_welcome_email("member@gmail.com", "Kairos Member")
     message = _SMTP.messages[0]

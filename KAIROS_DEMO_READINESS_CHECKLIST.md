@@ -35,7 +35,7 @@ infrastructure; **UNVERIFIED** = not executed.
 - [x] **PASS** Run records — 4 persisted demo runs (2 SUCCESS, 1 WARNING, 1 FAILED), 1 stored event each, environment surfaced; signed-in Runs page verified with 4 rows
 - [x] **PASS** API keys — active `ci-readonly-catalog` key; catalog read 200, members/ingest 403, revoke 401; revoked name can be recreated with a new secret (verified live 2026-11-23)
 - [x] **PASS** Webhooks — endpoint subscribed to all 7 events; signed `test.ping` delivered HTTP 200 and recorded in History with `X-Kairos-Signature` (verified live 2026-11-23)
-- [x] **PASS (on demand)** Incidents and notifications — `seed_demo_ops_signal.py` wrote a 180-minute-old manual confirmation, the freshness engine evaluated `customers` STALE, and one HIGH incident plus one unread `FRESHNESS_BREACH` were created. No background scheduler is deployed.
+- [x] **PASS (scheduled)** Incidents and notifications — `seed_demo_ops_signal.py` wrote a 180-minute-old manual confirmation, the freshness engine evaluated `customers` STALE, and one HIGH incident plus one unread `FRESHNESS_BREACH` were created. A Supabase `pg_cron` job now runs due evaluations every 15 minutes (see `docs/FRESHNESS_SCHEDULER.md`).
 - [x] **PASS** Column-level lineage — SQLGlot projections emitted 19 COLUMN evidence rows and edges in this workspace (BUG-03 fixed)
 - [x] **PASS** Dated/temporal evidence — the dbt manifest's source-declared `generated_at` gives 8 dependencies a KNOWN valid interval; the remaining 34 undated rows are counted, not silently excluded (BUG-04 limited to sources without a timestamp)
 

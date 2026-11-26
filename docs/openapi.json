@@ -5091,6 +5091,54 @@
         }
       }
     },
+    "/api/v1/internal/freshness/run": {
+      "post": {
+        "tags": [
+          "internal"
+        ],
+        "summary": "Run Freshness Schedule",
+        "description": "Run due scheduled freshness evaluations.\n\nThe caller is the database scheduler, not a browser. A missing secret\ndisables the route rather than making it public.",
+        "operationId": "run_freshness_schedule_api_v1_internal_freshness_run_post",
+        "parameters": [
+          {
+            "name": "x-kairos-cron-secret",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Kairos-Cron-Secret"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/governance/terms": {
       "get": {
         "tags": [
@@ -9449,7 +9497,7 @@
           "email": {
             "type": "boolean",
             "title": "Email",
-            "default": false
+            "default": true
           }
         },
         "additionalProperties": false,

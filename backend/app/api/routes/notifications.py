@@ -2,12 +2,14 @@
 from __future__ import annotations
 
 import uuid
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from psycopg2.extras import RealDictCursor
 from pydantic import BaseModel, ConfigDict
 
 from backend.app.auth import require_user
 from backend.app.db import get_conn
+from backend.app.services.notification_delivery import app_action_path
 
 router = APIRouter(prefix="/notifications", tags=["notifications"], dependencies=[Depends(require_user)])
 EVENT_TYPES = ("FRESHNESS_BREACH", "QUALITY_FAILURE", "INCIDENT_CREATED", "SYNC_FAILURE", "CREDENTIAL_EXPIRY", "LINEAGE_CHANGE", "PII_CHANGE")
@@ -26,6 +28,8 @@ def list_notifications(unread_only: bool = False, limit: int = Query(default=50,
             _require_table(cur)
             cur.execute("SELECT id::text,event_type,title,detail,action_path,read_at,created_at FROM notification WHERE recipient_user_id=%s::uuid AND (%s=false OR read_at IS NULL) ORDER BY created_at DESC LIMIT %s", (user["id"],unread_only,limit))
             rows = [dict(row) for row in cur.fetchall()]
+            for row in rows:
+                row["action_path"] = app_action_path(row.get("action_path"))
             cur.execute("SELECT count(*)::int AS unread_count FROM notification WHERE recipient_user_id=%s::uuid AND read_at IS NULL", (user["id"],))
             unread_count = cur.fetchone()["unread_count"]
     return {"notifications": rows, "count": len(rows), "unread_count": unread_count}
@@ -62,7 +66,7 @@ class PreferenceInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
     event_type: str
     in_app: bool = True
-    email: bool = False
+    email: bool = True
 
 
 @router.get("/preferences")

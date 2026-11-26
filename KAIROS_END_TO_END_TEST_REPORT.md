@@ -344,7 +344,7 @@ only chart, stewardship, evidence, lineage, app and removal scripts.
 | GitHub App import | Needs App credentials, installation, public callback |
 | OpenLineage ingest | Needs `KAIROS_OPENLINEAGE_WEBHOOK_SECRET` + workspace binding on the deployment |
 | Welcome / invitation email | Needs SMTP credentials and `KAIROS_PUBLIC_APP_URL` on Vercel |
-| Scheduler-driven freshness, incidents, notifications | No scheduler is deployed. The on-demand evaluator, incident lifecycle and notification fan-out are verified; only automatic cadence is unavailable. |
+| Scheduler-driven freshness, incidents, notifications | **Implemented 2026-11-26** — Supabase `pg_cron` calls the secret-protected runner every 15 minutes; deployment verification is recorded below. |
 | Hybrid vector search | No embeddings generated for this workspace |
 | Rotation of the password exposed before BUG-07 | Requires the Supabase dashboard; the repository code no longer contains it |
 
@@ -361,3 +361,27 @@ PLAYWRIGHT_BROWSERS_PATH=.pw-browsers node frontend/.demo-sweep.mjs   # local he
 
 All test rows created by this pass are retained deliberately (they are the demo
 dataset) and are listed by id in `KAIROS_DEMO_DATA_CATALOG.md` §8 for cleanup.
+
+## 10. Scheduled freshness completion (2026-11-26)
+
+- The freshness engine now has a shared manual/scheduled runner in
+  `backend/app/services/freshness_runner.py`. Scheduled evaluations persist
+  `evaluation_mode='SCHEDULED'`, use no human actor, and still create one
+  incident plus one notification on a new breach.
+- `POST /api/v1/internal/freshness/run` is protected by
+  `X-Kairos-Cron-Secret` and fails closed when `KAIROS_CRON_SECRET` is absent.
+- Supabase `pg_cron` runs the trigger every 15 minutes through `pg_net`; the
+  secret is stored in Supabase Vault, not in `cron.job`.
+- Setup and verification are documented in `docs/FRESHNESS_SCHEDULER.md`.
+- Verification: backend **862 passed / 83 skipped**, changed-file Ruff clean,
+  OpenAPI **127 paths**, and the live target query returned the expected due
+  hourly SLA.
+- Production deployment `data-lineage-engine-5i2x-o9uqr0oxl` is Ready and
+  aliased. The internal route returns **401** without or with a wrong secret
+  and **200** with the configured secret; the Vault-backed `pg_net` call also
+  returned **200**. The first automatic `pg_cron` run at **13:00 UTC** was
+  `succeeded` and stored an HTTP **200** response; the 12:51 scheduled
+  evaluation is stored with `evaluation_mode='SCHEDULED'`.
+- The configured SMTP path accepted a clearly labelled notification email to
+  the demo recipient (`smtp_accepted: true`), confirming notification delivery
+  credentials are live without printing the address or credentials.

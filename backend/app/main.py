@@ -17,23 +17,24 @@ from backend.app.api.routes.capabilities import router as capabilities_router
 from backend.app.api.routes.dependency import router as dependency_router
 from backend.app.api.routes.governance import router as governance_router
 from backend.app.api.routes.governance_registry import router as governance_registry_router
-from backend.app.api.routes.quality import router as quality_router
-from backend.app.api.routes.notifications import router as notifications_router
 from backend.app.api.routes.health import router as health_router
 from backend.app.api.routes.ingest import router as ingest_router
 from backend.app.api.routes.ingestion import router as ingestion_router
 from backend.app.api.routes.integrations import router as integrations_router
+from backend.app.api.routes.internal import router as internal_router
 from backend.app.api.routes.lineage import router as lineage_router
 from backend.app.api.routes.membership import router as membership_router
 from backend.app.api.routes.metadata import router as metadata_router
+from backend.app.api.routes.notifications import router as notifications_router
 from backend.app.api.routes.owner import router as owner_router
 from backend.app.api.routes.personalization import router as personalization_router
+from backend.app.api.routes.quality import router as quality_router
 from backend.app.api.routes.rea import router as rea_router
 from backend.app.api.routes.search import router as search_router
 from backend.app.api.routes.sources import router as sources_router
+from backend.app.api.routes.stewardship import router as stewardship_router
 from backend.app.api.routes.vector_search import router as vector_search_router
 from backend.app.api.routes.webhooks import router as webhooks_router
-from backend.app.api.routes.stewardship import router as stewardship_router
 from backend.app.api.routes.workspaces import router as workspaces_router
 from backend.app.auth import auth_disabled, require_user, supabase_auth_url
 from backend.app.settings import supabase_publishable_key
@@ -168,6 +169,7 @@ app.include_router(ingestion_router, prefix="/api/v1")
 app.include_router(membership_router, prefix="/api/v1")
 app.include_router(sources_router, prefix="/api/v1")
 app.include_router(governance_router, prefix="/api/v1")
+app.include_router(internal_router, prefix="/api/v1")
 app.include_router(governance_registry_router, prefix="/api/v1")
 app.include_router(quality_router, prefix="/api/v1")
 app.include_router(notifications_router, prefix="/api/v1")

@@ -135,6 +135,15 @@ Set these for the **Production** (and Preview, as needed) environment:
   `https://kairos.example.com` (no trailing slash; CORS compares exactly one
   origin).
 - Optional: `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY` (fallbacks).
+- `KAIROS_CRON_SECRET` — shared secret for the scheduled freshness trigger
+  (**secret**).
+- `KAIROS_FRESHNESS_SCHEDULE_ENABLED` — `true` only after the Supabase cron
+  job is installed; non-manual SLAs then report `SCHEDULED`.
+
+Scheduled freshness setup and verification are documented in
+[`FRESHNESS_SCHEDULER.md`](FRESHNESS_SCHEDULER.md). The job is installed with
+`python scripts/db/configure_freshness_cron.py`; it stores its credential in
+Supabase Vault and calls the internal route every 15 minutes.
 
 `DATABASE_URL` and the pooler password are secrets â€” store them as Vercel
 encrypted environment variables and never commit them.

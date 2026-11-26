@@ -93,7 +93,7 @@ Status vocabulary used below:
 | Quality results readback | `GET /quality/assertions/{id}/results` | **Verified (API)** | 1 `quality_result` row |
 | **Quality page / KPI** | `?view=quality`, Overview | **Verified live** | `catalog` loads latest results per assertion (BUG-02); deployed and serving 1 PASS result |
 | Freshness SLA | `POST /governance/slas` | **Verified** | `fct_daily_revenue` 48/60/120 min, `e0f15710-…` |
-| Freshness evaluation | `GET /governance/freshness`, `/datasets/{id}/evaluate` | **Verified (on demand)** | `customers` STALE at 180 min against a 120 min manual SLA; `fct_daily_revenue` stays UNKNOWN without a signal. No scheduler is deployed. |
+| Freshness evaluation | `GET /governance/freshness`, `/datasets/{id}/evaluate`, scheduled runner | **Verified (manual + scheduled)** | `customers` STALE at 180 min against a 120 min manual SLA; Supabase `pg_cron` now evaluates due SLAs every 15 minutes and records `SCHEDULED` evaluations. See `docs/FRESHNESS_SCHEDULER.md`. |
 | Incident lifecycle | `/governance/incidents` + ack/investigate/resolve/assign/comments | **Verified (demo data)** | 1 open `customers is STALE` incident, HIGH, assigned; DETECTED event; transitions tested against the real API |
 | Manual freshness confirmation | `POST /governance/datasets/{id}/confirm-freshness` | **Verified (route + tests)** | Not exercised in the demo workspace |
 
