@@ -227,3 +227,58 @@ def send_welcome_email(to_email: str, display_name: str | None = None) -> None:
         subtype="html",
     )
     _send(message, settings)
+
+
+def send_notification_email(
+    to_email: str,
+    *,
+    event_type: str,
+    title: str,
+    action_path: str | None = None,
+) -> str:
+    """Send an email copy of a generated in-app notification.
+
+    The message shares the invitation template and SMTP configuration.  The
+    return value is the absolute in-app URL used by the call to action.
+    """
+    settings = EmailSettings.from_env()
+    if settings is None:
+        raise EmailDeliveryError(
+            "Email delivery is not configured. Set SMTP_HOST, SMTP_USER, SMTP_PASSWORD, SMTP_FROM, "
+            "and KAIROS_PUBLIC_APP_URL."
+        )
+    safe_title = " ".join(str(title or "").split())[:200] or "New notification"
+    event_label = " ".join(str(event_type or "notification").replace("_", " ").split()).title()
+    path = action_path if isinstance(action_path, str) and action_path.startswith("/") else ""
+    url = f"{settings.public_app_url}{path}"
+    message = EmailMessage()
+    message["To"] = to_email
+    message["Subject"] = f"Kairos: {safe_title}"
+    message.set_content(
+        f"{safe_title}\n\n"
+        f"A {event_label} notification was generated for your Kairos workspace.\n"
+        "Open Kairos to review the details and take action.\n\n"
+        f"Open notification: {url}\n\n"
+        "You can turn off email copies for this notification type in Workspace settings."
+    )
+    message.add_alternative(
+        _branded_html(
+            preheader=safe_title,
+            eyebrow=f"{event_label} notification",
+            title=escape(safe_title),
+            body_html=(
+                f"<p style=\"margin:0 0 12px;\">A <strong>{escape(event_label)}</strong> notification "
+                "was generated for your Kairos workspace.</p>"
+                "<p style=\"margin:0;\">Open Kairos to review the details and take action.</p>"
+            ),
+            cta_label="Open notification",
+            cta_url=url,
+            footer_note=(
+                "You received this email because this notification was generated for your workspace. "
+                "You can turn off email copies for this notification type in Workspace settings."
+            ),
+        ),
+        subtype="html",
+    )
+    _send(message, settings)
+    return url

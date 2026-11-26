@@ -19,8 +19,8 @@ as a context manager – the connection is returned to the pool automatically.
 from __future__ import annotations
 
 import logging
-from contextvars import ContextVar
 from contextlib import contextmanager
+from contextvars import ContextVar
 from pathlib import Path
 from typing import Generator
 
@@ -29,6 +29,7 @@ from psycopg2 import pool as pg_pool
 from psycopg2.extras import RealDictCursor
 
 from backend.app.settings import database_url
+
 
 # ── Load .env (no-op if already in environment) ──────────────────────────────
 # Walk up from this file's directory until we find a .env file (or run out of parents)
@@ -117,6 +118,87 @@ def provision_personal_workspace(user_id: str) -> str:
         raise
     finally:
         pool.putconn(conn)
+
+
+def resolve_user_email(user_id: str) -> str | None:
+    """Read a recipient's verified email from Supabase Auth.
+
+    Notifications can be addressed to another workspace member, while
+    ``workspace_member`` stores only user IDs.  This narrowly scoped lookup
+    runs outside workspace RLS (like provisioning and API-key authentication),
+    is never exposed to a client, and selects only the email for the supplied
+    server-side user UUID.
+    """
+    if not user_id:
+        return None
+    pool = _get_pool()
+    conn = pool.getconn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT lower(btrim(email)) FROM auth.users WHERE id = %s::uuid",
+                (user_id,),
+            )
+            row = cur.fetchone()
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        pool.putconn(conn)
+    return (row[0] or None) if row else None
+
+
+def list_freshness_targets() -> list[dict[str, str]]:
+    """Return due scheduled freshness targets before any workspace scope exists.
+
+    The scheduled runner needs to discover targets across workspaces, then it
+    re-enters each workspace through ``set_workspace_id`` before evaluating.
+    This deliberately unscoped lookup returns only the two identifiers needed
+    to start that work; no governance content is exposed.
+    """
+    pool = _get_pool()
+    conn = pool.getconn()
+    try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute("SELECT to_regclass('public.freshness_sla') AS sla, to_regclass('public.freshness_evaluation') AS evaluation")
+            relations = cur.fetchone()
+            if not relations or relations["sla"] is None or relations["evaluation"] is None:
+                conn.commit()
+                return []
+            cur.execute(
+                """
+                SELECT s.workspace_id::text AS workspace_id,
+                       s.dataset_id::text AS dataset_id
+                FROM   freshness_sla s
+                LEFT JOIN LATERAL (
+                    SELECT e.evaluated_at
+                    FROM   freshness_evaluation e
+                    WHERE  e.dataset_id = s.dataset_id
+                    ORDER  BY e.evaluated_at DESC
+                    LIMIT  1
+                ) latest ON true
+                WHERE  s.paused = false
+                  AND  s.evaluation_schedule <> 'manual'
+                  AND  (
+                       latest.evaluated_at IS NULL
+                       OR latest.evaluated_at <= now() - CASE s.evaluation_schedule
+                            WHEN '15m' THEN interval '15 minutes'
+                            WHEN 'hourly' THEN interval '60 minutes'
+                            WHEN 'daily' THEN interval '24 hours'
+                          END
+                  )
+                ORDER BY s.workspace_id, s.dataset_id
+                """
+            )
+            rows = [dict(row) for row in cur.fetchall()]
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        pool.putconn(conn)
+    return rows
 
 
 def authenticate_api_key(secret_hash: str) -> dict | None:

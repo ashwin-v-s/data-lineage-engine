@@ -345,6 +345,8 @@ describe('freshness view contract', () => {
   });
 
   it('shows an authenticated API failure without substituting fixture readings', async () => {
+    // The bundled fixture is only read when demoPreview is explicitly selected;
+    // an authenticated API failure in live mode still clears the rows.
     const result = await fetchFreshness({
       fetcher: async () => ({
         ok: false,
@@ -357,6 +359,8 @@ describe('freshness view contract', () => {
     expect(result.error).toBe('Governance storage is unavailable.');
     expect(freshnessComponent).toContain('setEvaluations([])');
     expect(freshnessComponent).toContain('setError(freshnessResult.error)');
-    expect(freshnessComponent).toContain('No sample readings are substituted.');
+    expect(freshnessComponent).toContain('window.kairosDemoFixtures');
+    expect(freshnessComponent).toContain('normalizeFreshnessPayload(fixtures.freshness || {})');
+    expect(freshnessComponent).toMatch(/if \(demoPreview\) \{[\s\S]*?setEvaluations\(normalised\.evaluations\)/);
   });
 });

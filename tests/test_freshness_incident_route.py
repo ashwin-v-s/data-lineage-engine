@@ -10,7 +10,7 @@ from __future__ import annotations
 from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 from threading import Barrier, RLock, Thread, local
-from uuid import UUID, uuid4
+from uuid import UUID
 
 import pytest
 from fastapi import HTTPException
@@ -33,6 +33,7 @@ class _Store:
         self.incidents = []
         self.events = []
         self.notifications = []
+        self.email_messages = []
 
     def new_id(self):
         with self.lock:
@@ -148,6 +149,7 @@ def fake_governance_db(monkeypatch):
         yield _Connection(store, getattr(scope, "workspace", WORKSPACE_A))
 
     monkeypatch.setattr(governance, "get_conn", get_conn)
+    monkeypatch.setattr(governance, "dispatch_notification_emails", store.email_messages.extend)
     return store, scope
 
 
@@ -173,6 +175,8 @@ def test_repeated_freshness_breach_has_one_active_incident_and_preserves_evidenc
     assert incident["detail"]["evaluation_id"] == store.evaluations[0]["id"]
     assert [event["event_type"] for event in store.events] == ["DETECTED"]
     assert len(store.notifications) == 1
+    assert len(store.email_messages) == 1
+    assert store.email_messages[0].event_type == "FRESHNESS_BREACH"
 
 
 def test_concurrent_evaluations_follow_the_partial_unique_index_design(fake_governance_db):
@@ -197,6 +201,7 @@ def test_concurrent_evaluations_follow_the_partial_unique_index_design(fake_gove
     assert len([i for i in store.incidents if i["workspace_id"] == WORKSPACE_A and i["status"] != "RESOLVED"]) == 1
     assert sum(1 for event in store.events if event["event_type"] == "DETECTED") == 1
     assert sum(1 for item in store.notifications if item["type"] == "FRESHNESS_BREACH") == 1
+    assert len(store.email_messages) == 1
 
 
 def test_foreign_workspace_incident_read_is_hidden_and_resolution_is_audited(fake_governance_db):

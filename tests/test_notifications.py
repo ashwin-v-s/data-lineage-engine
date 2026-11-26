@@ -32,8 +32,8 @@ class _Store:
         self.notifications = []
         self.preferences = {}
 
-    def add(self, notice_id, recipient, read=False):
-        self.notifications.append({"id": notice_id, "recipient_user_id": recipient, "read": read})
+    def add(self, notice_id, recipient, read=False, action_path=None):
+        self.notifications.append({"id": notice_id, "recipient_user_id": recipient, "read": read, "action_path": action_path})
 
 
 def _dict_row(**values):
@@ -76,6 +76,30 @@ class _Cursor:
             self._one = self._shape(
                 {"relation": f"public.{table}" if table in self._store.tables else None}
             )
+        elif sql.startswith("SELECT id::text,event_type,title,detail,action_path,read_at,created_at FROM notification"):
+            recipient, unread_only, limit = params
+            self._many = [
+                self._shape({
+                    "id": notice["id"],
+                    "event_type": "FRESHNESS_BREACH",
+                    "title": "orders is STALE",
+                    "detail": {},
+                    "action_path": notice["action_path"],
+                    "read_at": notice["read"],
+                    "created_at": "2026-11-24T00:00:00Z",
+                })
+                for notice in self._store.notifications
+                if notice["recipient_user_id"] == recipient
+                and (not unread_only or not notice["read"])
+            ][:limit]
+        elif sql.startswith("SELECT count(*)::int AS unread_count FROM notification"):
+            (recipient,) = params
+            self._one = self._shape({
+                "unread_count": sum(
+                    1 for notice in self._store.notifications
+                    if notice["recipient_user_id"] == recipient and not notice["read"]
+                )
+            })
         elif sql.startswith("UPDATE notification SET read_at=coalesce"):
             recipient, notification_ids = params
             # Model both the endpoint's recipient predicate and the RLS policy.
@@ -156,6 +180,22 @@ def _missing_table(monkeypatch):
 
 
 # -- mark one read ---------------------------------------------------------------
+
+
+def test_notification_list_normalizes_legacy_action_paths(store):
+    from backend.app.api.routes.notifications import list_notifications
+
+    store.add(
+        NOTICE_ID,
+        USER_A,
+        action_path="/governance/freshness?asset=11111111-1111-4111-8111-111111111111",
+    )
+
+    listing = list_notifications(unread_only=False, limit=50, user={"id": USER_A})
+
+    assert listing["notifications"][0]["action_path"] == (
+        "/?view=freshness&asset=11111111-1111-4111-8111-111111111111"
+    )
 
 
 def test_mark_read_marks_the_recipients_notification(store):
@@ -251,7 +291,11 @@ def test_notification_event_type_is_validated(store):
 
 
 def test_notification_preference_round_trips_through_the_workspace_store(store):
-    from backend.app.api.routes.notifications import PreferenceInput, get_preferences, set_preference
+    from backend.app.api.routes.notifications import (
+        PreferenceInput,
+        get_preferences,
+        set_preference,
+    )
 
     saved = set_preference(
         PreferenceInput(event_type="FRESHNESS_BREACH", in_app=True, email=False),

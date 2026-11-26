@@ -77,10 +77,11 @@ describe('catalog data modes', () => {
     expect(app).toContain("localStorage.setItem('kairos_dataMode','postgresql')");
   });
 
-  it('refuses to present synthetic records as the live catalog', () => {
+  it('shows synthetic records only when the bundled demo fixture is selected', () => {
     const app = read('app.js');
-    expect(app).toContain('Demo fixture mode is not available in this build');
-    expect(app).toContain('Persisted catalog data is shown instead.');
+    expect(app).toContain('function loadDemoPreview()');
+    expect(app).toContain('window.kairosDemoFixtures');
+    expect(app).toContain("localStorage.setItem('kairos_dataMode','demo')");
     expect(app).toContain('The demo graph is not shown in PostgreSQL mode.');
   });
 

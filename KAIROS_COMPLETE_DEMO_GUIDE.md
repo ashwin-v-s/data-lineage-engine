@@ -299,12 +299,14 @@ and the UI shows the count, not a fake average.
 
 **B/C.** Sidebar → **Trust & governance → Freshness**.
 
-**D (verified).** SLA for `fct_daily_revenue`: warn 48, error 60, stale 120
-minutes, signal `manual`, schedule `manual`. Status is UNKNOWN because no
-runtime activity signal exists.
+**D (verified).** `fct_daily_revenue` has a 48/60/120-minute manual SLA and is
+**UNKNOWN** because no qualifying activity exists. `customers` has the same SLA
+and a stored manual confirmation three hours old, so its latest evaluation is
+**STALE** with one open incident. The evaluation is produced by the same
+freshness engine the API calls; the UI does not invent the state.
 
-**E.** "An SLA without a signal is honestly UNKNOWN. Kairos does not invent
-freshness."
+**E.** "An SLA without a signal is honestly UNKNOWN. A stored signal older than
+the threshold is STALE, and that opens exactly one incident."
 
 **F.** `GET /api/v1/governance/freshness`.
 
@@ -319,13 +321,17 @@ comments, owner assignment and a dedupe key.
 
 **B/C.** Sidebar → **Trust & governance → Incident console**.
 
-**D (verified empty).** 0 incidents, because no freshness breach ever fired.
+**D (verified).** **1 open incident**: `customers is STALE`, severity HIGH,
+status DETECTED, assigned to the active workspace owner. Its event timeline has
+the `DETECTED` event. Acknowledge → investigate → resolve are real transitions;
+resolution requires a reason and action.
 
 **E.** "Incidents are opened by the freshness engine when a stored evaluation
 breaches the SLA — not by the UI."
 
-**G.** To create one legitimately you need a runtime signal
-(OpenLineage/dbt/manual confirmation) plus an evaluation.
+**G.** If the console is empty, run
+`python scripts/db/seed_demo_ops_signal.py --workspace <demo-workspace>`; it
+records the old manual confirmation and evaluates it through the engine.
 
 ---
 
@@ -413,6 +419,30 @@ fields, not an absence of classification."
 **G.** If the column list is empty, confirm the selected asset is the variant
 that owns columns; otherwise demonstrate the persisted table instead of adding
 a guessed row.
+
+---
+
+## 15a. Metadata versions and rollback
+
+**A.** Metadata edits create immutable `asset_version` snapshots; rollback
+requests require owner/admin approval and a separate execution step.
+
+**B/C.** All assets → open `customers` → **Activity**.
+
+**D (verified).** `customers` has **v1** (baseline), **v2** (description edit)
+and **v3** (executed rollback from v2 to v1). The executed rollback request is
+visible with its reason. Each snapshot contains mutable metadata only
+(description, tags, owner/steward); identity and lineage are never rewritten.
+
+**E.** "The audit trail is append-only. A rollback creates a new version rather
+than deleting history, and every request, approval, rejection and execution is
+an `audit_event`."
+
+**F.** `GET /api/v1/audit/{asset_id}/versions` and
+`GET /api/v1/audit/{asset_id}/rollbacks`.
+
+**G.** Assets without edits show an honest “No metadata versions recorded”
+state: a baseline is written on the first description/tag edit.
 
 ---
 
@@ -599,11 +629,13 @@ preferences.
 
 **B/C.** Sidebar → **Trust & governance → Notifications**.
 
-**D (verified empty).** 0 rows — no scheduler produced a `FRESHNESS_BREACH`,
-`QUALITY_FAILURE` or `INCIDENT_CREATED` event.
+**D (verified).** **1 unread `FRESHNESS_BREACH`** for `customers is STALE`,
+with an action path to the freshness view. It was inserted by the freshness
+evaluation that created the incident, not by the browser. Mark-read and
+read-all persist; preferences are editable.
 
-**E.** "Notification records are written by the event that caused them; with no
-scheduler running there is nothing to show, and we do not fake one."
+**E.** "Notification records are written by the event that caused them. A
+manual evaluation can create one; the UI never fabricates one."
 
 ---
 

@@ -179,6 +179,11 @@ committed file.
 | Quality assertion | "Revenue mart schema contract", type `schema`, severity HIGH, schedule manual | `480a9715-3dbc-4b4d-be47-703dde52a6bd` |
 | Quality result | PASS, checked 1, failed 0, evaluated 2026-11-21T11:36Z | `54a0cd91-49b3-4ec6-a532-6169b28e3e8b` |
 | Freshness SLA | `fct_daily_revenue`: warn 48 min, error 60 min, stale 120 min, signal `manual`, schedule `manual` | `e0f15710-ed4a-4947-8c2f-9e486d3854ea` |
+| Freshness SLA | `customers`: warn 48 min, error 60 min, stale 120 min, signal `manual` | created by `seed_demo_ops_signal.py` |
+| Freshness evaluation | `customers` STALE, age 180 min, threshold 120 min, manual evidence | created by `seed_demo_ops_signal.py` |
+| Incident | `customers is STALE`, HIGH, DETECTED, owner assigned | `4a265fd6-1623-4dc8-86aa-f216854db487` |
+| Notification | `FRESHNESS_BREACH` · "customers is STALE" · unread | `b4dc70af-16de-454d-bf34-7925f31e0e99` |
+| Metadata versions | `customers` v1 baseline, v2 description edit, v3 executed rollback to v1 | created by the metadata/rollback API |
 
 Readbacks: `/governance/terms` 4 rows, `/governance/domains` 3 rows,
 `/governance/products` 3 rows, `/quality/assertions` 1 row,
@@ -190,7 +195,7 @@ Readbacks: `/governance/terms` 4 rows, `/governance/domains` 3 rows,
 | --- | --- |
 | PII classification on `customers.email` | **Created** — after the BUG-01 merge, `customers` is one asset with 6 columns and the classification resolves to it. |
 | Data contract version | Available, but a contract needs an assertion id and clause JSON; prepared steps are in the demo guide. |
-| Incidents / notifications | No scheduler or runtime freshness signal exists in this deployment, so nothing legitimately triggers them. |
+| Incidents / notifications | **Populated** by `seed_demo_ops_signal.py`: one stale manual confirmation produced one incident and one unread notification through the real evaluation engine. A background scheduler is still not deployed; evaluations are triggered on demand. |
 | Sync jobs, source connections | Requires a reachable PostgreSQL source and `KAIROS_TOKEN_ENCRYPTION_KEY`. |
 | Column-level lineage | **Available** — 19 SQL projection mappings backfilled; no longer a gap. |
 

@@ -7,18 +7,23 @@ execution contract.
 """
 from __future__ import annotations
 
-import uuid
 import re
+import uuid
 from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from psycopg2.extras import Json, RealDictCursor
 from pydantic import BaseModel, ConfigDict, Field
 
+from backend.app.api.routes.membership import require_role
 from backend.app.auth import require_user
 from backend.app.db import get_conn
-from backend.app.api.routes.membership import require_role
 from backend.app.services.freshness_evidence import last_successful_runtime_activity
+from backend.app.services.notification_delivery import (
+    NotificationMessage,
+    create_in_app_notification,
+    dispatch_notification_emails,
+)
 
 router = APIRouter(prefix="/quality", tags=["quality"], dependencies=[Depends(require_user)])
 
@@ -156,6 +161,7 @@ def create_assertion(request: AssertionInput, user: dict = Depends(require_user)
 
 @router.post("/assertions/{assertion_id}/evaluate", dependencies=[Depends(require_role("owner", "admin", "editor"))])
 def evaluate_assertion(assertion_id: uuid.UUID, user: dict = Depends(require_user)):
+    notification: NotificationMessage | None = None
     with get_conn() as conn:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
             _require_tables(cur, "quality_assertion", "quality_result", "incident", "incident_event", "notification")
@@ -190,7 +196,9 @@ def evaluate_assertion(assertion_id: uuid.UUID, user: dict = Depends(require_use
                 if incident:
                     cur.execute("INSERT INTO incident_event(incident_id,event_type,actor_user_id,detail) VALUES (%s::uuid,'DETECTED',%s::uuid,%s)", (incident["id"], user["id"], Json({"breach_type": "quality", "result_id": persisted["id"]})))
                     if owner_id:
-                        cur.execute("INSERT INTO notification(recipient_user_id,event_type,title,detail,action_path) VALUES (%s::uuid,'QUALITY_FAILURE',%s,%s,%s)", (owner_id, f"Quality assertion failed: {assertion['name']}", Json({"incident_id": incident["id"], "result_id": persisted["id"]}), f"/governance/incidents?id={incident['id']}"))
+                        notification = create_in_app_notification(cur, owner_id, "QUALITY_FAILURE", f"Quality assertion failed: {assertion['name']}", {"incident_id": incident["id"], "result_id": persisted["id"]}, f"/?view=incidents&id={incident['id']}")
+    if notification is not None:
+        dispatch_notification_emails([notification])
     return {**persisted, **result, "assertion_id": str(assertion_id)}
 
 

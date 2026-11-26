@@ -11,10 +11,16 @@ member of this workspace (Pranav Samal) is stored as an ``owner_id``; the other
 owner names are descriptive assignments until those people are added to the
 workspace, so no access is silently granted.
 
+Workspaces with only a subset of the imports (for example a two-asset upload
+workspace) can be seeded with ``--allow-partial``. Missing assets are reported
+and skipped instead of aborting the whole run; a PII row whose source column is
+absent is recorded at asset level so the privacy review is still explicit.
+
 Usage
 -----
     python scripts/db/seed_demo_ownership_pii.py --workspace <uuid>
     python scripts/db/seed_demo_ownership_pii.py --workspace <uuid> --dry-run
+    python scripts/db/seed_demo_ownership_pii.py --workspace <uuid> --allow-partial
 """
 from __future__ import annotations
 
@@ -122,6 +128,11 @@ def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--workspace", required=True, help="Workspace UUID to seed")
     parser.add_argument("--dry-run", action="store_true", help="Report without writing")
+    parser.add_argument(
+        "--allow-partial",
+        action="store_true",
+        help="Skip assets or columns that are not present in this workspace instead of failing",
+    )
     args = parser.parse_args(argv)
 
     load_dotenv(dotenv_path=str(ROOT / ".env"))
@@ -140,18 +151,26 @@ def main(argv=None) -> int:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
             cur.execute("SELECT set_config('kairos.workspace_id', %s, true)", (args.workspace,))
             cur.execute(
-                "SELECT user_id::text FROM workspace_member "
-                "WHERE workspace_id=%s::uuid AND status='active' AND role='owner' LIMIT 1",
+                """
+                SELECT wm.user_id::text, u.email,
+                       COALESCE(u.raw_user_meta_data->>'full_name', u.raw_user_meta_data->>'name', u.email) AS display_name
+                FROM workspace_member wm
+                LEFT JOIN auth.users u ON u.id = wm.user_id
+                WHERE wm.workspace_id=%s::uuid AND wm.status='active' AND wm.role='owner'
+                ORDER BY wm.created_at LIMIT 1
+                """,
                 (args.workspace,),
             )
             member = cur.fetchone()
             if not member:
                 raise RuntimeError("No active workspace owner to attribute the seeded records to")
             actor = member["user_id"]
+            actor_name = (member.get("display_name") or member.get("email") or "").strip()
 
             updated = 0
+            skipped_assets = []
             for name, asset_type, owner, steward, description, tags in ASSETS:
-                owner_id = actor if owner == DEMO_OWNER else None
+                owner_id = actor if owner == DEMO_OWNER or owner.casefold() == actor_name.casefold() else None
                 cur.execute(
                     """
                     UPDATE dataset
@@ -160,23 +179,33 @@ def main(argv=None) -> int:
                            assigned_by=%s, assigned_at=now(),
                            last_modified_by='demo-ownership-seed', last_modified_at=now()
                      WHERE workspace_id=%s::uuid AND name=%s AND asset_type=%s
+                       AND removed_at IS NULL
                     """,
                     (owner, owner_id, steward, description, tags, actor, args.workspace, name, asset_type),
                 )
-                updated += cur.rowcount
+                if cur.rowcount:
+                    updated += cur.rowcount
+                elif args.allow_partial:
+                    skipped_assets.append(f"{name} ({asset_type})")
+                else:
+                    raise RuntimeError(f"Asset not found: {name} ({asset_type})")
 
             cur.execute("DELETE FROM pii_classification WHERE workspace_id=%s::uuid", (args.workspace,))
             inserted = 0
+            skipped_pii = []
             for name, asset_type, column, classification, evidence, note in PII:
                 # A name/type can have more than one physical import row (the
                 # SQL fixture was committed twice).  Classify every visible
                 # variant, otherwise one row remains "Not classified".
                 cur.execute(
-                    "SELECT id::text FROM dataset WHERE workspace_id=%s::uuid AND name=%s AND asset_type=%s",
+                    "SELECT id::text FROM dataset WHERE workspace_id=%s::uuid AND name=%s AND asset_type=%s AND removed_at IS NULL",
                     (args.workspace, name, asset_type),
                 )
                 datasets = cur.fetchall()
                 if not datasets:
+                    if args.allow_partial:
+                        skipped_pii.append(f"{name} ({asset_type}) [{classification}]")
+                        continue
                     raise RuntimeError(f"Asset not found: {name} ({asset_type})")
                 for dataset in datasets:
                     column_id = None
@@ -187,9 +216,15 @@ def main(argv=None) -> int:
                             (dataset["id"], column),
                         )
                         column_row = cur.fetchone()
-                        if not column_row:
+                        if column_row:
+                            column_id = column_row["id"]
+                        elif args.allow_partial:
+                            # The import did not retain this column; keep the
+                            # classification at asset level so the review is
+                            # still visible instead of silently disappearing.
+                            skipped_pii.append(f"{name}.{column} (classified at asset level)")
+                        else:
                             raise RuntimeError(f"Column not found: {name}.{column}")
-                        column_id = column_row["id"]
                     origin = ORIGIN.get(classification, "manual_steward")
                     provenance = Json({"origin": origin, "note": note, "seed": "demo-ownership-pii-v1"})
                     reviewed = classification == "PII_CLEARED"
@@ -221,6 +256,10 @@ def main(argv=None) -> int:
             )
         conn.commit()
         print(f"Updated {updated} asset rows and inserted {inserted} PII classifications into {args.workspace}.")
+        if skipped_assets:
+            print(f"Skipped {len(skipped_assets)} absent assets: {', '.join(skipped_assets)}")
+        if skipped_pii:
+            print(f"Partial PII: {', '.join(skipped_pii)}")
         return 0
     except Exception as exc:
         conn.rollback()

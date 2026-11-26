@@ -19,7 +19,7 @@ Test identity: the repository's documented test account
 
 | Suite | Command | Result |
 | --- | --- | --- |
-| Backend (pytest) | `python -m pytest -q` | **733 passed, 83 skipped, 0 failed** (16.9 s) |
+| Backend (pytest) | `python -m pytest -q` | **848 passed, 83 skipped, 0 failed** |
 | Frontend (vitest) | `npx vitest run` | **134 passed / 134** |
 | Frontend build | `npm --prefix frontend run build` | **clean** (46 modules, 1.77 s) |
 | Migration/table presence | `python scripts/db/verify_applied.py` | **PASS** — 47 tables, 0 missing columns, routines present |
@@ -28,6 +28,19 @@ Test identity: the repository's documented test account
 
 Skipped tests are the live/credential-gated ones (`KAIROS_LIVE_*` flags not set
 for this run); their behaviour was exercised manually instead (section 3).
+
+### 1a. Final end-to-end completion (2026-11-24)
+
+| Area | Evidence | Result |
+| --- | --- | --- |
+| Metadata versions | `asset_version` v1 baseline + v2 description edit on `customers` | **PASS** |
+| Rollback workflow | request → PENDING → approve → APPROVED → execute → EXECUTED; description restored; v3 appended | **PASS** |
+| Rollback authorization | Owner/admin role gate; approve/reject/execute each append `audit_event` | **PASS** |
+| Version/rollback UI | Signed-in Chromium, `customers` → Activity: 3 versions and the executed request rendered; zero console errors | **PASS** |
+| Offline version tests | `tests/test_asset_versions.py` (4 tests) inside the 848 | **PASS** |
+| OpenAPI | regenerated, 126 paths, drift 0 | **PASS** |
+| Freshness → incident → notification | stored 180-minute-old manual confirmation; evaluator produced STALE, one HIGH incident and one unread `FRESHNESS_BREACH` | **PASS (on demand)** |
+| UI claims audit | `python scripts/check_ui_claims.py` (16 paths) | **PASS** |
 
 ## 2. Authentication and tenancy
 
@@ -331,7 +344,7 @@ only chart, stewardship, evidence, lineage, app and removal scripts.
 | GitHub App import | Needs App credentials, installation, public callback |
 | OpenLineage ingest | Needs `KAIROS_OPENLINEAGE_WEBHOOK_SECRET` + workspace binding on the deployment |
 | Welcome / invitation email | Needs SMTP credentials and `KAIROS_PUBLIC_APP_URL` on Vercel |
-| Scheduler-driven freshness, incidents, notifications | No scheduler is deployed; signals are `manual` |
+| Scheduler-driven freshness, incidents, notifications | **Implemented 2026-11-26** — Supabase `pg_cron` calls the secret-protected runner every 15 minutes; deployment verification is recorded below. |
 | Hybrid vector search | No embeddings generated for this workspace |
 | Rotation of the password exposed before BUG-07 | Requires the Supabase dashboard; the repository code no longer contains it |
 
@@ -348,3 +361,27 @@ PLAYWRIGHT_BROWSERS_PATH=.pw-browsers node frontend/.demo-sweep.mjs   # local he
 
 All test rows created by this pass are retained deliberately (they are the demo
 dataset) and are listed by id in `KAIROS_DEMO_DATA_CATALOG.md` §8 for cleanup.
+
+## 10. Scheduled freshness completion (2026-11-26)
+
+- The freshness engine now has a shared manual/scheduled runner in
+  `backend/app/services/freshness_runner.py`. Scheduled evaluations persist
+  `evaluation_mode='SCHEDULED'`, use no human actor, and still create one
+  incident plus one notification on a new breach.
+- `POST /api/v1/internal/freshness/run` is protected by
+  `X-Kairos-Cron-Secret` and fails closed when `KAIROS_CRON_SECRET` is absent.
+- Supabase `pg_cron` runs the trigger every 15 minutes through `pg_net`; the
+  secret is stored in Supabase Vault, not in `cron.job`.
+- Setup and verification are documented in `docs/FRESHNESS_SCHEDULER.md`.
+- Verification: backend **862 passed / 83 skipped**, changed-file Ruff clean,
+  OpenAPI **127 paths**, and the live target query returned the expected due
+  hourly SLA.
+- Production deployment `data-lineage-engine-5i2x-o9uqr0oxl` is Ready and
+  aliased. The internal route returns **401** without or with a wrong secret
+  and **200** with the configured secret; the Vault-backed `pg_net` call also
+  returned **200**. The first automatic `pg_cron` run at **13:00 UTC** was
+  `succeeded` and stored an HTTP **200** response; the 12:51 scheduled
+  evaluation is stored with `evaluation_mode='SCHEDULED'`.
+- The configured SMTP path accepted a clearly labelled notification email to
+  the demo recipient (`smtp_accepted: true`), confirming notification delivery
+  credentials are live without printing the address or credentials.

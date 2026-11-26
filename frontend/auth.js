@@ -17,6 +17,10 @@
   let activeSession = null;
   let refreshTimer = null;
   let appStarted = false;
+  // Workspace ids are persisted across sign-ins. A different account on the same
+  // browser can inherit an id it does not belong to, so the first API request
+  // validates the saved id against that account's memberships before sending it.
+  let workspaceValidation = null;
 
   function showDashboardStartupError(message, details = '') {
     const main = document.getElementById('mainContent');
@@ -92,6 +96,7 @@
     return session;
   };
   const clearSession = () => {
+    workspaceValidation = null;
     localStorage.removeItem(sessionKey);
     sessionStorage.removeItem(sessionKey);
     // Browser-local profile values are user-specific; don't leave them visible
@@ -148,6 +153,24 @@
       catch (_) { clearSession(); location.replace('/'); }
     }, Math.min(delay, 2_147_000_000));
   }
+  async function resolveActiveWorkspace(session, originalFetch) {
+    let stored = '';
+    try { stored = localStorage.getItem('kairos_activeWorkspaceId') || ''; } catch (_) { stored = ''; }
+    if (!stored || !session?.access_token) return stored;
+    if (!workspaceValidation) {
+      workspaceValidation = originalFetch('/api/v1/me/workspaces', {
+        headers: { Accept: 'application/json', Authorization: `Bearer ${session.access_token}` },
+      }).then((response) => (response.ok ? response.json() : null))
+        .then((data) => new Set((Array.isArray(data?.workspaces) ? data.workspaces : []).map((row) => String(row.id))))
+        .catch(() => null);
+    }
+    const memberships = await workspaceValidation;
+    if (memberships && !memberships.has(stored)) {
+      try { localStorage.removeItem('kairos_activeWorkspaceId'); } catch (_) {}
+      return '';
+    }
+    return stored;
+  }
   function installApiAuthorization() {
     if (window.__kairosBearerFetch) return;
     const originalFetch = window.fetch.bind(window);
@@ -160,6 +183,14 @@
       }
       const headers = new Headers(init.headers || (input instanceof Request ? input.headers : undefined));
       if (session?.access_token) headers.set('Authorization', `Bearer ${session.access_token}`);
+      // The API scopes every catalog and governance read to this workspace. Without
+      // the header it falls back to the user's personal workspace, so switching
+      // workspaces in the UI would keep showing the previous workspace's data.
+      // The membership list itself stays unscoped, otherwise a stale id would hide it.
+      if (session?.access_token && !url.startsWith('/api/v1/me/workspaces')) {
+        const workspaceId = await resolveActiveWorkspace(session, originalFetch);
+        if (workspaceId) headers.set('x-kairos-workspace-id', workspaceId);
+      }
       const response = await originalFetch(input, { ...init, headers });
       if (response.status === 401 && session?.access_token) {
         clearSession();

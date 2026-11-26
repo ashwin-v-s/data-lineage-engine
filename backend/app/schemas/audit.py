@@ -2,10 +2,11 @@
 Audit Trail & Version History Schemas
 """
 
-from pydantic import BaseModel, Field
 from datetime import datetime
-from typing import Optional, Any
+from typing import Any, Optional
 from uuid import UUID
+
+from pydantic import BaseModel
 
 
 class AuditLogEntry(BaseModel):
@@ -78,8 +79,12 @@ class AuditEvent(BaseModel):
 
 
 class RollbackRequest(BaseModel):
-    """Request to rollback to previous version"""
-    asset_id: UUID
+    """Request to rollback to previous version.
+
+    The canonical asset id is the path parameter; ``asset_id`` is accepted for
+    older clients and must match it when supplied.
+    """
+    asset_id: Optional[UUID] = None
     from_version: int
     to_version: int
     rollback_reason: str

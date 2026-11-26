@@ -93,16 +93,16 @@ describe('dashboard shell contract', () => {
     // loadAssetCapabilities must be called during render, not just defined
     expect(appCode).toContain("loadAssetCapabilities(S.selected)");
     // The call must be gated by the asset_detail view and not a live view
-    expect(appCode).toContain("if(S.view==='asset_detail'&&!liveView)loadAssetCapabilities(S.selected)");
+    expect(appCode).toMatch(/if\(S\.view==='asset_detail'&&!liveView\)\{?loadAssetCapabilities\(S\.selected\)/);
   });
 });
 
 describe('provenance status in the dashboard script', () => {
-  it('starts as NOT CONNECTED until an authenticated catalog request succeeds', () => {
+  it('starts in live mode unless a bundled demo fixture was explicitly selected', () => {
     expect(app).toMatch(/catalogStatus:'loading'/);
     expect(appCode).toContain("localStorage.setItem('kairos_catalogStatus','loading')");
-    // No demo records may be loaded at boot; the catalog is the only source.
-    expect(appCode).toContain("S.dataMode='postgresql';localStorage.setItem('kairos_dataMode','postgresql')");
+    expect(appCode).toContain("requestedMode==='demo'&&window.kairosDemoFixtures?'demo':'postgresql'");
+    expect(appCode).toContain("if(S.dataMode==='demo')loadDemoPreview();else setDataMode('postgresql')");
   });
 
   it('labels loading, ready and error catalog states distinctly', () => {
@@ -133,9 +133,11 @@ describe('provenance status in the dashboard script', () => {
     expect(appCode).toContain("P[requestedView]||['catalog','assets'].includes(requestedView)");
   });
 
-  it('refuses to switch to demo data silently', () => {
+  it('labels demo data as a synthetic fixture instead of presenting it as live', () => {
     expect(appCode).toContain("button.dataset.modeSwitch==='postgresql'");
-    expect(appCode).toContain('Demo fixture mode is not available in this build');
+    expect(appCode).toContain('function loadDemoPreview()');
+    expect(appCode).toContain("S.dataMode='demo'");
+    expect(appCode).toContain("localStorage.setItem('kairos_dataMode','demo')");
     expect(appCode).toContain('function setDataMode(mode)');
   });
 });
@@ -170,6 +172,12 @@ describe('legacy runtime assets', () => {
   it('includes personalization assets in the build output', () => {
     expect(viteConfig).toContain("'personalization.js'");
     expect(viteConfig).toContain("'personalization.css'");
+  });
+
+  it('bundles the demo preview fixture before the dashboard shell loads', () => {
+    expect(read('index.html')).toContain('src="/demo-preview-data.js');
+    expect(viteConfig).toContain("'demo-preview-data.js'");
+    expect(appCode).toContain("A.splice(0,A.length,...(fixtures.assets||[]))");
   });
 
   it('keeps the ingestion link interception that serves the page through the authenticated fetch', () => {
@@ -229,6 +237,6 @@ describe('React provenance ownership and data-mode consumption', () => {
   });
 
   it('keeps the loadAssetCapabilities call intact in the render flow', () => {
-    expect(appCode).toContain("if(S.view==='asset_detail'&&!liveView)loadAssetCapabilities(S.selected)");
+    expect(appCode).toMatch(/if\(S\.view==='asset_detail'&&!liveView\)\{?loadAssetCapabilities\(S\.selected\)/);
   });
 });

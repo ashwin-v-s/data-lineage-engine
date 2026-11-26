@@ -1823,7 +1823,7 @@
           "audit"
         ],
         "summary": "Request Rollback",
-        "description": "Return an explicit unsupported response until approval/execution exists.",
+        "description": "Create a PENDING rollback request for approval and later execution.",
         "operationId": "request_rollback_api_v1_audit__asset_id__rollback_post",
         "security": [
           {
@@ -1852,11 +1852,233 @@
           }
         },
         "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RollbackResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/audit/{asset_id}/rollbacks": {
+      "get": {
+        "tags": [
+          "audit"
+        ],
+        "summary": "List Rollbacks",
+        "description": "List rollback requests for one asset, newest first.",
+        "operationId": "list_rollbacks_api_v1_audit__asset_id__rollbacks_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "asset_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Asset Id"
+            }
+          }
+        ],
+        "responses": {
           "200": {
             "description": "Successful Response",
             "content": {
               "application/json": {
                 "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/audit/{asset_id}/rollbacks/{rollback_id}/approve": {
+      "post": {
+        "tags": [
+          "audit"
+        ],
+        "summary": "Approve Rollback",
+        "description": "Approve a PENDING rollback; execution is a separate explicit action.",
+        "operationId": "approve_rollback_api_v1_audit__asset_id__rollbacks__rollback_id__approve_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "asset_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Asset Id"
+            }
+          },
+          {
+            "name": "rollback_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Rollback Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RollbackResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/audit/{asset_id}/rollbacks/{rollback_id}/reject": {
+      "post": {
+        "tags": [
+          "audit"
+        ],
+        "summary": "Reject Rollback",
+        "description": "Reject a PENDING or APPROVED rollback without changing asset metadata.",
+        "operationId": "reject_rollback_api_v1_audit__asset_id__rollbacks__rollback_id__reject_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "asset_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Asset Id"
+            }
+          },
+          {
+            "name": "rollback_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Rollback Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RollbackResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/audit/{asset_id}/rollbacks/{rollback_id}/execute": {
+      "post": {
+        "tags": [
+          "audit"
+        ],
+        "summary": "Execute Rollback",
+        "description": "Restore the selected snapshot's mutable metadata and append a new version.",
+        "operationId": "execute_rollback_api_v1_audit__asset_id__rollbacks__rollback_id__execute_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "asset_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Asset Id"
+            }
+          },
+          {
+            "name": "rollback_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Rollback Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RollbackResponse"
+                }
               }
             }
           },
@@ -4847,6 +5069,54 @@
             }
           }
         },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/internal/freshness/run": {
+      "post": {
+        "tags": [
+          "internal"
+        ],
+        "summary": "Run Freshness Schedule",
+        "description": "Run due scheduled freshness evaluations.\n\nThe caller is the database scheduler, not a browser. A missing secret\ndisables the route rather than making it public.",
+        "operationId": "run_freshness_schedule_api_v1_internal_freshness_run_post",
+        "parameters": [
+          {
+            "name": "x-kairos-cron-secret",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Kairos-Cron-Secret"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -9227,7 +9497,7 @@
           "email": {
             "type": "boolean",
             "title": "Email",
-            "default": false
+            "default": true
           }
         },
         "additionalProperties": false,
@@ -9383,8 +9653,15 @@
       "RollbackRequest": {
         "properties": {
           "asset_id": {
-            "type": "string",
-            "format": "uuid",
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Asset Id"
           },
           "from_version": {
@@ -9413,13 +9690,64 @@
         },
         "type": "object",
         "required": [
-          "asset_id",
           "from_version",
           "to_version",
           "rollback_reason"
         ],
         "title": "RollbackRequest",
-        "description": "Request to rollback to previous version"
+        "description": "Request to rollback to previous version.\n\nThe canonical asset id is the path parameter; ``asset_id`` is accepted for\nolder clients and must match it when supplied."
+      },
+      "RollbackResponse": {
+        "properties": {
+          "rollback_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Rollback Id"
+          },
+          "asset_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Asset Id"
+          },
+          "from_version": {
+            "type": "integer",
+            "title": "From Version"
+          },
+          "to_version": {
+            "type": "integer",
+            "title": "To Version"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "requested_by": {
+            "type": "string",
+            "title": "Requested By"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "rollback_id",
+          "asset_id",
+          "from_version",
+          "to_version",
+          "status",
+          "requested_by",
+          "created_at",
+          "message"
+        ],
+        "title": "RollbackResponse",
+        "description": "Response from rollback operation"
       },
       "SearchResponse": {
         "properties": {

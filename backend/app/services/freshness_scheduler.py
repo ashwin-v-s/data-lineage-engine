@@ -6,10 +6,12 @@ implementation is deliberately BLOCKED and never starts background work.
 """
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 from typing import Protocol
 
 SCHEDULER_STATUS = "BLOCKED"
+SCHEDULER_SCHEDULED = "SCHEDULED"
 SCHEDULER_BLOCK_REASON = "M2/M1 must approve a durable scheduler adapter before scheduled evaluations can run."
 
 
@@ -42,6 +44,17 @@ class BlockedFreshnessScheduler:
         raise RuntimeError(self.block_reason)
 
 
+def scheduled_runtime_enabled() -> bool:
+    """Whether this deployment has an approved scheduler running."""
+    return os.getenv("KAIROS_FRESHNESS_SCHEDULE_ENABLED", "").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+    }
+
+
 def scheduler_status(cadence: str) -> str:
     """Report schedule truth without implying a configured cadence is active."""
-    return "MANUAL" if cadence == "manual" else SCHEDULER_STATUS
+    if cadence == "manual":
+        return "MANUAL"
+    return SCHEDULER_SCHEDULED if scheduled_runtime_enabled() else SCHEDULER_STATUS

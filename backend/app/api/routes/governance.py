@@ -38,14 +38,14 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from backend.app.api.routes.membership import require_role
 from backend.app.auth import require_user
 from backend.app.db import get_conn
-from backend.app.services.freshness import (
-    evaluate_freshness,
-    incident_dedupe_key,
-    incident_severity_for_state,
-    next_incident_status,
-)
-from backend.app.services.freshness_evidence import last_successful_runtime_activity
+from backend.app.services.freshness import next_incident_status
+from backend.app.services.freshness_runner import evaluate_dataset_freshness
 from backend.app.services.freshness_scheduler import scheduler_status
+from backend.app.services.notification_delivery import (
+    NotificationMessage,
+    create_in_app_notification,
+    dispatch_notification_emails,
+)
 
 router = APIRouter(prefix="/governance", tags=["governance"], dependencies=[Depends(require_user)])
 
@@ -272,52 +272,6 @@ def list_freshness(user: dict = Depends(require_user)):
     return {"evaluations": evaluations, "counts": counts, "total": len(evaluations)}
 
 
-def _last_source_activity(cur, dataset_id: str, signal: str | None):
-    """Return authoritative freshness evidence, or None (UNKNOWN).
-
-    Ingestion time and lineage writes do not prove a successful source run.
-    Only a manual confirmation or a positive OpenLineage observation joined
-    to a canonical completed run is accepted.
-    """
-    if signal == "manual":
-        cur.execute("SELECT observed_at AS last_activity, NULL::uuid AS evidence_id, jsonb_build_object('kind','MANUAL_CONFIRMATION','confirmation_id',id::text,'confirmed_by',confirmed_by::text,'note',note,'recorded_at',created_at) AS evidence_ref FROM freshness_confirmation WHERE dataset_id=%s::uuid ORDER BY observed_at DESC LIMIT 1", (dataset_id,))
-        return cur.fetchone()
-    if signal != "openlineage_run":
-        # dbt run_results and source updated_at are not yet persisted by the
-        # M2/M3 contract in a source-verifiable form, so neither may imply stale.
-        return None
-    return last_successful_runtime_activity(cur, dataset_id)
-
-
-def _open_incident_id(cur, dedupe_key: str) -> str | None:
-    cur.execute(
-        """
-        SELECT id::text AS id FROM incident
-        WHERE dedupe_key = %s AND status <> 'RESOLVED'
-        ORDER BY opened_at DESC
-        LIMIT 1
-        """,
-        (dedupe_key,),
-    )
-    row = cur.fetchone()
-    return row["id"] if row else None
-
-
-def _workspace_owner_id(cur, dataset_id: str) -> str | None:
-    """Resolve a dataset owner only when its stored identifier is a workspace user UUID."""
-    cur.execute("SELECT owner_id FROM dataset WHERE id=%s::uuid", (dataset_id,))
-    row = cur.fetchone()
-    owner = str(row["owner_id"] or "") if row else ""
-    if not _UUID_RE.fullmatch(owner):
-        return None
-    cur.execute("SELECT to_regclass('public.workspace_member') AS relation")
-    if cur.fetchone()["relation"] is None:
-        return None
-    cur.execute("SELECT user_id::text FROM workspace_member WHERE user_id=%s::uuid AND status='active'", (owner,))
-    member = cur.fetchone()
-    return member["user_id"] if member else None
-
-
 @router.post("/datasets/{asset_id}/evaluate", dependencies=[Depends(require_role("owner", "admin", "editor"))])
 def evaluate_dataset(asset_id: uuid.UUID, user: dict = Depends(require_user)):
     """Run the freshness engine for one dataset and reconcile its incident."""
@@ -327,147 +281,28 @@ def evaluate_dataset(asset_id: uuid.UUID, user: dict = Depends(require_user)):
             dataset = _resolve_dataset(cur, str(asset_id))
             if not dataset:
                 raise HTTPException(status_code=404, detail=f"Asset '{asset_id}' not found.")
-            dataset_id = dataset["id"]
-
-            cur.execute(
-                """
-                SELECT id::text AS id, warn_after_minutes, error_after_minutes,
-                       stale_after_minutes, signal, paused
-                FROM   freshness_sla
-                WHERE  dataset_id = %s::uuid
-                LIMIT  1
-                """,
-                (dataset_id,),
-            )
-            sla = cur.fetchone()
-
-            signal = sla["signal"] if sla else None
-            activity = _last_source_activity(cur, dataset_id, signal)
-            last_activity = activity["last_activity"] if activity else None
-            evidence_id = str(activity["evidence_id"]) if activity and activity.get("evidence_id") else None
-            now = datetime.now(timezone.utc)
-            verdict = evaluate_freshness(
-                last_source_activity_at=last_activity,
-                now=now,
-                warn_after_minutes=sla["warn_after_minutes"] if sla else None,
-                error_after_minutes=sla["error_after_minutes"] if sla else None,
-                stale_after_minutes=sla["stale_after_minutes"] if sla else None,
-                paused=bool(sla and sla["paused"]),
+            run = evaluate_dataset_freshness(
+                cur,
+                dataset["id"],
+                actor_user_id=user["id"],
+                mode="MANUAL",
             )
 
-            cur.execute(
-                """
-                INSERT INTO freshness_evaluation
-                    (dataset_id, sla_id, state, age_minutes, threshold_minutes, reason,
-                     last_source_activity_at, evidence_id, evidence_ref, evaluation_mode, evaluated_at)
-                VALUES (%s::uuid, %s::uuid, %s, %s, %s, %s, %s, %s::uuid, %s, 'MANUAL', %s)
-                RETURNING id::text AS id
-                """,
-                (
-                    dataset_id,
-                    sla["id"] if sla else None,
-                    verdict.state,
-                    verdict.age_minutes,
-                    verdict.threshold_minutes,
-                    verdict.reason,
-                    last_activity,
-                    evidence_id,
-                    Json(activity.get("evidence_ref") if activity and activity.get("evidence_ref") else ({"kind": "EVIDENCE", "evidence_id": evidence_id} if evidence_id else {"kind": "UNAVAILABLE", "reason": "No supported evidence signal was found."})),
-                    now,
-                ),
-            )
-            evaluation_id = cur.fetchone()["id"]
-
-            detail = Json(
-                {
-                    "state": verdict.state,
-                    "reason": verdict.reason,
-                    "age_minutes": verdict.age_minutes,
-                    "threshold_minutes": verdict.threshold_minutes,
-                    "evaluation_id": evaluation_id,
-                    "evidence_id": evidence_id,
-                    "evidence_ref": activity.get("evidence_ref") if activity else None,
-                }
-            )
-
-            incident_action = "none"
-            incident_id: str | None = None
-
-            if verdict.state in ("LATE", "STALE"):
-                dedupe_key = incident_dedupe_key(dataset_id)
-                owner_user_id = _workspace_owner_id(cur, dataset_id)
-                cur.execute(
-                    """
-                    INSERT INTO incident
-                        (dataset_id, title, severity, status, dedupe_key, detail, assigned_user_id)
-                    VALUES (%s::uuid, %s, %s, 'DETECTED', %s, %s, %s::uuid)
-                    ON CONFLICT (workspace_id, dedupe_key)
-                        WHERE status <> 'RESOLVED' DO NOTHING
-                    RETURNING id::text AS id
-                    """,
-                    (
-                        dataset_id,
-                        f"{dataset['name']} is {verdict.state}",
-                        incident_severity_for_state(verdict.state),
-                        dedupe_key,
-                        detail,
-                        owner_user_id,
-                    ),
-                )
-                opened = cur.fetchone()
-                if opened:
-                    incident_id = opened["id"]
-                    incident_action = "created"
-                    cur.execute(
-                        """
-                        INSERT INTO incident_event
-                            (incident_id, event_type, actor_user_id, detail)
-                        VALUES (%s::uuid, 'DETECTED', %s::uuid, %s)
-                        """,
-                        (incident_id, user["id"], detail),
-                    )
-                else:
-                    incident_action = "existing"
-                    incident_id = _open_incident_id(cur, dedupe_key)
-            elif verdict.state in ("HEALTHY", "AT_RISK"):
-                dedupe_key = incident_dedupe_key(dataset_id)
-                open_id = _open_incident_id(cur, dedupe_key)
-                if open_id:
-                    incident_id = open_id
-                    incident_action = "resolved"
-                    cur.execute(
-                        """
-                        UPDATE incident
-                        SET    status = 'RESOLVED', resolved_at = now()
-                        WHERE  id = %s::uuid
-                        """,
-                        (incident_id,),
-                    )
-                    cur.execute(
-                        """
-                        INSERT INTO incident_event
-                            (incident_id, event_type, actor_user_id, detail)
-                        VALUES (%s::uuid, 'RESOLVED', %s::uuid, %s)
-                        """,
-                        (incident_id, user["id"], detail),
-                    )
-
-            # State snapshots and their source evidence share one transaction.
-            # Subscribers must refetch via the authorized API; no sensitive
-            # row is broadcast through Realtime.
-            if verdict.state in ("LATE", "STALE") and incident_action == "created":
-                if owner_user_id:
-                    _create_in_app_notification(cur, owner_user_id, "FRESHNESS_BREACH", f"{dataset['name']} is {verdict.state}", {"dataset_id": dataset_id, "incident_id": incident_id, "evaluation_id": evaluation_id}, f"/governance/freshness?asset={dataset_id}")
+    # State snapshots and their source evidence share one transaction.
+    # Subscribers must refetch via the authorized API; no sensitive row is
+    # broadcast through Realtime. Email is sent only after that commit.
+    if run.notification is not None:
+        dispatch_notification_emails([run.notification])
 
     return {
         "verdict": {
-            "state": verdict.state,
-            "age_minutes": verdict.age_minutes,
-            "threshold_minutes": verdict.threshold_minutes,
-            "reason": verdict.reason,
+            "state": run.verdict.state,
+            "age_minutes": run.verdict.age_minutes,
+            "threshold_minutes": run.verdict.threshold_minutes,
+            "reason": run.verdict.reason,
         },
-        "incident_action": incident_action,
-        "incident_id": incident_id,
+        "incident_action": run.incident_action,
+        "incident_id": run.incident_id,
     }
 
 
@@ -492,14 +327,7 @@ def confirm_freshness(asset_id: uuid.UUID, body: FreshnessConfirmation, user: di
 
 def _create_in_app_notification(cur, recipient_id, event_type, title, detail, action_path):
     """Best-effort schema guard; notification storage stays transaction-local."""
-    cur.execute("SELECT to_regclass('public.notification') AS relation")
-    if cur.fetchone()["relation"] is None:
-        return
-    cur.execute(
-        """INSERT INTO notification (recipient_user_id,event_type,title,detail,action_path)
-           VALUES (%s::uuid,%s,%s,%s,%s)""",
-        (recipient_id, event_type, title, Json(detail), action_path),
-    )
+    return create_in_app_notification(cur, recipient_id, event_type, title, detail, action_path)
 
 
 @router.get("/incidents")
@@ -669,6 +497,7 @@ def comment_on_incident(incident_id: uuid.UUID, body: IncidentComment, user: dic
 
 @router.post("/incidents/{incident_id}/assign", dependencies=[Depends(require_role("owner", "admin"))])
 def assign_incident(incident_id: uuid.UUID, body: IncidentAssignment, user: dict = Depends(require_user)):
+    notification: NotificationMessage | None = None
     with get_conn() as conn:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
             _require_governance(cur, "incident", "incident_event", "workspace_member")
@@ -679,5 +508,7 @@ def assign_incident(incident_id: uuid.UUID, body: IncidentAssignment, user: dict
             if not cur.fetchone():
                 raise HTTPException(status_code=404, detail="Incident not found")
             cur.execute("INSERT INTO incident_event(incident_id,event_type,actor_user_id,detail) VALUES (%s::uuid,'COMMENTED',%s::uuid,%s)", (str(incident_id),user["id"],Json({"assignment": "changed", "assigned_user_id": str(body.user_id)})))
-            _create_in_app_notification(cur, str(body.user_id), "INCIDENT_CREATED", "Incident assigned to you", {"incident_id": str(incident_id)}, f"/governance/incidents/{incident_id}")
+            notification = _create_in_app_notification(cur, str(body.user_id), "INCIDENT_CREATED", "Incident assigned to you", {"incident_id": str(incident_id)}, f"/?view=incidents&id={incident_id}")
+    if notification is not None:
+        dispatch_notification_emails([notification])
     return {"ok": True, "assigned_user_id": str(body.user_id)}
