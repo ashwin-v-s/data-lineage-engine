@@ -287,8 +287,12 @@ project on 2026-11-26:
   recorded open incremented engagement `None → 1`. Temporary rows were removed
   and the counter restored.
 
-Not verified: the hosted deployment does not include this code yet, and the new
-Trust Center has not been rendered in a browser. See `docs/TRUST_CENTER.md` §6.
+Verified: the hosted deployment now includes this code. Commit `b783e96` was
+deployed to Vercel production (`https://data-lineage-engine-5i2x.vercel.app`) and
+the Trust Center was rendered in a browser (Trust center heading, Overview /
+Certifications / Discussions tabs, metric cards, quality scorecard, most-opened
+assets, and the PII `Propagate from lineage` button all present; zero console
+errors and zero failing API calls). See `docs/TRUST_CENTER.md` §6.
 
 ---
 

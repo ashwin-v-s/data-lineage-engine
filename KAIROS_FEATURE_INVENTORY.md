@@ -116,7 +116,7 @@ Status vocabulary used below:
 | Webhooks + deliveries | `/api/v1/webhooks` | **Verified (demo delivery)** | 1 endpoint subscribed to all 7 events; signed `test.ping` delivered HTTP 200 in 26 ms and recorded in history; private/rebound hosts refused (BUG-05) |
 | Profile / preferences | `?view=settings`, `/api/v1/me/welcome-email` | **Verified** | Name from Supabase metadata; avatar/preferences browser-local |
 | Usage / popularity | `asset_engagement` ← explicit asset opens → `?view=trust` | **Verified (live API)** | Workspace-level open counter with no user identity; live `None → 1` increment, then the test counter was restored. It measures recorded opens, not warehouse query frequency |
-| Trust center | `?view=trust` (`TrustView.jsx`) | **Partial** | Overview, certification register and discussion pane built against the live-verified APIs; the deployed site does not include this build yet, so browser rendering is unchecked |
+| Trust center | `?view=trust` (`TrustView.jsx`) | **Verified (deployed)** | Commit `b783e96` shipped to Vercel production (`https://data-lineage-engine-5i2x.vercel.app`); browser render confirmed (Trust center heading, Overview/Certifications/Discussions tabs, metric cards, quality scorecard, most-opened assets, PII `Propagate from lineage`); zero console errors and zero failing API calls |
 | REA insight endpoints | `/api/v1/rea/*` | **Partial** | Static recommendation/pattern catalog, not workspace data |
 
 ## 8. Deliberate placeholders (honest, not bugs)

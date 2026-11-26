@@ -1,10 +1,12 @@
 # Trust Center: certification, discussion, usage and quality
 
-**Status:** implemented and applied 2026-11-26. Migration
+**Status:** implemented, applied and deployed 2026-11-26. Migration
 `0019_trust_collaboration.sql` is applied to the shared Supabase project and was
 verified with `verify_applied.py` and `verify_rls.py`. The API was exercised
-against that database (see §6). This build is **not deployed**, so the hosted
-site does not serve the Trust Center yet.
+against that database (see §6). The build shipped as commit `b783e96` to Vercel
+production (`https://data-lineage-engine-5i2x.vercel.app`) and the Trust Center
+was rendered in a browser there: `Trust center` heading and `Propagate from
+lineage` button present, zero console errors and zero failing API calls.
 
 ---
 
@@ -164,5 +166,12 @@ which produced `PII_INHERITED` / `POSSIBLE` with the exact lineage edge id.
 Both the temporary seed and the inherited row were removed afterwards, and the
 workspace's usage counter was restored.
 
-What these do **not** prove: that the deployed site renders the new view. That
-requires an explicit deploy and a browser check.
+Deployed verification (2026-11-26): commit `b783e96` was pushed to `main` and
+deployed to Vercel production (`https://data-lineage-engine-5i2x.vercel.app`). A
+Playwright browser check signed in with the demo account and rendered both
+`/?view=trust` and `/?view=pii`: the `Trust center` heading, the Overview /
+Certifications / Discussions tabs, the four metric cards, the quality scorecard
+and most-opened-assets sections, and the `Propagate from lineage` button all
+appeared. Zero console errors and zero API responses >= 400 were recorded;
+`/api/v1/trust/overview` and `/api/v1/quality/scorecard` correctly returned
+401 without a session.
